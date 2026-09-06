@@ -59,8 +59,23 @@ Nothing. Public GitHub files.
 
 ## Phase 2 — deploy
 
-### VPS (Hetzner)
-1. `https://console.hetzner.cloud` → new project → Add server. Location: Ashburn (US East). Image: Ubuntu 24.04. Type: smallest shared x86 (CX-series; avoid ARM to keep Docker images simple). Add your SSH public key. Firewall: allow inbound 22 only. Nothing else needs to be open; the tunnel is outbound.
+### Where to run it (pick one)
+
+Everything runs in one container: API, scheduler, and the built frontend. State is the `/data` volume (SQLite + key file). `cloudflared` is the only other process. Needs ~250 MB RAM, negligible CPU, under 1 GB disk, and a few MB of egress a day. Nothing needs an open inbound port. Moving between boxes = `docker compose up` on the new one and copying the `data/` directory.
+
+| Option | Cost | Notes |
+|---|---|---|
+| **Google Cloud e2-micro (Always Free)** | $0 | 1 GB RAM, 30 GB disk, 1 GB egress/month, only in `us-east1` / `us-central1` / `us-west1`. Needs a card on file. Add 1 GB swap. The best free option for this workload. |
+| **GitHub Student Pack → DigitalOcean credit** | $0 for a year, then ~$6/mo | Simplest UI. 1 GB droplet in NYC. |
+| **A friend's always-on box** | $0 | Tunnel makes this trivial: Docker + outbound internet is all it needs. Ask for a user account with Docker access. |
+| **Oracle Cloud Always Free ARM** | $0 | 2 OCPU / 12 GB as of mid-2026, far more than needed. Signup is flaky and idle instances get reclaimed unless you upgrade to pay-as-you-go (still free within limits). Build the image on the box (arm64). |
+| **Hetzner Cloud, EU location** | ~€4–5/mo | US locations tripled in price in 2026; Falkenstein/Helsinki CX plans are still cheap. Extra ~100 ms latency is irrelevant behind Cloudflare for one user. |
+| **Railway / Fly.io** | ~$5/mo | Dockerfile + volume both work; no free tier any more. |
+| **Your Mac** | $0 | Works through the tunnel whenever the lid is open; ingesters miss runs while asleep. Fine as a stopgap. |
+| **Cloudflare Workers + D1** | $0–5/mo | Would need a port: Node-only pieces (googleapis, pino, cookie jar, scheduler) replaced, and the free tier's daily D1 write cap is smaller than one hourly job sync. Not worth it until something else forces a rewrite. |
+
+### VPS (Hetzner or any Ubuntu box)
+1. Any Ubuntu 24.04 box works. Hetzner: `https://console.hetzner.cloud` → new project → Add server, a Falkenstein/Helsinki CX plan is the cheap one. Google Cloud: Compute Engine → Create instance → e2-micro in `us-east1`, Ubuntu 24.04, 30 GB standard disk, then `sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` and add it to `/etc/fstab`. Either way: add your SSH key, firewall inbound 22 only. Nothing else needs to be open; the tunnel is outbound.
 2. SSH in. Install Docker: `curl -fsSL https://get.docker.com | sh`, then `usermod -aG docker $USER`.
 3. Layout for multiple projects on one box:
    ```
