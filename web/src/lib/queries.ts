@@ -332,6 +332,14 @@ export function useQuickAddTask() {
   });
 }
 
+export function useMarkJobsSeen() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (ids: string[]) => api('/jobs/seen', { method: 'PATCH', json: { ids } }),
+    onSettled: () => inv(qk.jobStats),
+  });
+}
+
 export function usePatchJobState() {
   const inv = useInvalidate();
   return useMutation({

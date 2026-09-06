@@ -4,9 +4,9 @@ import type { TitleContext } from './types';
 import { CalendarWidget } from './calendar/CalendarWidget';
 import { ClassWidget } from './class/ClassWidget';
 import { ClassesWidget } from './classes/ClassesWidget';
+import { JobsWidget } from './jobs/JobsWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
 import { TodoWidget } from './todo/TodoWidget';
-import { makeStub } from './stubs';
 import type { WidgetDef } from './types';
 
 /**
@@ -82,12 +82,12 @@ export const WIDGETS: WidgetDef[] = [
     icon: Briefcase,
     requires: ['jobs'],
     presets: [
-      { label: 'Tape', w: 8, h: 3 },
+      { label: 'Tape', w: 8, h: 4 },
+      { label: 'Grid', w: 8, h: 7 },
       { label: 'List', w: 4, h: 8 },
     ],
-    min: { w: 3, h: 2 },
-    Component: makeStub('Job feed widget arrives in M7. The ingester is already running; see Settings → Jobs.'),
-    comingSoon: 'M7',
+    min: { w: 3, h: 3 },
+    Component: JobsWidget,
   },
   {
     type: 'sources',
