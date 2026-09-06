@@ -121,3 +121,21 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* react-grid-layout: theme the drag placeholder and resize handle instead of the library's red box. */
+.react-grid-item.react-grid-placeholder {
+  background: color-mix(in oklch, var(--primary) 18%, transparent) !important;
+  opacity: 1 !important;
+  border-radius: var(--radius-lg);
+  transition-duration: 100ms;
+}
+.react-grid-item > .react-resizable-handle {
+  opacity: 0.55;
+}
+.react-grid-item > .react-resizable-handle::after {
+  border-color: var(--muted-foreground) !important;
+}
+.react-grid-item.react-draggable-dragging {
+  z-index: 30;
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.4);
+}

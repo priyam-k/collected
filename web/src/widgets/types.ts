@@ -1,0 +1,35 @@
+import type { ComponentType } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import type { SourceId, WidgetInstance } from '@collected/shared';
+import type { WidgetSize } from '@/dashboard/useWidgetSize';
+
+export interface WidgetPreset {
+  label: string;
+  w: number;
+  h: number;
+}
+
+export interface WidgetProps<C = Record<string, unknown>> {
+  instance: WidgetInstance & { config: C };
+  size: WidgetSize;
+  editMode: boolean;
+}
+
+export interface WidgetDef<C = Record<string, unknown>> {
+  type: string;
+  name: string;
+  description: string;
+  icon: LucideIcon;
+  /** Sources that must be connected for the widget to be useful. Otherwise a placeholder renders. */
+  requires: SourceId[];
+  presets: WidgetPreset[];
+  min: { w: number; h: number };
+  max?: { w: number; h: number };
+  /** One instance per course, etc. */
+  multiInstance?: boolean;
+  /** Title shown in the frame; can depend on config (e.g. course code). */
+  title?: (instance: WidgetInstance & { config: C }) => string;
+  Component: ComponentType<WidgetProps<C>>;
+  /** Milestone marker for stubs; hides "coming soon" once implemented. */
+  comingSoon?: string;
+}

@@ -36,6 +36,8 @@ export type CourseInput = z.infer<typeof courseInputSchema>;
 export const jobsFilterSchema = z.object({
   require_active: z.boolean().default(true),
   require_visible: z.boolean().default(true),
+  categories_include: z.array(z.string()).default([]),
+  terms_include: z.array(z.string()).default([]),
   title_include: z.string().default(''),
   title_exclude: z.string().default(''),
   locations_include: z.string().default(''),

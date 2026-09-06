@@ -22,7 +22,10 @@ export async function seed(ctx: AppContext): Promise<void> {
   }
 
   const [{ n }] = (await db.select({ n: count() }).from(courses)) as [{ n: number }];
-  if (n > 0) return;
+  if (n > 0) {
+    await ensureSettingDefaults(ctx);
+    return;
+  }
 
   const seedPath = env.SEED_CONFIG_PATH
     ? path.resolve(env.rootDir, 'server', env.SEED_CONFIG_PATH)
@@ -94,6 +97,19 @@ export async function seed(ctx: AppContext): Promise<void> {
 
   await ensureCoreWidgets(ctx, courseIds);
   log.info({ courses: courseIds.length, file }, 'seeded from seed-config.json');
+}
+
+/** Fills in settings keys that were added after this database was first seeded. Never overwrites existing values. */
+async function ensureSettingDefaults(ctx: AppContext): Promise<void> {
+  const defaults: Record<string, unknown> = {
+    'jobs.filter': jobsFilterSchema.parse({}),
+    'todoist.push': todoistPushConfigSchema.parse({}),
+    'todo.sections': ['homework'],
+    timezone: ctx.env.TZ ?? 'America/New_York',
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    await ctx.db.insert(settings).values({ key, value }).onConflictDoNothing();
+  }
 }
 
 async function ensureCoreWidgets(ctx: AppContext, courseIds: string[]): Promise<void> {

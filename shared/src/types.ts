@@ -139,8 +139,10 @@ export interface Job {
   terms: string[];
   sponsorship: string | null;
   degrees: string[];
+  category: string | null;
   postedAt: string | null;
   active: boolean;
+  visible: boolean;
   matchesFilter: boolean;
   score: number | null;
   firstSeenAt: string;
@@ -175,11 +177,20 @@ export type Layouts = Partial<Record<Breakpoint, LayoutItem[]>>;
 export interface JobsFilter {
   require_active: boolean;
   require_visible: boolean;
+  /** Simplify `category` values that pass (empty = any). */
+  categories_include: string[];
+  /** Simplify `terms` values that pass, e.g. "Summer 2027" (empty = any). */
+  terms_include: string[];
   title_include: string;
   title_exclude: string;
   locations_include: string;
   locations_exclude: string;
   sponsorship: 'ignore' | 'require_none_needed';
+}
+
+export interface JobsSource {
+  id: string;
+  url: string;
 }
 
 export interface TodoistPushConfig {

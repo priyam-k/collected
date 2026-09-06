@@ -1,12 +1,12 @@
 # Progress
 
-Last updated: 2026-09-06. Status: M1 skeleton done; building M2.
+Last updated: 2026-09-06. Status: M1–M2 done (grid, edit mode, settings, jobs ingester); building M3 Canvas.
 
 ## Milestones
 
 - [x] **M0 — Design.** DESIGN, DECISIONS, SETUP, seed-config written.
 - [x] **M1 — Skeleton.** pnpm workspaces (server, web, shared). Hono boots, runs Drizzle migrations, serves `/api/health` and the built SPA. Vite dev proxy. Cloudflare Access middleware with `AUTH_DISABLED` bypass. Dockerfile + compose. `.env.example`.
-- [ ] **M2 — Dashboard shell.** Grid with edit mode, registry, layout persistence per breakpoint, `useWidgetSize` hook + container queries, add/hide tray. Sources widget (reads `sources`). Settings page shell with JSON export/import.
+- [x] **M2 — Dashboard shell.** Grid with edit mode, registry, layout persistence per breakpoint, `useWidgetSize` hook + container queries, add/hide tray. Sources widget (reads `sources`). Settings page shell with JSON export/import.
 - [ ] **M3 — Canvas.** Cookie-jar ingester (planner items, courses, assignments, announcements), iCal fallback, `needs_auth` handling. Courses seeded from `seed-config.json`. Class widget (multi-instance). Local cookie helper.
 - [ ] **M4 — Gradescope.** Scraper (student + TA courses), per-course `submits_via` dedup + fuzzy linking, manual link UI in settings.
 - [ ] **M5 — Google Calendar.** OAuth connect flow, incremental sync, calendar widget with all tiers, quick-add event write-through.
@@ -25,6 +25,10 @@ Last updated: 2026-09-06. Status: M1 skeleton done; building M2.
 - Applications tracker widget.
 - Piazza / Ed unanswered-posts feed for the 330 TA role.
 - TerpLink events.
+
+## Environment notes
+
+- Docker Desktop on the Mac cannot pull images (Docker Hub requests hang inside the Docker VM; the host reaches Docker Hub fine). The Dockerfile is written but untested until Docker Desktop networking is fixed (try restarting Docker Desktop, or Settings → Resources → Network). The VPS build in M9 does not depend on this.
 
 ## Open questions
 
