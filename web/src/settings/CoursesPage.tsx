@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useCourses, useDeleteCourse, useSaveCourse } from '@/lib/queries';
+import { useCourseLinks, useCourses, useDeleteCourse, useLinkItems, useSaveCourse } from '@/lib/queries';
+import { friendlyDate } from '@/lib/time';
 import { Field, PageTitle } from './ui';
 
 type Draft = Omit<CourseInput, 'links' | 'schedule'> & { id?: string; links: CourseLink[]; scheduleText: string };
@@ -210,6 +211,11 @@ export function CoursesPage() {
                   <Textarea rows={2} value={draft.notes ?? ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
                 </Field>
               </div>
+              {draft.id && (
+                <div className="sm:col-span-2">
+                  <LinkedAssignments courseId={draft.id} />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -218,6 +224,54 @@ export function CoursesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+
+/** Canvas ↔ Gradescope pairs for one course: auto links can be broken, unlinked rows can be paired by hand. */
+function LinkedAssignments({ courseId }: { courseId: string }) {
+  const q = useCourseLinks(courseId);
+  const link = useLinkItems();
+  const [pick, setPick] = useState<{ a: string; b: string }>({ a: '', b: '' });
+  if (q.isPending) return <p className="text-xs text-muted-foreground">Loading assignments…</p>;
+  if (q.isError || !q.data) return null;
+  const { canvas, gradescope, links } = q.data;
+  if (!canvas.length && !gradescope.length) return <p className="text-xs text-muted-foreground">No Canvas or Gradescope assignments synced for this course yet.</p>;
+  const title = (id: string) => [...canvas, ...gradescope].find((x) => x.id === id)?.title ?? id;
+  const linkedIds = new Set(links.flatMap((l) => [l.a, l.b]));
+  const freeCanvas = canvas.filter((x) => !linkedIds.has(x.id));
+  const freeGs = gradescope.filter((x) => !linkedIds.has(x.id));
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="text-sm font-medium">Linked assignments</div>
+      <p className="text-xs text-muted-foreground">Pairs count as one item; done on either side marks both done. Auto pairs come from title and due-date similarity.</p>
+      {links.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {links.map((l) => (
+            <li key={l.a + l.b} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate">{title(l.a)}</span>
+              <span className="text-muted-foreground">↔</span>
+              <span className="min-w-0 flex-1 truncate">{title(l.b)}</span>
+              <span className="text-xs text-muted-foreground">{l.method}{l.confidence != null ? ` ${Math.round(l.confidence * 100)}%` : ''}</span>
+              <Button size="xs" variant="ghost" onClick={() => link.mutate({ a: l.a, b: l.b, unlink: true })}>Unlink</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {freeCanvas.length > 0 && freeGs.length > 0 && (
+        <div className="flex flex-wrap items-end gap-2 text-sm">
+          <select className="h-8 min-w-40 flex-1 rounded-md border bg-background px-2 text-sm" value={pick.a} onChange={(e) => setPick({ ...pick, a: e.target.value })}>
+            <option value="">Canvas assignment…</option>
+            {freeCanvas.map((x) => <option key={x.id} value={x.id}>{x.title}{x.dueAt ? ` · ${friendlyDate(x.dueAt)}` : ''}</option>)}
+          </select>
+          <select className="h-8 min-w-40 flex-1 rounded-md border bg-background px-2 text-sm" value={pick.b} onChange={(e) => setPick({ ...pick, b: e.target.value })}>
+            <option value="">Gradescope assignment…</option>
+            {freeGs.map((x) => <option key={x.id} value={x.id}>{x.title}{x.dueAt ? ` · ${friendlyDate(x.dueAt)}` : ''}</option>)}
+          </select>
+          <Button size="sm" variant="secondary" disabled={!pick.a || !pick.b || link.isPending} onClick={() => { link.mutate({ a: pick.a, b: pick.b }); setPick({ a: '', b: '' }); }}>Link</Button>
+        </div>
+      )}
     </div>
   );
 }

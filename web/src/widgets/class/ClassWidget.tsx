@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { FileText, Megaphone } from 'lucide-react';
+import { ClipboardCheck, FileText, Megaphone } from 'lucide-react';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { EmptyState } from '@/widgets/Placeholder';
@@ -17,7 +17,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
   const coursesQ = useCourses();
   const course = coursesQ.data?.find((c) => c.id === courseId);
   const win = useMemo(() => windowFromNow(14), []);
-  const upcoming = useItems({ kind: ['assignment'], course: courseId, from: win.from, to: win.to, limit: 50 }, !!courseId);
+  const upcoming = useItems({ kind: ['assignment'], course: courseId, from: win.from, to: win.to, limit: 50, includeInformational: true }, !!courseId);
   const announcements = useItems({ kind: ['announcement'], course: courseId, limit: 5 }, !!courseId && size.tier !== 'xs' && size.tier !== 'sm');
   const content = useCourseContent(courseId);
 
@@ -32,6 +32,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
 
   const meeting = nextMeeting(course.schedule);
   const files = (content.data ?? []).filter((r) => r.kind === 'file').slice(0, 5);
+  const grading = (content.data ?? []).filter((r) => r.kind === 'grading');
   const syllabus = (content.data ?? []).find((r) => r.kind === 'syllabus');
   const isTa = course.role === 'ta';
   const showAnnouncements = size.tier !== 'xs' && size.tier !== 'sm';
@@ -61,6 +62,29 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
           <p className="text-xs text-muted-foreground">Nothing due in the next two weeks.</p>
         )}
       </section>
+
+      {isTa && grading.length > 0 && (
+        <section>
+          <h4 className="mb-0.5 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <ClipboardCheck className="size-3" /> Grading
+          </h4>
+          <ul className="space-y-1">
+            {grading.map((g) => {
+              const raw = g.raw as { gradingProgress?: number; submissions?: number; dueAt?: string | null; openRegradeRequests?: number; published?: boolean };
+              const pct = Math.round(raw.gradingProgress ?? 0);
+              return (
+                <li key={g.id} className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <a href={g.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">{g.title}</a>
+                    <span className="text-xs text-muted-foreground">{raw.submissions ?? 0} subs · {pct}% graded{raw.openRegradeRequests ? ` · ${raw.openRegradeRequests} regrades` : ''}{raw.published ? '' : ' · unpublished'}</span>
+                  </div>
+                  <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-muted"><div className="h-full rounded bg-primary/70" style={{ width: `${pct}%` }} /></div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {showAnnouncements && announcements.data && announcements.data.length > 0 && (
         <section>

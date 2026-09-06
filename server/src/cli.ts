@@ -12,7 +12,8 @@ function usage(): never {
   cli sync <source|all>    run an ingester now, ignoring the enabled flag
   cli export               print config export JSON
   cli import <file>        import config JSON (courses, settings, widgets, layouts)
-  cli demo canvas          load the Canvas fixtures into this database (UI development without a session)`);
+  cli demo <canvas|gradescope>  load fixtures into this database (UI development without a session)
+  cli dedup                re-run Canvas/Gradescope assignment linking`);
   process.exit(cmd ? 1 : 0);
 }
 
@@ -43,11 +44,22 @@ switch (cmd) {
     console.log(JSON.stringify(await buildExport(ctx), null, 2));
     break;
   case 'demo': {
-    if (rest[0] !== 'canvas') usage();
-    const { fixtureCanvasClient } = await import('./ingest/canvas/fixture-client.js');
-    const { syncCanvas } = await import('./ingest/canvas/ingest.js');
-    const counts = await syncCanvas(ctx, fixtureCanvasClient());
-    console.log(JSON.stringify(counts));
+    if (rest[0] === 'canvas') {
+      const { fixtureCanvasClient } = await import('./ingest/canvas/fixture-client.js');
+      const { syncCanvas } = await import('./ingest/canvas/ingest.js');
+      console.log(JSON.stringify(await syncCanvas(ctx, fixtureCanvasClient())));
+    } else if (rest[0] === 'gradescope') {
+      const { fixtureGradescopeClient } = await import('./ingest/gradescope/fixture-client.js');
+      const { syncGradescope } = await import('./ingest/gradescope/ingest.js');
+      console.log(JSON.stringify(await syncGradescope(ctx, fixtureGradescopeClient())));
+    } else usage();
+    const { runDedup } = await import('./sync/dedup.js');
+    console.log(JSON.stringify({ dedup: await runDedup(ctx) }));
+    break;
+  }
+  case 'dedup': {
+    const { runDedup } = await import('./sync/dedup.js');
+    console.log(JSON.stringify(await runDedup(ctx)));
     break;
   }
   case 'import': {

@@ -22,6 +22,8 @@ export function itemsRoutes(ctx: AppContext) {
       courseId: q.course,
       includeDone: q.includeDone === '1' || q.includeDone === 'true',
       includeHidden: q.includeHidden === '1' || q.includeHidden === 'true',
+      includeInformational: q.includeInformational === '1' || q.includeInformational === 'true',
+      noCollapse: q.noCollapse === '1',
       limit: q.limit ? Number(q.limit) : undefined,
     });
     return c.json(rows);

@@ -74,3 +74,30 @@ Why: a VPS is the same box with power, network, and hardware handled for you. A 
 ## 015 — Commit conventions (2026-09-06)
 
 Plain commit messages. No Co-Authored-By or session trailers. Commit at meaningful steps (a working milestone, a completed ingester, a schema change), not per file.
+
+## 016 — libsql instead of better-sqlite3; tsup bundle for the server (2026-09-06)
+
+`@libsql/client` over a `file:` URL with Drizzle's libsql driver. Server bundled with tsup (shared package inlined, node_modules external), deployed with `pnpm deploy --prod`.
+Why: libsql ships N-API prebuilds that work on any Node version (the Mac runs Node 25; Docker runs Node 24); better-sqlite3 needs per-version binaries. tsup avoids emitting TypeScript from a workspace package at runtime.
+
+## 017 — Jobs ingester built first, as the pipeline proof (2026-09-06)
+
+It needs no credentials, so it exercised runner → status → sources widget on day one. The `category` and `terms` fields in Simplify's JSON became filter dimensions after the first real pull showed the repo carries every past season.
+
+## 018 — Canvas cookie helper is Python (2026-09-06)
+
+`local/canvas_cookie.py` uses browser-cookie3 to read Chrome's Keychain-encrypted cookie store. Hand-rolling that decryption in TypeScript is the error-prone path; the helper is a 60-line script that only runs on the Mac.
+
+## 019 — TA-course rows are informational (2026-09-06)
+
+Assignments from courses where the role is TA (Canvas TaEnrollment / Gradescope instructor list) are stored with `raw.ta=true`, never `missing`, excluded from todo/calendar and from the Todoist push, shown in the class widget with the grading queue.
+Why: Canvas returns an empty submission for a TA, which would otherwise read as "you have homework due".
+
+## 020 — Linked pairs collapse to one row (2026-09-06)
+
+When a Canvas and a Gradescope assignment are linked, the items API returns only the preferred side (`submits_via=gradescope` → Gradescope row, otherwise Canvas row) with `linkedIds` pointing at the other; done is true if either side is done. `submits_via=canvas` never links and marks Gradescope rows informational.
+Why: widgets should never show the same homework twice; the preferred side is the one whose status is trustworthy for that course.
+
+## 021 — Gradescope instructor pages are read from embedded React props (2026-09-06)
+
+The instructor assignments table is React-rendered, but its data is embedded server-side as JSON in `data-react-props` on the mount point, so plain HTTP still works. Student pages remain server-rendered tables.

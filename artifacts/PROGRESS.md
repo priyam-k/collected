@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-06. Status: M1–M3 done (grid, settings, jobs, Canvas + iCal fallback, class widgets); building M4 Gradescope.
+Last updated: 2026-09-06. Status: M1–M4 done (grid, settings, jobs, Canvas, Gradescope, dedup); building M5 Google Calendar.
 
 ## Milestones
 
@@ -20,7 +20,8 @@ Last updated: 2026-09-06. Status: M1–M3 done (grid, settings, jobs, Canvas + i
 
 - [ ] Canvas: run `local/canvas_cookie.py` (see local/README.md) or paste the cookie in Settings → Sources, then `pnpm sync canvas`. Confirm the six courses get Canvas ids (Settings → Courses) and CMSC330 shows as TA with no homework rows.
 - [ ] Canvas iCal: paste your personal feed URL (Canvas → Calendar → Calendar Feed) as the fallback.
-- [ ] Try `pnpm cli demo canvas` any time you want fixture data in a fresh database.
+- [ ] Gradescope: enter the native email + password in Settings → Sources, then `pnpm sync gradescope`. Confirm CMSC330 shows the grading queue and CMSC422/MATH423 get Gradescope ids. Then set `submits_via` per course (Settings → Courses) and check the linked-assignments list.
+- [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` any time you want fixture data in a fresh database.
 
 ## Later
 

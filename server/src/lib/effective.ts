@@ -13,6 +13,10 @@ export interface ItemQuery {
   includeDone?: boolean;
   includeHidden?: boolean;
   includeDeleted?: boolean;
+  /** Include TA-course rows and Gradescope rows in canvas-only courses (class widgets want them). */
+  includeInformational?: boolean;
+  /** Return both sides of a Canvas↔Gradescope link instead of the preferred one. */
+  noCollapse?: boolean;
   limit?: number;
 }
 
@@ -44,7 +48,7 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
     ctx.db.select().from(overrides).where(inArray(overrides.itemId, ids)),
     ctx.db.select().from(itemLinks).where(or(inArray(itemLinks.aItemId, ids), inArray(itemLinks.bItemId, ids))!),
     ctx.db.select().from(todoistMap).where(inArray(todoistMap.itemId, ids)),
-    ctx.db.select({ id: courses.id, code: courses.code, color: courses.color, role: courses.role }).from(courses),
+    ctx.db.select({ id: courses.id, code: courses.code, color: courses.color, role: courses.role, submitsVia: courses.submitsVia }).from(courses),
     ctx.db.select({ id: sources.id, status: sources.status, lastSuccessAt: sources.lastSuccessAt }).from(sources),
   ]);
 
@@ -88,12 +92,22 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
   // and show none at all while the cookie source is healthy.
   const canvasExternalIds = new Set(rows.filter((r) => r.source === 'canvas').map((r) => r.externalId));
 
+  /** Which side of a linked pair represents it, per the course's submits_via. */
+  const preferredSource = (submitsVia: string | undefined): 'canvas' | 'gradescope' => (submitsVia === 'gradescope' ? 'gradescope' : 'canvas');
+
   const out: EffectiveItem[] = [];
   for (const r of rows) {
     if (r.source === 'canvas_ical' && (canvasHealthy || canvasExternalIds.has(r.externalId))) continue;
     if (r.source === 'todoist' && (r.raw as { mirror?: boolean }).mirror) continue;
+    const c = r.courseId ? courseById.get(r.courseId) : undefined;
     const ov = ovById.get(r.id) ?? null;
     const linkedIds = linkedOf.get(r.id) ?? [];
+    if (!q.noCollapse && linkedIds.length) {
+      // Collapse: only the preferred source's row survives when its partner is present.
+      const pref = preferredSource(c?.submitsVia);
+      const partnerPresent = linkedIds.some((id) => rowById.get(id)?.source === pref);
+      if (r.source !== pref && partnerPresent) continue;
+    }
     const linkedDone = linkedIds.some((id) => {
       const p = rowById.get(id);
       return p ? selfDone(p) : false;
@@ -101,13 +115,15 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
     const effectiveDone = selfDone(r) || linkedDone;
     const snoozed = !!ov?.snoozedUntil && new Date(ov.snoozedUntil) > new Date();
     const effectiveHidden = !!ov?.hidden || snoozed;
+    const informational = !!(r.raw as { ta?: boolean }).ta || (r.source === 'gradescope' && c?.submitsVia === 'canvas');
+    if (informational && !q.includeInformational) continue;
     if (effectiveDone && !q.includeDone) continue;
     if (effectiveHidden && !q.includeHidden) continue;
-    const c = r.courseId ? courseById.get(r.courseId) : undefined;
     out.push({
       ...(r as unknown as EffectiveItem),
       effectiveDone,
       effectiveHidden,
+      informational,
       linkedIds,
       override: ov,
       course: c ? { id: c.id, code: c.code, color: c.color, role: c.role as 'student' | 'ta' } : null,

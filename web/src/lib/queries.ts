@@ -73,6 +73,28 @@ export function useCourseContent(courseId: string | undefined) {
   });
 }
 
+export interface CourseLinksResponse {
+  canvas: { id: string; title: string; dueAt: string | null; status: string; url: string | null }[];
+  gradescope: { id: string; title: string; dueAt: string | null; status: string; url: string | null }[];
+  links: { a: string; b: string; method: 'auto' | 'manual'; confidence: number | null }[];
+}
+
+export function useCourseLinks(courseId: string | undefined) {
+  return useQuery({
+    queryKey: ['courses', courseId ?? '', 'links'] as const,
+    queryFn: () => api<CourseLinksResponse>(`/courses/${encodeURIComponent(courseId!)}/links`),
+    enabled: !!courseId,
+  });
+}
+
+export function useLinkItems() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: ({ a, b, unlink }: { a: string; b: string; unlink?: boolean }) => api(`/items/${unlink ? 'unlink' : 'link'}`, { method: 'POST', json: { a, b } }),
+    onSettled: () => inv(['courses'], ['items']),
+  });
+}
+
 export function useSettings() {
   return useQuery({ queryKey: qk.settings, queryFn: () => api<Record<string, unknown>>('/settings'), staleTime: 60_000 });
 }
@@ -85,6 +107,7 @@ export interface ItemsParams {
   course?: string;
   includeDone?: boolean;
   includeHidden?: boolean;
+  includeInformational?: boolean;
   limit?: number;
 }
 
@@ -97,6 +120,7 @@ function itemsQuery(p: ItemsParams): Record<string, string | undefined> {
     course: p.course,
     includeDone: p.includeDone ? '1' : undefined,
     includeHidden: p.includeHidden ? '1' : undefined,
+    includeInformational: p.includeInformational ? '1' : undefined,
     limit: p.limit?.toString(),
   };
 }

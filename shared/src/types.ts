@@ -123,6 +123,9 @@ export interface Override {
 export interface EffectiveItem extends Item {
   effectiveDone: boolean;
   effectiveHidden: boolean;
+  /** TA-course rows and Gradescope rows in canvas-only courses: shown in class widgets, never in todo/calendar. */
+  informational: boolean;
+  /** Ids of linked rows from the other source that were collapsed into this one. */
   linkedIds: string[];
   override: Override | null;
   course: Pick<Course, 'id' | 'code' | 'color' | 'role'> | null;

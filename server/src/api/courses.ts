@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { courseInputSchema, type Course } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courseContent, courses, widgetInstances } from '../db/schema.js';
+import { courseContent, courses, itemLinks, items, widgetInstances } from '../db/schema.js';
 import { courseSlug } from '../seed.js';
 import { bad, parseBody } from './util.js';
 
@@ -53,6 +53,23 @@ export function coursesRoutes(ctx: AppContext) {
     await ctx.db.delete(widgetInstances).where(eq(widgetInstances.id, `class:${id}`));
     await ctx.db.delete(courseContent).where(eq(courseContent.courseId, id));
     return c.json({ ok: true });
+  });
+
+  /** Canvas and Gradescope assignments for a course plus current links, for the settings drawer. */
+  r.get('/:id/links', async (c) => {
+    const id = c.req.param('id');
+    const rows = await ctx.db
+      .select()
+      .from(items)
+      .where(and(eq(items.courseId, id), eq(items.kind, 'assignment'), isNull(items.deletedAt), inArray(items.source, ['canvas', 'gradescope'])))
+      .orderBy(asc(items.dueAt));
+    const ids = rows.map((x) => x.id);
+    const links = ids.length ? await ctx.db.select().from(itemLinks).where(or(inArray(itemLinks.aItemId, ids), inArray(itemLinks.bItemId, ids))!) : [];
+    return c.json({
+      canvas: rows.filter((x) => x.source === 'canvas').map(({ id, title, dueAt, status, url }) => ({ id, title, dueAt, status, url })),
+      gradescope: rows.filter((x) => x.source === 'gradescope').map(({ id, title, dueAt, status, url }) => ({ id, title, dueAt, status, url })),
+      links: links.map((l) => ({ a: l.aItemId, b: l.bItemId, method: l.method, confidence: l.confidence })),
+    });
   });
 
   r.get('/:id/content', async (c) => {

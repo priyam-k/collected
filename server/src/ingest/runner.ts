@@ -6,6 +6,19 @@ import { NeedsAuthError, NotConfiguredError, type Ingester, type RunResult } fro
 
 const running = new Set<SourceId>();
 
+/** Post-sync work that depends on more than one source (dedup, push sync). Failures are logged, never propagated. */
+async function runAfterHooks(ctx: AppContext, id: SourceId): Promise<void> {
+  if (id === 'canvas' || id === 'gradescope') {
+    try {
+      const { runDedup } = await import('../sync/dedup.js');
+      const r = await runDedup(ctx);
+      ctx.log.debug({ ...r }, 'dedup done');
+    } catch (err) {
+      ctx.log.error({ err }, 'dedup failed');
+    }
+  }
+}
+
 export type RunOutcome =
   | { ok: true; result: RunResult; ms: number }
   | { ok: false; skipped: 'running' | 'disabled' }
@@ -35,6 +48,7 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
     await setSourceStatus(ctx, ing.id, 'connected', { lastError: null, lastSuccessAt: nowIso() });
     if (result.meta) await mergeSourceMeta(ctx, ing.id, result.meta);
     log.info({ ms, ...result.counts }, 'sync ok');
+    await runAfterHooks(ctx, ing.id);
     return { ok: true, result, ms };
   } catch (err) {
     const ms = Date.now() - started;
