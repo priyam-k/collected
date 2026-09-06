@@ -2,6 +2,18 @@
 
 Nothing external is required before coding starts. Everything below is needed the day the matching ingester is built (Phase 1) or the day it goes public (Phase 2).
 
+## Local development (what already works)
+
+```sh
+npm i -g pnpm && pnpm install
+cp .env.example .env    # set SECRET_KEY=$(openssl rand -hex 32), AUTH_DISABLED=true, LOCAL_HELPER_KEY=$(openssl rand -hex 16)
+pnpm dev                # http://localhost:5173
+```
+
+`.env.example` ships with `AUTH_DISABLED=false` on purpose: copying it verbatim onto the VPS must never disable the login check. Only the local `.env` sets it to `true`.
+
+pnpm 12 blocks install scripts by default; `pnpm-workspace.yaml` allow-lists `esbuild`. SQLite comes from `@libsql/client` (prebuilt for every Node version), so there is nothing to compile.
+
 ## Phase 0 — now, optional but cheap
 
 - **Todoist**: rename the "Homework" project to **School** (project ids survive renames, so timing doesn't matter). Grab the API token: Todoist → Settings → Integrations → Developer → API token. Keep it for Phase 1.
@@ -16,7 +28,14 @@ All of these are entered in the app's Settings page (or `.env` for the Google cl
 Paste the API token into Settings → Sources → Todoist.
 
 ### Canvas
-Either run the local helper (`pnpm --filter local canvas-cookie`) which reads the cookie from Chrome and posts it to the running app, or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `_normandy_session` (and `canvas_session` if present) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
+Either run the local helper, which reads the cookie from Chrome and posts it to the running app:
+
+```sh
+python3 -m venv local/.venv && local/.venv/bin/pip install -r local/requirements.txt
+local/.venv/bin/python local/canvas_cookie.py            # expects the dev server on :3000
+```
+
+or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `_normandy_session` (and `canvas_session` if present) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
 
 ### Gradescope
 Email + password into Settings → Sources → Gradescope. Then in Settings → Courses, set each course's Gradescope course id (the number in the course URL) and `submits_via`.
@@ -48,7 +67,7 @@ Nothing. Public GitHub files.
    /srv/backups/
    ```
    Run **one** `cloudflared` on the host as a systemd service (`cloudflared service install <token>`), not one per project. It routes every hostname to a local port. Each project's compose stays independent.
-4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it, `docker compose up -d --build`.
+4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, the Cloudflare and Google values from below), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
 5. Host cron: nightly `sqlite3 /srv/collected/data/collected.db ".backup /srv/backups/collected-$(date +%F).db"` and delete files older than 14 days. Enable Hetzner weekly snapshots if you want a second copy.
 
 Alternative if you'd rather not run a box: Fly.io with a 1 GB volume. Same Dockerfile, `fly launch`, and cloudflared runs as a second process. Slightly more magic, slightly less flexible for hosting other projects.

@@ -144,7 +144,11 @@ Rule is per course, driven by `courses.submits_via`:
 
 Fuzzy match: same course, normalized title similarity above threshold, due dates within 24h. Auto links get `method=auto`; the settings panel can add or break links (`manual`).
 
-Effective done for an item = source status in {submitted, done, graded} OR linked item done OR override.done OR (todoist_map task closed). Effective visibility = not hidden, not snoozed, not effectively done (unless a widget asks for done items).
+Effective done for an item = source status in {submitted, graded, late, done} OR linked item done OR override.done OR its mirrored Todoist task is closed. Effective visibility = not hidden, not snoozed, not effectively done (unless a widget asks for done items), not informational (unless asked).
+
+Linked pairs collapse to one row: the Gradescope side when `submits_via=gradescope`, otherwise the Canvas side; the survivor carries `linkedIds`. `submits_via=canvas` never links and marks Gradescope rows informational. The iCal fallback only fills gaps: its rows are hidden while the cookie source is healthy, and never shown for an assignment the cookie source already has.
+
+Timezone rule: everything is stored as UTC ISO strings. The server computes windows ("today", planner ranges) in Node local time, so `TZ` is set in `.env` and in `docker-compose.yml`. The web renders in the browser's zone. All-day items are stored as local midnight.
 
 ## Todoist push sync (opt-in module)
 
@@ -188,11 +192,11 @@ Adding a widget = adding a folder and a registry entry.
 
 **v1 widgets and their tiers**
 
-- **calendar** (gcal + todoist due dates + assignments): xs = next 3 items; sm tall = today + tomorrow agenda; md wide = 7-day strip; lg = week grid; xl = month. Quick-add event (writes to GCal).
-- **todo** (unified items of kind task/assignment, grouped by section = label): narrow = one section with tabs; wide = sections as columns. Homework section is fed by assignments. Check-off writes an override (and closes the Todoist task if mapped).
+- **calendar** (gcal + todoist due dates + assignments): view auto-picked from the box (next-up, agenda, 7-day strip, week grid with a due/all-day lane, month) with a manual override; prev/today/next; quick-add popover writes through to Google and appears immediately.
+- **todo** (unified items of kind task/assignment, grouped by section = label): narrow = one section with tabs; wide = sections as columns. Homework section is fed by effective assignments plus Todoist tasks carrying the homework label. Check-off writes an override for source items and closes the task for Todoist items. Quick-add box uses Todoist's natural-language parser.
 - **sources**: xs = colored dots; md = table with status, last success, error, and per-source actions (sync now, reconnect).
 - **class** (multi-instance, config: course_id): header with code + color + next meeting; hotlinks row from `courses.links`; upcoming assignments; recent announcements; for TA role: grading queue and discussion time. sm = links + next due; lg = full.
-- **jobs**: wide = horizontal tape of new matches; tall = list. Star / hide / applied actions. Filter toggle: matches only vs all.
+- **jobs**: short and wide = horizontal tape of matches; otherwise a card grid (1–3 columns by width). Star / hide / applied actions; starred-only and all-listings toggles; header shows new / match / active counts. Cards on screen for two seconds are marked seen, which drives the "new" count.
 - **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor, todoist sync options, job filter, layout reset, JSON export/import.
 
 ## API

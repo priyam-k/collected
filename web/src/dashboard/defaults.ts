@@ -64,7 +64,10 @@ export function reconcileLayouts(stored: Layouts, instances: WidgetInstance[]): 
     const current = (bp === 'lg' ? base : (stored[bp] ?? [])).filter((l) => visibleIds.has(l.i));
     const have = new Set(current.map((l) => l.i));
     let maxY = Math.max(0, ...current.map((l) => l.y + l.h));
-    for (const w of visible) {
+    // Missing items are appended in the desktop layout's reading order (top-to-bottom, left-to-right).
+    const order = new Map(base.slice().sort((a, b) => a.y - b.y || a.x - b.x).map((l, i) => [l.i, i]));
+    const pending = visible.slice().sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
+    for (const w of pending) {
       if (have.has(w.id)) continue;
       const fromLg = base.find((l) => l.i === w.id);
       const def = getWidgetDef(w.type);

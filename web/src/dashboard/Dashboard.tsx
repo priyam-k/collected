@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { LayoutGrid, Moon, Plus, Settings, Sun, SunMoon } from 'lucide-react';
+import { LayoutGrid, Moon, Plus, RefreshCw, Settings, Sun, SunMoon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Layouts } from '@collected/shared';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,7 @@ export function Dashboard() {
             <TooltipContent>Rearrange widgets (e)</TooltipContent>
           </Tooltip>
         )}
+        <RefreshAll />
         <ThemeMenu />
         <Button asChild size="sm" variant="ghost" aria-label="Settings">
           <Link to="/settings">
@@ -123,6 +125,26 @@ export function Dashboard() {
 
       <AddTray open={trayOpen} onOpenChange={setTrayOpen} instances={instances} courses={coursesQ.data ?? []} onAdd={add} />
     </div>
+  );
+}
+
+function RefreshAll() {
+  const qc = useQueryClient();
+  const [spinning, setSpinning] = useState(false);
+  const refresh = async () => {
+    setSpinning(true);
+    await qc.invalidateQueries();
+    setTimeout(() => setSpinning(false), 600);
+  };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size="sm" variant="ghost" aria-label="Refresh" onClick={refresh}>
+          <RefreshCw className={cn('size-4', spinning && 'animate-spin')} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Refresh all widgets</TooltipContent>
+    </Tooltip>
   );
 }
 
