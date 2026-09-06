@@ -288,6 +288,15 @@ export function useSetOverride() {
   });
 }
 
+export function useCreateEvent() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (body: { title: string; allDay: boolean; start: string; end?: string; calendarId?: string; description?: string; location?: string }) =>
+      api<EffectiveItem>('/calendar/events', { method: 'POST', json: body }),
+    onSettled: () => inv(['items']),
+  });
+}
+
 export function usePatchJobState() {
   const inv = useInvalidate();
   return useMutation({

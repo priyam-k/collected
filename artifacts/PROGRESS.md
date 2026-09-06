@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-06. Status: M1–M4 done (grid, settings, jobs, Canvas, Gradescope, dedup); building M5 Google Calendar.
+Last updated: 2026-09-06. Status: M1–M5 done (grid, settings, jobs, Canvas, Gradescope, dedup, Google Calendar); building M6 Todoist.
 
 ## Milestones
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-06. Status: M1–M4 done (grid, settings, jobs, Canvas, Gr
 - [x] **M2 — Dashboard shell.** Grid with edit mode, registry, layout persistence per breakpoint, `useWidgetSize` hook + container queries, add/hide tray. Sources widget (reads `sources`). Settings page shell with JSON export/import.
 - [x] **M3 — Canvas.** Cookie-jar ingester (planner items, courses, assignments, announcements), iCal fallback, `needs_auth` handling. Courses seeded from `seed-config.json`. Class widget (multi-instance). Local cookie helper.
 - [ ] **M4 — Gradescope.** Scraper (student + TA courses), per-course `submits_via` dedup + fuzzy linking, manual link UI in settings.
-- [ ] **M5 — Google Calendar.** OAuth connect flow, incremental sync, calendar widget with all tiers, quick-add event write-through.
+- [x] **M5 — Google Calendar.** OAuth connect flow, incremental sync, calendar widget with all tiers, quick-add event write-through.
 - [ ] **M6 — Todoist.** Ingester (projects, sections, labels, tasks). Todo widget grouped by label with homework section fed by assignments. Push sync module with the one-way rules, behind a toggle.
 - [ ] **M7 — Jobs.** Simplify listings.json poller, deterministic filter from seed-config, jobs widget (tape + list), star/hide/applied state.
 - [ ] **M8 — Polish.** Mobile stack layout, PWA manifest, visibility-aware polling, empty/error states on every widget, keyboard shortcut for edit mode.
@@ -21,7 +21,8 @@ Last updated: 2026-09-06. Status: M1–M4 done (grid, settings, jobs, Canvas, Gr
 - [ ] Canvas: run `local/canvas_cookie.py` (see local/README.md) or paste the cookie in Settings → Sources, then `pnpm sync canvas`. Confirm the six courses get Canvas ids (Settings → Courses) and CMSC330 shows as TA with no homework rows.
 - [ ] Canvas iCal: paste your personal feed URL (Canvas → Calendar → Calendar Feed) as the fallback.
 - [ ] Gradescope: enter the native email + password in Settings → Sources, then `pnpm sync gradescope`. Confirm CMSC330 shows the grading queue and CMSC422/MATH423 get Gradescope ids. Then set `submits_via` per course (Settings → Courses) and check the linked-assignments list.
-- [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` any time you want fixture data in a fresh database.
+- [ ] Google Calendar: create the OAuth client (SETUP.md Phase 1; register both `http://localhost:5173/api/google/callback` and `http://localhost:3000/api/google/callback` plus the prod URI), put the id/secret in `.env`, restart `pnpm dev`, then Settings → Sources → Connect Google Calendar. Tick the calendars you want. Try the + button in the calendar widget; the event should appear in Google within a second.
+- [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` / `pnpm cli demo gcal` any time you want fixture data in a fresh database.
 
 ## Later
 

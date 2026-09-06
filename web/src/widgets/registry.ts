@@ -1,6 +1,7 @@
 import { Briefcase, CalendarDays, CheckSquare, GraduationCap, LayoutList, Plug } from 'lucide-react';
 import type { WidgetInstance } from '@collected/shared';
 import type { TitleContext } from './types';
+import { CalendarWidget } from './calendar/CalendarWidget';
 import { ClassWidget } from './class/ClassWidget';
 import { ClassesWidget } from './classes/ClassesWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
@@ -25,8 +26,7 @@ export const WIDGETS: WidgetDef[] = [
       { label: 'Month', w: 12, h: 9 },
     ],
     min: { w: 3, h: 3 },
-    Component: makeStub('Calendar arrives in M5.'),
-    comingSoon: 'M5',
+    Component: CalendarWidget,
   },
   {
     type: 'todo',

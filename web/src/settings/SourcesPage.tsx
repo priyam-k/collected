@@ -7,7 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useClearSourceConfig, useSaveSourceConfig, useSetSourceEnabled, useSources, useSyncSource } from '@/lib/queries';
+import { useClearSourceConfig, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSources, useSyncSource } from '@/lib/queries';
+import { useSearchParams } from 'react-router';
+import { useEffect } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { relative } from '@/lib/time';
 import { Field, PageTitle } from './ui';
 
@@ -32,8 +35,8 @@ export function SourcesPage() {
       <SourceCard source={by.gradescope} description="Native email + password login (not the school SSO button).">
         <GradescopeForm source={by.gradescope} />
       </SourceCard>
-      <SourceCard source={by.gcal} description="OAuth connect. Arrives in M5.">
-        <p className="text-sm text-muted-foreground">Google Calendar connect button lands in M5.</p>
+      <SourceCard source={by.gcal} description="OAuth connect with read and write access. Needs GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env (artifacts/SETUP.md, Phase 1).">
+        <GoogleForm source={by.gcal} />
       </SourceCard>
       <SourceCard source={by.todoist} description="API token from Todoist → Settings → Integrations → Developer.">
         <TokenForm source={by.todoist} field="token" label="API token" />
@@ -218,5 +221,73 @@ function TokenForm({ source, field, label }: { source: Source; field: string; la
         </Button>
       )}
     </form>
+  );
+}
+
+
+interface GCalMeta {
+  calendars?: { id: string; summary: string; primary: boolean; backgroundColor: string | null; accessRole: string | null }[];
+  selectedCalendars?: string[];
+  defaultCalendarId?: string | null;
+  demo?: boolean;
+}
+
+function GoogleForm({ source }: { source: Source }) {
+  const meta = (source.meta ?? {}) as GCalMeta;
+  const patch = usePatchSourceMeta();
+  const clear = useClearSourceConfig();
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const g = params.get('google');
+    if (!g) return;
+    if (g === 'connected') toast.success('Google Calendar connected');
+    else if (g === 'unconfigured') toast.error('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env first');
+    else toast.error(`Google connect failed: ${params.get('reason') ?? g}`);
+    params.delete('google');
+    params.delete('reason');
+    setParams(params, { replace: true });
+  }, [params, setParams]);
+
+  const selected = new Set(meta.selectedCalendars ?? (meta.calendars ?? []).filter((c) => c.primary).map((c) => c.id));
+  const toggle = (id: string, on: boolean) => {
+    const next = new Set(selected);
+    on ? next.add(id) : next.delete(id);
+    patch.mutate({ id: 'gcal', meta: { selectedCalendars: [...next] } });
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <a href="/api/google/start">{source.hasConfig ? 'Reconnect Google' : 'Connect Google Calendar'}</a>
+        </Button>
+        {source.hasConfig && (
+          <Button size="sm" variant="ghost" onClick={() => clear.mutate('gcal', { onSuccess: () => toast.success('Disconnected') })}>
+            Disconnect
+          </Button>
+        )}
+        {meta.demo && <span className="text-xs text-muted-foreground">showing demo calendars from `cli demo gcal`</span>}
+      </div>
+      {meta.calendars && meta.calendars.length > 0 && (
+        <div className="grid gap-1.5 sm:grid-cols-2">
+          {meta.calendars.map((c) => (
+            <label key={c.id} className="flex items-center gap-2 text-sm">
+              <Checkbox checked={selected.has(c.id)} onCheckedChange={(v) => toggle(c.id, v === true)} />
+              <span className="inline-block size-2.5 rounded-full" style={{ background: c.backgroundColor ?? '#888' }} />
+              <span className="truncate">{c.summary}</span>
+              {c.primary && <span className="text-xs text-muted-foreground">primary</span>}
+              {meta.defaultCalendarId === c.id ? (
+                <span className="text-xs text-muted-foreground">· default for new events</span>
+              ) : (
+                (c.accessRole === 'owner' || c.accessRole === 'writer') && (
+                  <button className="text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => patch.mutate({ id: 'gcal', meta: { defaultCalendarId: c.id } })}>
+                    make default
+                  </button>
+                )
+              )}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { accessAuth, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
+import { calendarRoutes } from './calendar.js';
 import { coursesRoutes } from './courses.js';
+import { googleRoutes } from './google.js';
 import { exportRoutes } from './export.js';
 import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
@@ -32,6 +34,8 @@ export function createApi(ctx: AppContext) {
   api.route('/layout', layoutRoutes(ctx));
   api.route('/widgets', widgetRoutes(ctx));
   api.route('/settings', settingsRoutes(ctx));
+  api.route('/google', googleRoutes(ctx));
+  api.route('/calendar', calendarRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 
   api.notFound((c) => c.json({ error: 'not found' }, 404));

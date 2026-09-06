@@ -26,11 +26,12 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
 2. APIs & Services → Library → enable **Google Calendar API**.
 3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events` and `.../auth/calendar.readonly`. Add yourself as a test user.
 4. **Publish the app** (Publishing status → In production). Ignore the "needs verification" notice; unverified is fine for a personal app. This is what stops refresh tokens from expiring after 7 days.
-5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs:
+5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs (the app builds the URI from `PUBLIC_URL`, which is the Vite server in dev):
+   - `http://localhost:5173/api/google/callback`
    - `http://localhost:3000/api/google/callback`
    - `https://collected.priyamkabra.com/api/google/callback`
 6. Copy client id + secret into `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
-7. In the app: Settings → Sources → Google Calendar → Connect. Click through the "unverified app" warning (Advanced → Go to collected). Pick which calendars to show.
+7. Restart `pnpm dev` so the server picks up the new `.env`. In the app: Settings → Sources → Google Calendar → Connect. Click through the "unverified app" warning (Advanced → Go to collected). Pick which calendars to show and which one new events go to.
 
 ### Jobs
 Nothing. Public GitHub files.

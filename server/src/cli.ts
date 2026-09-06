@@ -12,7 +12,7 @@ function usage(): never {
   cli sync <source|all>    run an ingester now, ignoring the enabled flag
   cli export               print config export JSON
   cli import <file>        import config JSON (courses, settings, widgets, layouts)
-  cli demo <canvas|gradescope>  load fixtures into this database (UI development without a session)
+  cli demo <canvas|gradescope|gcal>  load fixtures into this database (UI development without a session)
   cli dedup                re-run Canvas/Gradescope assignment linking`);
   process.exit(cmd ? 1 : 0);
 }
@@ -52,6 +52,16 @@ switch (cmd) {
       const { fixtureGradescopeClient } = await import('./ingest/gradescope/fixture-client.js');
       const { syncGradescope } = await import('./ingest/gradescope/ingest.js');
       console.log(JSON.stringify(await syncGradescope(ctx, fixtureGradescopeClient())));
+    } else if (rest[0] === 'gcal') {
+      const { MockCalendarApi, demoCalendars, demoScript } = await import('./ingest/gcal/mock-api.js');
+      const { syncGcal } = await import('./ingest/gcal/ingest.js');
+      const { mergeSourceMeta, setSourceStatus, getSourceRow } = await import('./lib/sources.js');
+      const api = new MockCalendarApi(demoCalendars, demoScript());
+      const row = await getSourceRow(ctx, 'gcal');
+      const { counts, meta } = await syncGcal(ctx, api, { ...(row.meta as object), selectedCalendars: demoCalendars.map((c) => c.id), syncTokens: {} });
+      await mergeSourceMeta(ctx, 'gcal', { ...meta, defaultCalendarId: demoCalendars[0]!.id, demo: true });
+      await setSourceStatus(ctx, 'gcal', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
+      console.log(JSON.stringify(counts));
     } else usage();
     const { runDedup } = await import('./sync/dedup.js');
     console.log(JSON.stringify({ dedup: await runDedup(ctx) }));
