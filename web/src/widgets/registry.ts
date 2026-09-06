@@ -1,5 +1,8 @@
 import { Briefcase, CalendarDays, CheckSquare, GraduationCap, LayoutList, Plug } from 'lucide-react';
 import type { WidgetInstance } from '@collected/shared';
+import type { TitleContext } from './types';
+import { ClassWidget } from './class/ClassWidget';
+import { ClassesWidget } from './classes/ClassesWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
 import { makeStub } from './stubs';
 import type { WidgetDef } from './types';
@@ -50,8 +53,7 @@ export const WIDGETS: WidgetDef[] = [
       { label: 'Wide', w: 12, h: 4 },
     ],
     min: { w: 4, h: 3 },
-    Component: makeStub('Classes overview arrives in M3.'),
-    comingSoon: 'M3',
+    Component: ClassesWidget,
   },
   {
     type: 'class',
@@ -66,9 +68,12 @@ export const WIDGETS: WidgetDef[] = [
     ],
     min: { w: 3, h: 3 },
     multiInstance: true,
-    title: (w) => String((w.config as { courseCode?: string; courseId?: string }).courseCode ?? (w.config as { courseId?: string }).courseId ?? 'Class'),
-    Component: makeStub('Class widget arrives in M3.'),
-    comingSoon: 'M3',
+    title: (w, ctx) => {
+      const cfg = w.config as { courseCode?: string; courseId?: string };
+      const c = ctx.courses.find((x) => x.id === cfg.courseId);
+      return c ? `${c.code}${c.section ? ` · ${c.section}` : ''}` : (cfg.courseCode ?? 'Class');
+    },
+    Component: ClassWidget as WidgetDef['Component'],
   },
   {
     type: 'jobs',
@@ -105,8 +110,8 @@ export function getWidgetDef(type: string): WidgetDef | undefined {
   return byType.get(type);
 }
 
-export function widgetTitle(instance: WidgetInstance): string {
+export function widgetTitle(instance: WidgetInstance, ctx: TitleContext = { courses: [] }): string {
   const def = byType.get(instance.type);
   if (!def) return instance.type;
-  return def.title ? def.title(instance) : def.name;
+  return def.title ? def.title(instance, ctx) : def.name;
 }

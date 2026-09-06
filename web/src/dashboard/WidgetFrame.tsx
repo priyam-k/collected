@@ -3,6 +3,7 @@ import { EyeOff, GripVertical } from 'lucide-react';
 import type { Source, WidgetInstance } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useCourses } from '@/lib/queries';
 import { ConnectPlaceholder } from '@/widgets/Placeholder';
 import { getWidgetDef, widgetTitle } from '@/widgets/registry';
 import { useWidgetSize } from './useWidgetSize';
@@ -31,6 +32,8 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
 ) {
   const def = getWidgetDef(instance.type);
   const [bodyRef, size] = useWidgetSize();
+  const coursesQ = useCourses();
+  const title = widgetTitle(instance, { courses: coursesQ.data ?? [] });
   const Icon = def?.icon;
   const missing = def?.requires.filter((id) => {
     const s = sources.find((x) => x.id === id);
@@ -49,7 +52,7 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
       <div className={cn('flex h-8 shrink-0 items-center gap-1.5 border-b px-2 text-xs font-medium', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')}>
         {editMode && <GripVertical className="size-3.5 text-muted-foreground" />}
         {Icon && <Icon className="size-3.5 text-muted-foreground" />}
-        <span className="truncate">{widgetTitle(instance)}</span>
+        <span className="truncate">{title}</span>
         <span className="ml-auto flex items-center gap-1">
           {editMode && (
             <Button size="icon-xs" variant="ghost" aria-label="Hide widget" onMouseDown={(e) => e.stopPropagation()} onClick={onHide}>

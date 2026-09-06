@@ -1,0 +1,156 @@
+import { eq, inArray } from 'drizzle-orm';
+import { sourceConfigSchemas } from '@collected/shared';
+import type { AppContext } from '../../context.js';
+import { courses, items, type NewItemRow } from '../../db/schema.js';
+import { replaceCourseContent, upsertItems } from '../../lib/items.js';
+import { getSourceConfig, setSourceConfig } from '../../lib/sources.js';
+import { addDays } from '../../lib/time.js';
+import { NotConfiguredError, type Ingester } from '../types.js';
+import { CanvasClient, type CanvasConfig } from './client.js';
+import {
+  announcementToRow,
+  assignmentToRow,
+  filesToContent,
+  matchCourses,
+  modulesToContent,
+  plannerToRow,
+  syllabusToContent,
+  type CanvasAnnouncement,
+  type CanvasAssignment,
+  type CanvasCourse,
+  type CanvasFile,
+  type CanvasModule,
+  type CourseCtx,
+  type PlannerItem,
+} from './map.js';
+
+export const PLANNER_PAST_DAYS = 14;
+export const PLANNER_FUTURE_DAYS = 60;
+export const ANNOUNCEMENT_PAST_DAYS = 30;
+
+/**
+ * Runs one Canvas sync against an already-built client. Split from the ingester so tests can inject
+ * a client over fixtures.
+ */
+export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?: AbortSignal): Promise<Record<string, number>> {
+  const baseUrl = client.baseUrl;
+  const ours = await ctx.db.select().from(courses).where(eq(courses.archived, false));
+
+  const canvasCourses = await client.getAll<CanvasCourse>('/api/v1/courses', { enrollment_state: 'active', 'include[]': ['term'] }, { signal });
+  const { matched, autoFilled } = matchCourses(ours, canvasCourses);
+  for (const f of autoFilled) {
+    await ctx.db.update(courses).set({ canvasCourseId: f.canvasCourseId }).where(eq(courses.id, f.courseId));
+    ctx.log.info({ course: f.courseId, canvasCourseId: f.canvasCourseId }, 'canvas course id auto-filled');
+  }
+  const ctxByCanvasId = new Map<string, CourseCtx>();
+  for (const c of ours) {
+    const k = matched.get(c.id);
+    if (k) ctxByCanvasId.set(String(k.id), { courseId: c.id, role: c.role as CourseCtx['role'] });
+  }
+  const trackedCourseIds = [...ctxByCanvasId.values()].map((c) => c.courseId);
+  const counts: Record<string, number> = { canvasCourses: canvasCourses.length, matchedCourses: ctxByCanvasId.size, autoFilled: autoFilled.length };
+  if (!ctxByCanvasId.size) {
+    ctx.log.warn('no courses matched Canvas; set canvas ids in Settings → Courses');
+    return counts;
+  }
+
+  // Assignments per course are the authoritative assignment list (full history, has descriptions and submission state).
+  const rows = new Map<string, NewItemRow>();
+  for (const [canvasId, cc] of ctxByCanvasId) {
+    const list = await client.tryGetAll<CanvasAssignment>(`/api/v1/courses/${canvasId}/assignments`, { 'include[]': ['submission'], order_by: 'due_at' }, { signal });
+    for (const a of list) {
+      if (a.published === false) continue;
+      rows.set(`canvas:assignment:${a.id}`, assignmentToRow(a, cc, baseUrl));
+    }
+  }
+  counts.assignments = rows.size;
+
+  // Planner overlay: planner overrides (marked complete), missing flags, events, announcements in the window.
+  const now = new Date();
+  const planner = await client.tryGetAll<PlannerItem>(
+    '/api/v1/planner/items',
+    { start_date: addDays(now, -PLANNER_PAST_DAYS).toISOString(), end_date: addDays(now, PLANNER_FUTURE_DAYS).toISOString() },
+    { signal, maxPages: 10 },
+  );
+  let plannerUsed = 0;
+  for (const p of planner) {
+    const cc = p.course_id != null ? ctxByCanvasId.get(String(p.course_id)) : undefined;
+    if (!cc) continue; // untracked course (old term, advising shells)
+    const row = plannerToRow(p, cc, baseUrl);
+    if (!row) continue;
+    plannerUsed++;
+    const existing = rows.get(row.id);
+    if (existing) {
+      // keep the richer assignment row, but planner knows about overrides / missing
+      const plannerSaysDone = row.status === 'done';
+      rows.set(row.id, {
+        ...existing,
+        status: plannerSaysDone ? 'done' : existing.status === 'open' && row.status !== 'open' ? row.status : existing.status,
+        url: existing.url ?? row.url,
+        raw: { ...(existing.raw as object), plannerOverride: (row.raw as { plannerOverride?: unknown }).plannerOverride ?? null },
+      });
+    } else {
+      rows.set(row.id, row);
+    }
+  }
+  counts.plannerItems = plannerUsed;
+
+  // Announcements for tracked courses (planner only shows unread ones).
+  const contextCodes = [...ctxByCanvasId.keys()].map((id) => `course_${id}`);
+  const anns = await client.tryGetAll<CanvasAnnouncement>(
+    '/api/v1/announcements',
+    { 'context_codes[]': contextCodes, start_date: addDays(now, -ANNOUNCEMENT_PAST_DAYS).toISOString().slice(0, 10), end_date: addDays(now, 7).toISOString().slice(0, 10) },
+    { signal, maxPages: 3 },
+  );
+  for (const a of anns) {
+    const canvasId = (a.context_code ?? '').replace('course_', '');
+    const cc = ctxByCanvasId.get(canvasId);
+    if (!cc) continue;
+    rows.set(`canvas:announcement:${a.id}`, announcementToRow(a, cc, baseUrl));
+  }
+  counts.announcements = anns.length;
+
+  // Upsert. Soft-delete assignments for tracked courses that Canvas no longer returns; leave events/announcements to age out.
+  const result = await upsertItems(ctx, 'canvas', [...rows.values()], [eq(items.kind, 'assignment'), inArray(items.courseId, trackedCourseIds)]);
+  counts.upserted = result.upserted;
+  counts.created = result.created;
+  counts.deleted = result.deleted;
+
+  // Course content for the class widget: syllabus, module items, recent files.
+  let content = 0;
+  for (const [canvasId, cc] of ctxByCanvasId) {
+    const detail = await client.tryGet<{ syllabus_body?: string | null }>(`/api/v1/courses/${canvasId}`, { 'include[]': ['syllabus_body'] }, signal);
+    const mods = await client.tryGetAll<CanvasModule>(`/api/v1/courses/${canvasId}/modules`, { 'include[]': ['items'] }, { signal, maxPages: 3 });
+    const files = await client.tryGetAll<CanvasFile>(`/api/v1/courses/${canvasId}/files`, { sort: 'updated_at', order: 'desc', per_page: 30 }, { signal, maxPages: 1 });
+    const contentRows = [
+      ...(syllabusToContent(detail?.syllabus_body, cc.courseId, canvasId, baseUrl) ? [syllabusToContent(detail?.syllabus_body, cc.courseId, canvasId, baseUrl)!] : []),
+      ...modulesToContent(mods, cc.courseId, baseUrl),
+      ...filesToContent(files, cc.courseId),
+    ];
+    content += await replaceCourseContent(ctx, cc.courseId, ['syllabus', 'module_item', 'file'], contentRows);
+  }
+  counts.content = content;
+  counts.requests = client.requestCount;
+  return counts;
+}
+
+export const canvasIngester: Ingester = {
+  id: 'canvas',
+  intervalMinutes: 15,
+  timeoutMs: 240_000,
+  async run(ctx, signal) {
+    const config = await getSourceConfig<CanvasConfig>(ctx, 'canvas');
+    if (!config) throw new NotConfiguredError('Canvas is not set up: paste a session cookie in Settings → Sources');
+    const parsed = sourceConfigSchemas.canvas.parse(config);
+    const client = await CanvasClient.fromConfig(parsed, ctx.log);
+    try {
+      const counts = await syncCanvas(ctx, client, signal);
+      return { counts };
+    } finally {
+      // Always persist the jar: Canvas rotates the session cookie on responses, and the sliding expiry
+      // only slides if we keep the newest value.
+      const jar = await client.serializeJar();
+      await setSourceConfig(ctx, 'canvas', { baseUrl: parsed.baseUrl, cookieJar: jar });
+    }
+  },
+};

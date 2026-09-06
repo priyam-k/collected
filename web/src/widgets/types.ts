@@ -1,7 +1,11 @@
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import type { SourceId, WidgetInstance } from '@collected/shared';
+import type { Course, SourceId, WidgetInstance } from '@collected/shared';
 import type { WidgetSize } from '@/dashboard/useWidgetSize';
+
+export interface TitleContext {
+  courses: Course[];
+}
 
 export interface WidgetPreset {
   label: string;
@@ -27,8 +31,8 @@ export interface WidgetDef<C = Record<string, unknown>> {
   max?: { w: number; h: number };
   /** One instance per course, etc. */
   multiInstance?: boolean;
-  /** Title shown in the frame; can depend on config (e.g. course code). */
-  title?: (instance: WidgetInstance & { config: C }) => string;
+  /** Title shown in the frame; can depend on config and loaded courses (e.g. course code). */
+  title?: (instance: WidgetInstance & { config: C }, ctx: TitleContext) => string;
   Component: ComponentType<WidgetProps<C>>;
   /** Milestone marker for stubs; hides "coming soon" once implemented. */
   comingSoon?: string;

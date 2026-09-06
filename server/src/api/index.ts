@@ -15,23 +15,13 @@ export function createApi(ctx: AppContext) {
   const api = new Hono<{ Variables: AuthVariables }>();
 
   // The Canvas cookie drop-off authenticates itself (helper key or Access); everything else needs Access.
+  const guard = accessAuth(ctx.env);
   api.use('*', async (c, next) => {
     if (c.req.path === '/api/sources/canvas/cookie' && c.req.method === 'POST') {
       c.set('user', null);
-      const guard = accessAuth(ctx.env);
-      // Try Access first; if it fails, fall through with user=null and let the route check the helper key.
-      let passed = false;
-      await guard(c, async () => {
-        passed = true;
-        await next();
-      });
-      if (!passed) {
-        c.res = undefined as unknown as Response; // discard the 401 the guard produced
-        await next();
-      }
-      return;
+      return next();
     }
-    return accessAuth(ctx.env)(c, next);
+    return guard(c, next);
   });
 
   api.route('/health', healthRoutes(ctx));

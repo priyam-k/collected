@@ -1,13 +1,13 @@
 # Progress
 
-Last updated: 2026-09-06. Status: M1–M2 done (grid, edit mode, settings, jobs ingester); building M3 Canvas.
+Last updated: 2026-09-06. Status: M1–M3 done (grid, settings, jobs, Canvas + iCal fallback, class widgets); building M4 Gradescope.
 
 ## Milestones
 
 - [x] **M0 — Design.** DESIGN, DECISIONS, SETUP, seed-config written.
 - [x] **M1 — Skeleton.** pnpm workspaces (server, web, shared). Hono boots, runs Drizzle migrations, serves `/api/health` and the built SPA. Vite dev proxy. Cloudflare Access middleware with `AUTH_DISABLED` bypass. Dockerfile + compose. `.env.example`.
 - [x] **M2 — Dashboard shell.** Grid with edit mode, registry, layout persistence per breakpoint, `useWidgetSize` hook + container queries, add/hide tray. Sources widget (reads `sources`). Settings page shell with JSON export/import.
-- [ ] **M3 — Canvas.** Cookie-jar ingester (planner items, courses, assignments, announcements), iCal fallback, `needs_auth` handling. Courses seeded from `seed-config.json`. Class widget (multi-instance). Local cookie helper.
+- [x] **M3 — Canvas.** Cookie-jar ingester (planner items, courses, assignments, announcements), iCal fallback, `needs_auth` handling. Courses seeded from `seed-config.json`. Class widget (multi-instance). Local cookie helper.
 - [ ] **M4 — Gradescope.** Scraper (student + TA courses), per-course `submits_via` dedup + fuzzy linking, manual link UI in settings.
 - [ ] **M5 — Google Calendar.** OAuth connect flow, incremental sync, calendar widget with all tiers, quick-add event write-through.
 - [ ] **M6 — Todoist.** Ingester (projects, sections, labels, tasks). Todo widget grouped by label with homework section fed by assignments. Push sync module with the one-way rules, behind a toggle.
@@ -15,6 +15,12 @@ Last updated: 2026-09-06. Status: M1–M2 done (grid, edit mode, settings, jobs 
 - [ ] **M8 — Polish.** Mobile stack layout, PWA manifest, visibility-aware polling, empty/error states on every widget, keyboard shortcut for edit mode.
 - [ ] **M9 — Deploy.** VPS, tunnel, Access, backups. Prod connect of all sources.
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.
+
+## Post-run checklist (needs you)
+
+- [ ] Canvas: run `local/canvas_cookie.py` (see local/README.md) or paste the cookie in Settings → Sources, then `pnpm sync canvas`. Confirm the six courses get Canvas ids (Settings → Courses) and CMSC330 shows as TA with no homework rows.
+- [ ] Canvas iCal: paste your personal feed URL (Canvas → Calendar → Calendar Feed) as the fallback.
+- [ ] Try `pnpm cli demo canvas` any time you want fixture data in a fresh database.
 
 ## Later
 

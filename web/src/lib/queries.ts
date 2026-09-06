@@ -51,6 +51,28 @@ export function useWidgets() {
   return useQuery({ queryKey: qk.widgets, queryFn: () => api<WidgetInstance[]>('/widgets'), staleTime: Infinity });
 }
 
+export interface CourseContentRow {
+  id: string;
+  courseId: string;
+  kind: string;
+  externalId: string;
+  moduleName: string | null;
+  title: string;
+  url: string | null;
+  position: number | null;
+  raw: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export function useCourseContent(courseId: string | undefined) {
+  return useQuery({
+    queryKey: qk.courseContent(courseId ?? ''),
+    queryFn: () => api<CourseContentRow[]>(`/courses/${encodeURIComponent(courseId!)}/content`),
+    enabled: !!courseId,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useSettings() {
   return useQuery({ queryKey: qk.settings, queryFn: () => api<Record<string, unknown>>('/settings'), staleTime: 60_000 });
 }

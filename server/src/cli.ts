@@ -11,7 +11,8 @@ function usage(): never {
   cli seed                 re-run seeding (idempotent)
   cli sync <source|all>    run an ingester now, ignoring the enabled flag
   cli export               print config export JSON
-  cli import <file>        import config JSON (courses, settings, widgets, layouts)`);
+  cli import <file>        import config JSON (courses, settings, widgets, layouts)
+  cli demo canvas          load the Canvas fixtures into this database (UI development without a session)`);
   process.exit(cmd ? 1 : 0);
 }
 
@@ -41,6 +42,14 @@ switch (cmd) {
   case 'export':
     console.log(JSON.stringify(await buildExport(ctx), null, 2));
     break;
+  case 'demo': {
+    if (rest[0] !== 'canvas') usage();
+    const { fixtureCanvasClient } = await import('./ingest/canvas/fixture-client.js');
+    const { syncCanvas } = await import('./ingest/canvas/ingest.js');
+    const counts = await syncCanvas(ctx, fixtureCanvasClient());
+    console.log(JSON.stringify(counts));
+    break;
+  }
   case 'import': {
     const file = rest[0];
     if (!file) usage();

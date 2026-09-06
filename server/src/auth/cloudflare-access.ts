@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Env } from '../env.js';
@@ -9,27 +9,30 @@ export type AuthVariables = { user: string | null };
  * Verifies the JWT Cloudflare Access attaches to every request that passed the login wall.
  * With AUTH_DISABLED (local dev) every request is allowed and `user` is "dev".
  */
-export function accessAuth(env: Env): MiddlewareHandler<{ Variables: AuthVariables }> {
-  if (env.AUTH_DISABLED) {
-    return async (c, next) => {
-      c.set('user', 'dev');
-      await next();
-    };
-  }
+let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+/** Resolves the authenticated user (email) for a request, or null. "dev" when AUTH_DISABLED. */
+export async function verifyAccess(env: Env, c: Context): Promise<string | null> {
+  if (env.AUTH_DISABLED) return 'dev';
   const team = env.CF_ACCESS_TEAM_DOMAIN!;
   const issuer = `https://${team}`;
-  const jwks = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
-  const audience = env.CF_ACCESS_AUD!;
+  jwksCache ??= createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
+  const token = c.req.header('cf-access-jwt-assertion') ?? getCookie(c, 'CF_Authorization');
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, jwksCache, { issuer, audience: env.CF_ACCESS_AUD! });
+    return typeof payload.email === 'string' ? payload.email : (payload.sub ?? 'unknown');
+  } catch {
+    return null;
+  }
+}
+
+export function accessAuth(env: Env): MiddlewareHandler<{ Variables: AuthVariables }> {
   return async (c, next) => {
-    const token = c.req.header('cf-access-jwt-assertion') ?? getCookie(c, 'CF_Authorization');
-    if (!token) return c.json({ error: 'unauthorized' }, 401);
-    try {
-      const { payload } = await jwtVerify(token, jwks, { issuer, audience });
-      c.set('user', typeof payload.email === 'string' ? payload.email : (payload.sub ?? null));
-      await next();
-    } catch {
-      return c.json({ error: 'unauthorized' }, 401);
-    }
+    const user = await verifyAccess(env, c);
+    if (!user) return c.json({ error: 'unauthorized' }, 401);
+    c.set('user', user);
+    await next();
   };
 }
 

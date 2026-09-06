@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { SOURCE_IDS, sourceConfigSchemas, sourceIdSchema, type Source, type SourceId } from '@collected/shared';
-import { helperKeyMatches } from '../auth/cloudflare-access.js';
+import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { sources } from '../db/schema.js';
 import { getIngester } from '../ingest/registry.js';
 import { runIngester } from '../ingest/runner.js';
-import { getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
+import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
 import { bad, parseBody } from './util.js';
 import { eq } from 'drizzle-orm';
 
@@ -94,10 +94,10 @@ export function sourcesRoutes(ctx: AppContext) {
    */
   r.post('/canvas/cookie', async (c) => {
     const viaHelper = helperKeyMatches(ctx.env, c.req.header('x-collected-key'));
-    const viaUser = c.get('user' as never) as string | null | undefined;
-    if (!viaHelper && !viaUser) return c.json({ error: 'unauthorized' }, 401);
+    const user = viaHelper ? 'helper' : await verifyAccess(ctx.env, c);
+    if (!user) return c.json({ error: 'unauthorized' }, 401);
     const body = await parseBody(c, z.object({ cookieHeader: z.string().min(10), baseUrl: z.string().url().optional() }));
-    const existing = (await import('../lib/sources.js').then((m) => m.getSourceConfig<{ baseUrl?: string }>(ctx, 'canvas'))) ?? {};
+    const existing = (await getSourceConfig<{ baseUrl?: string }>(ctx, 'canvas')) ?? {};
     await setSourceConfig(ctx, 'canvas', {
       baseUrl: body.baseUrl ?? existing.baseUrl ?? 'https://umd.instructure.com',
       cookieHeader: body.cookieHeader,

@@ -1,0 +1,26 @@
+[
+  {
+    "id": 2122479,
+    "name": "Week 1 (09/01 & 09/03): Introduction, Decision Trees",
+    "position": 1,
+    "items_count": 3,
+    "state": "completed",
+    "items": [
+      { "id": 30001, "module_id": 2122479, "position": 1, "indent": 0, "title": "Lecture slides", "type": "SubHeader", "published": true },
+      { "id": 30002, "module_id": 2122479, "position": 2, "indent": 1, "title": "lecture01_intro.pdf", "type": "File", "content_id": 90735990, "html_url": "https://umd.instructure.com/courses/1408462/modules/items/30002", "url": "https://umd.instructure.com/api/v1/courses/1408462/files/90735990", "published": true },
+      { "id": 30003, "module_id": 2122479, "position": 3, "indent": 1, "title": "Course textbook (CIML)", "type": "ExternalUrl", "external_url": "http://ciml.info/", "html_url": "https://umd.instructure.com/courses/1408462/modules/items/30003", "new_tab": true, "published": true },
+      { "id": 30004, "module_id": 2122479, "position": 4, "indent": 0, "title": "HW01: Warm up", "type": "Quiz", "content_id": 1895452, "html_url": "https://umd.instructure.com/courses/1408462/modules/items/30004", "published": true }
+    ]
+  },
+  {
+    "id": 2123365,
+    "name": "Week 2 (09/08 & 09/10): Decision Trees Contd. & Ensemble Methods",
+    "position": 3,
+    "items_count": 1,
+    "state": "unlocked",
+    "items": [
+      { "id": 30010, "module_id": 2123365, "position": 1, "indent": 0, "title": "DecisionTreesNotes.pdf", "type": "File", "content_id": 90778257, "html_url": "https://umd.instructure.com/courses/1408462/modules/items/30010", "published": true },
+      { "id": 30011, "module_id": 2123365, "position": 2, "indent": 0, "title": "Hidden draft", "type": "Page", "html_url": "https://umd.instructure.com/courses/1408462/modules/items/30011", "published": false }
+    ]
+  }
+]

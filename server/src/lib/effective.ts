@@ -84,9 +84,13 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
 
   const selfDone = (r: ItemRow): boolean => isDoneStatus(r.status) || !!ovById.get(r.id)?.done || mirrorClosed.has(r.id);
 
+  // The iCal fallback only fills gaps: never show an iCal row for an assignment/event the cookie source already has,
+  // and show none at all while the cookie source is healthy.
+  const canvasExternalIds = new Set(rows.filter((r) => r.source === 'canvas').map((r) => r.externalId));
+
   const out: EffectiveItem[] = [];
   for (const r of rows) {
-    if (r.source === 'canvas_ical' && canvasHealthy) continue;
+    if (r.source === 'canvas_ical' && (canvasHealthy || canvasExternalIds.has(r.externalId))) continue;
     if (r.source === 'todoist' && (r.raw as { mirror?: boolean }).mirror) continue;
     const ov = ovById.get(r.id) ?? null;
     const linkedIds = linkedOf.get(r.id) ?? [];

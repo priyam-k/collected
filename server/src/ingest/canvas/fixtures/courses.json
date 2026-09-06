@@ -1,0 +1,66 @@
+[
+  {
+    "id": 1408462,
+    "name": "CMSC422-0101: Introduction to Machine Learning-Fall 2026 nayeem",
+    "course_code": "CMSC422",
+    "workflow_state": "available",
+    "enrollment_term_id": 4801,
+    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
+    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_AAAA.ics" },
+    "time_zone": "America/New_York",
+    "default_view": "modules"
+  },
+  {
+    "id": 1408293,
+    "name": "CMSC330-0101,0102,0103,0104,0105,0106,0107,0108: Organization of Programming Languages-Fall 2026 anwar",
+    "course_code": "CMSC330",
+    "sis_course_id": "202608-CMSC330-1VGM4WM",
+    "workflow_state": "available",
+    "enrollment_term_id": 4801,
+    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "enrollments": [
+      { "type": "ta", "role": "TaEnrollment", "role_id": 2397, "enrollment_state": "active", "user_id": 0 },
+      { "type": "ta", "role": "TaEnrollment", "role_id": 2397, "enrollment_state": "active", "user_id": 0 }
+    ],
+    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_BBBB.ics" },
+    "time_zone": "America/New_York",
+    "default_view": "wiki"
+  },
+  {
+    "id": 1398424,
+    "name": "CMSC330 Spring 2026",
+    "course_code": "CMSC330",
+    "workflow_state": "available",
+    "enrollment_term_id": 4715,
+    "term": { "id": 4715, "name": "Spring 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
+    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_CCCC.ics" },
+    "time_zone": "America/New_York",
+    "default_view": "modules"
+  },
+  {
+    "id": 1410485,
+    "name": "Math423 Linear Optimization",
+    "course_code": "MATH423",
+    "workflow_state": "available",
+    "enrollment_term_id": 4801,
+    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
+    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_DDDD.ics" },
+    "time_zone": "America/New_York",
+    "default_view": "modules"
+  },
+  {
+    "id": 1413849,
+    "name": "Computer Science Undergraduate Advising 2026-2027",
+    "course_code": "CS Ugrad Adv 26-27",
+    "workflow_state": "available",
+    "enrollment_term_id": 212,
+    "term": { "id": 212, "name": "Default Term", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
+    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_EEEE.ics" },
+    "time_zone": "America/New_York",
+    "default_view": "wiki"
+  }
+]
