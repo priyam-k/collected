@@ -62,19 +62,58 @@ def main() -> int:
     p.add_argument("--domain", default="umd.instructure.com")
     p.add_argument("--browser", default="chrome", choices=BROWSERS)
     p.add_argument("--key", default=os.environ.get("LOCAL_HELPER_KEY") or read_env_key(repo_root))
+    p.add_argument("--cookie-file", default=None, help="path to a specific Chromium profile Cookies DB (auto-detected otherwise)")
     p.add_argument("--dry-run", action="store_true", help="only report which cookies were found")
     args = p.parse_args()
 
     loader = getattr(browser_cookie3, args.browser)
-    try:
-        jar = loader(domain_name=args.domain)
-    except Exception as e:  # keychain prompt declined, browser not installed, etc.
-        sys.exit(f"could not read {args.browser} cookies: {e}")
+    session_names = ("canvas_session", "_normandy_session", "_legacy_normandy_session")
 
-    cookies = {c.name: c.value for c in jar if args.domain in (c.domain or "")}
-    if "_normandy_session" not in cookies:
-        sys.exit(f"no _normandy_session cookie for {args.domain} in {args.browser}; open Canvas in that browser and log in first")
-    print(f"found {len(cookies)} cookies for {args.domain} in {args.browser}: {', '.join(sorted(cookies))}")
+    def read(cookie_file: str | None) -> dict[str, str]:
+        kwargs = {"domain_name": args.domain}
+        if cookie_file:
+            kwargs["cookie_file"] = cookie_file
+        jar = loader(**kwargs)
+        return {c.name: c.value for c in jar if args.domain in (c.domain or "")}
+
+    candidates: list[str | None] = [args.cookie_file] if args.cookie_file else [None]
+    if not args.cookie_file and args.browser in ("chrome", "chromium", "brave", "edge", "arc", "vivaldi"):
+        # Chromium keeps one cookie DB per profile; the default loader only reads "Default".
+        roots = {
+            "chrome": "~/Library/Application Support/Google/Chrome",
+            "chromium": "~/Library/Application Support/Chromium",
+            "brave": "~/Library/Application Support/BraveSoftware/Brave-Browser",
+            "edge": "~/Library/Application Support/Microsoft Edge",
+            "arc": "~/Library/Application Support/Arc/User Data",
+            "vivaldi": "~/Library/Application Support/Vivaldi",
+        }
+        root = pathlib.Path(roots[args.browser]).expanduser()
+        for prof in sorted(root.glob("*/Cookies")) + sorted(root.glob("*/Network/Cookies")):
+            if "Default" in prof.parts:
+                continue
+            candidates.append(str(prof))
+
+    cookies: dict[str, str] = {}
+    used = None
+    errors = []
+    for cf in candidates:
+        try:
+            found = read(cf)
+        except Exception as e:  # keychain prompt declined, locked DB, etc.
+            errors.append(f"{cf or 'default profile'}: {e}")
+            continue
+        if any(n in found for n in session_names):
+            cookies, used = found, cf
+            break
+        if not cookies:
+            cookies = found
+    if not any(n in cookies for n in session_names):
+        hint = f" (errors: {'; '.join(errors)})" if errors else ""
+        sys.exit(
+            f"no Canvas session cookie ({' / '.join(session_names)}) for {args.domain} in {args.browser}; "
+            f"open Canvas in that browser and log in first, or pass --cookie-file for a specific profile{hint}"
+        )
+    print(f"found {len(cookies)} cookies for {args.domain} in {args.browser}{' profile ' + used if used else ''}: {', '.join(sorted(cookies))}")
     if args.dry_run:
         return 0
 

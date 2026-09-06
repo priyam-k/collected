@@ -1,6 +1,7 @@
 import { addDays, differenceInMinutes, format, getHours, getMinutes, isSameMonth } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
 import { cn } from '@/lib/utils';
+import { ItemPopover } from '@/widgets/ItemPopover';
 import { CourseDot } from '@/widgets/shared';
 import { dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, sortItems, timeLabel } from './utils';
 
@@ -17,13 +18,7 @@ function Chip({ item, dense }: { item: EffectiveItem; dense?: boolean }) {
       <span className="truncate">{item.title}</span>
     </span>
   );
-  return item.url ? (
-    <a href={item.url} target="_blank" rel="noreferrer" className="block min-w-0">
-      {body}
-    </a>
-  ) : (
-    <div className="min-w-0">{body}</div>
-  );
+  return <ItemPopover item={item}>{body}</ItemPopover>;
 }
 
 function Row({ item }: { item: EffectiveItem }) {
@@ -37,13 +32,10 @@ function Row({ item }: { item: EffectiveItem }) {
       {item.kind === 'event' && (item.raw as { location?: string | null }).location && <span className="hidden shrink-0 truncate text-xs text-muted-foreground sm:inline">{(item.raw as { location?: string }).location}</span>}
     </>
   );
-  const cls = 'flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60';
-  return item.url ? (
-    <a href={item.url} target="_blank" rel="noreferrer" className={cls}>
-      {inner}
-    </a>
-  ) : (
-    <div className={cls}>{inner}</div>
+  return (
+    <ItemPopover item={item}>
+      <span className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60">{inner}</span>
+    </ItemPopover>
   );
 }
 
@@ -64,10 +56,14 @@ export function NextUp({ items, limit = 4 }: { items: EffectiveItem[]; limit?: n
       {upcoming.map((i) => {
         const t = itemTime(i)!;
         return (
-          <li key={i.id} className="flex items-baseline gap-2 rounded px-1 py-0.5 text-sm">
-            <span className="w-16 shrink-0 text-xs text-muted-foreground">{isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a')}</span>
-            <CourseDot color={itemColor(i)} />
-            <a href={i.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">{i.title}</a>
+          <li key={i.id}>
+            <ItemPopover item={i}>
+              <span className="flex items-baseline gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent/60">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">{isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a')}</span>
+                <CourseDot color={itemColor(i)} />
+                <span className="min-w-0 flex-1 truncate">{i.title}</span>
+              </span>
+            </ItemPopover>
           </li>
         );
       })}
@@ -169,18 +165,18 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
                   const height = Math.max(18, (differenceInMinutes(e, s) / 60) * PX_PER_HOUR - 2);
                   const color = itemColor(i);
                   return (
-                    <a
-                      key={i.id}
-                      href={i.url ?? '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="absolute inset-x-0.5 overflow-hidden rounded border px-1 py-0.5 text-[11px] leading-tight hover:brightness-110"
-                      style={{ top, height, background: `color-mix(in oklch, ${color ?? 'var(--primary)'} 18%, var(--card))`, borderColor: `color-mix(in oklch, ${color ?? 'var(--primary)'} 40%, transparent)` }}
-                      title={`${i.title} · ${timeLabel(i)}`}
-                    >
-                      <div className="truncate font-medium">{i.title}</div>
-                      {height > 30 && <div className="truncate text-muted-foreground">{timeLabel(i)}</div>}
-                    </a>
+                    <div key={i.id} className="absolute inset-x-0.5" style={{ top, height }}>
+                      <ItemPopover item={i} side="right" className="h-full">
+                        <div
+                          className="h-full overflow-hidden rounded border px-1 py-0.5 text-[11px] leading-tight hover:brightness-110"
+                          style={{ background: `color-mix(in oklch, ${color ?? 'var(--primary)'} 18%, var(--card))`, borderColor: `color-mix(in oklch, ${color ?? 'var(--primary)'} 40%, transparent)` }}
+                          title={`${i.title} · ${timeLabel(i)}`}
+                        >
+                          <div className="truncate font-medium">{i.title}</div>
+                          {height > 30 && <div className="truncate text-muted-foreground">{timeLabel(i)}</div>}
+                        </div>
+                      </ItemPopover>
+                    </div>
                   );
                 })}
               </div>

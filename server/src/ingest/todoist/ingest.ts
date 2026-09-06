@@ -48,6 +48,7 @@ export function taskToRow(t: TTask, ctx: { projects: Map<string, TProject>; sect
     labels: t.labels ?? [],
     raw: {
       projectId: t.project_id,
+      parentId: t.parent_id ?? null,
       projectName: ctx.projects.get(t.project_id)?.name ?? null,
       sectionId: t.section_id ?? null,
       sectionName: t.section_id ? (ctx.sections.get(t.section_id)?.name ?? null) : null,

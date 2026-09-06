@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { sourceConfigSchemas } from '@collected/shared';
 import type { AppContext } from '../../context.js';
 import { items, type NewItemRow } from '../../db/schema.js';
@@ -89,8 +89,15 @@ export async function syncGcal(ctx: AppContext, api: CalendarApi, meta: GcalMeta
     if (result.syncToken) nextMeta.syncTokens![calId] = result.syncToken;
     if (full) nextMeta.lastFullSyncAt![calId] = nowIso();
   }
-  // Drop tokens for calendars that are no longer selected so re-selecting does a clean full sync.
+  // Drop tokens for calendars that are no longer selected so re-selecting does a clean full sync,
+  // and retire rows from calendars we no longer sync (deselected, or demo calendars from before a real connect).
   for (const k of Object.keys(nextMeta.syncTokens!)) if (!selected.includes(k)) delete nextMeta.syncTokens![k];
+  const live = await ctx.db.select({ id: items.id, externalId: items.externalId }).from(items).where(and(eq(items.source, 'gcal'), isNull(items.deletedAt)));
+  const stale = live.filter((r) => !selected.some((cal) => r.externalId.startsWith(`${cal}:`))).map((r) => r.id);
+  if (stale.length) {
+    await ctx.db.update(items).set({ deletedAt: nowIso() }).where(inArray(items.id, stale));
+    counts.retired = stale.length;
+  }
   return { counts, meta: nextMeta };
 }
 

@@ -18,13 +18,13 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 
 ## Post-run checklist (needs you)
 
-- [ ] Canvas: run `local/canvas_cookie.py` (see local/README.md) or paste the cookie in Settings → Sources, then `pnpm sync canvas`. Confirm the six courses get Canvas ids (Settings → Courses) and CMSC330 shows as TA with no homework rows.
+- [ ] Canvas: run `pnpm canvas-cookie` (it now accepts `canvas_session`, which is what UMD's Canvas sets, and scans every Chrome profile) or paste the cookie in Settings → Sources, then `pnpm sync canvas`. Confirm the six courses get Canvas ids (Settings → Courses) and CMSC330 shows as TA with no homework rows.
 - [ ] Canvas iCal: paste your personal feed URL (Canvas → Calendar → Calendar Feed) as the fallback.
 - [ ] Gradescope: enter the native email + password in Settings → Sources, then `pnpm sync gradescope`. Confirm CMSC330 shows the grading queue and CMSC422/MATH423 get Gradescope ids. Then set `submits_via` per course (Settings → Courses) and check the linked-assignments list.
-- [ ] Google Calendar: create the OAuth client (SETUP.md Phase 1; register both `http://localhost:5173/api/google/callback` and `http://localhost:3000/api/google/callback` plus the prod URI), put the id/secret in `.env`, restart `pnpm dev`, then Settings → Sources → Connect Google Calendar. Tick the calendars you want. Try the + button in the calendar widget; the event should appear in Google within a second.
+- [ ] Google Calendar: connected on 2026-09-06. Clearing the demo data reset the calendar selection to the primary calendar once; re-tick the calendars you want in Settings → Sources. Original note: create the OAuth client (SETUP.md Phase 1; register both `http://localhost:5173/api/google/callback` and `http://localhost:3000/api/google/callback` plus the prod URI), put the id/secret in `.env`, restart `pnpm dev`, then Settings → Sources → Connect Google Calendar. Tick the calendars you want. Try the + button in the calendar widget; the event should appear in Google within a second.
 - [ ] Todoist: paste the API token in Settings → Sources (again, if you did it before the key change), `pnpm sync todoist`, check the to-do widget sections (Settings → Todoist sync → sections). Then **Preview** the push, read the list, and only then **Push now** / enable the automatic push. Close one pushed task by hand in Todoist and confirm the next preview leaves it alone.
 - [ ] Jobs: the widget is live against the real Simplify feed already. Star a few, tune Settings → Jobs if the matches feel off (the exclude regex is the lever).
-- [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` / `pnpm cli demo gcal` / `pnpm cli demo todoist` any time you want fixture data in a fresh database. The dev database currently holds demo rows for Canvas, Gradescope, Google Calendar, and Todoist; `rm -rf data/` and restart to start clean before connecting real accounts.
+- [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` / `pnpm cli demo gcal` / `pnpm cli demo todoist` any time you want fixture data in a fresh database. Demo rows are tagged and removable with `pnpm cli demo clear` or Settings → Export / import → Remove demo data (done on 2026-09-06; the dev database now holds only real Google Calendar and Todoist rows plus the job feed).
 
 ## Deferred from the v1 plan
 

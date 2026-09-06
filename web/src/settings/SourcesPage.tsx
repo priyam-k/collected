@@ -209,7 +209,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
           hint={
             <>
               DevTools → Application → Cookies → your Canvas domain. Paste the whole cookie header, or at least{' '}
-              <code>_normandy_session=…</code>. Or run <code>local/canvas_cookie.py</code>.
+              <code>canvas_session=…</code> (older instances call it <code>_normandy_session</code>). Or run <code>pnpm canvas-cookie</code>.
             </>
           }
         >

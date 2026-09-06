@@ -5,6 +5,7 @@ import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { EmptyState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
+import { ItemPopover } from '@/widgets/ItemPopover';
 import { HotLinks, ItemRow, nextMeeting, windowFromNow } from '@/widgets/shared';
 
 export interface ClassWidgetConfig {
@@ -97,11 +98,13 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
               .sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''))
               .slice(0, 3)
               .map((a) => (
-                <li key={a.id} className="flex items-baseline gap-2">
-                  <a href={a.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">
-                    {a.title}
-                  </a>
-                  <span className="shrink-0 text-xs text-muted-foreground">{friendlyDate(a.startsAt)}</span>
+                <li key={a.id}>
+                  <ItemPopover item={a}>
+                    <span className="flex items-baseline gap-2 rounded hover:bg-accent/60">
+                      <span className="min-w-0 flex-1 truncate">{a.title}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{friendlyDate(a.startsAt)}</span>
+                    </span>
+                  </ItemPopover>
                 </li>
               ))}
           </ul>

@@ -3,6 +3,7 @@ import type { CourseLink, CourseSchedule, EffectiveItem, ItemStatus, Meeting } f
 import { Badge } from '@/components/ui/badge';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { ItemPopover } from '@/widgets/ItemPopover';
 
 export function CourseDot({ color, className, title }: { color: string | null | undefined; className?: string; title?: string }) {
   return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: color ?? 'var(--muted-foreground)' }} title={title} />;
@@ -87,13 +88,10 @@ export function ItemRow({ item, showCourse }: { item: EffectiveItem; showCourse?
       <DueLabel item={item} className="shrink-0 text-xs" />
     </>
   );
-  const cls = 'flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60';
-  return item.url ? (
-    <a href={item.url} target="_blank" rel="noreferrer" className={cls}>
-      {inner}
-    </a>
-  ) : (
-    <div className={cls}>{inner}</div>
+  return (
+    <ItemPopover item={item}>
+      <span className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60">{inner}</span>
+    </ItemPopover>
   );
 }
 

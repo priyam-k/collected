@@ -70,6 +70,10 @@ export const importSchema = exportSchema;
 export function exportRoutes(ctx: AppContext) {
   const r = new Hono();
   r.get('/export', async (c) => c.json(await buildExport(ctx)));
+  r.delete('/demo', async (c) => {
+    const { clearDemoData } = await import('../lib/demo.js');
+    return c.json(await clearDemoData(ctx));
+  });
   r.post('/import', async (c) => {
     const data = await parseBody(c, exportSchema);
     return c.json(await applyImport(ctx, data));

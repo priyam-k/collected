@@ -37,7 +37,7 @@ pnpm canvas-cookie                    # expects the dev server on :3000
 pnpm canvas-cookie -- --dry-run       # just list what it found
 ```
 
-or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `_normandy_session` (and `canvas_session` if present) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
+or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `canvas_session` (older Canvas instances call it `_normandy_session`; either works) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
 
 ### Gradescope
 Email + password into Settings → Sources → Gradescope. Then in Settings → Courses, set each course's Gradescope course id (the number in the course URL) and `submits_via`.

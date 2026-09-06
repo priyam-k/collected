@@ -4,6 +4,7 @@ import { useCourses, useItems } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
+import { ItemPopover } from '@/widgets/ItemPopover';
 import { CourseDot, DueLabel, HotLinks, StatusBadge, nextMeeting, windowFromNow } from '@/widgets/shared';
 
 /** One row per course: next due, hotlinks, upcoming count. */
@@ -48,11 +49,13 @@ export function ClassesWidget({ size }: WidgetProps) {
                 </td>
                 <td className="py-1.5 pr-2 align-top">
                   {next ? (
-                    <a href={next.url ?? '#'} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:underline">
-                      <span className="truncate">{next.title}</span>
-                      <StatusBadge item={next} />
-                      <DueLabel item={next} className="shrink-0 text-xs" />
-                    </a>
+                    <ItemPopover item={next}>
+                      <span className="flex items-center gap-2 rounded hover:bg-accent/60">
+                        <span className="truncate">{next.title}</span>
+                        <StatusBadge item={next} />
+                        <DueLabel item={next} className="shrink-0 text-xs" />
+                      </span>
+                    </ItemPopover>
                   ) : (
                     <span className="text-xs text-muted-foreground">nothing due in 3 weeks</span>
                   )}

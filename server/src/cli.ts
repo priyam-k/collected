@@ -13,6 +13,7 @@ function usage(): never {
   cli export               print config export JSON
   cli import <file>        import config JSON (courses, settings, widgets, layouts)
   cli demo <canvas|gradescope|gcal|todoist>  load fixtures into this database (UI development without a session)
+  cli demo clear           remove everything the demo loaders created
   cli push [--dry-run]     run the Todoist push now (ignores the enabled flag)
   cli dedup                re-run Canvas/Gradescope assignment linking`);
   process.exit(cmd ? 1 : 0);
@@ -45,6 +46,12 @@ switch (cmd) {
     console.log(JSON.stringify(await buildExport(ctx), null, 2));
     break;
   case 'demo': {
+    const demoStartedAt = new Date().toISOString();
+    const { clearDemoData, tagDemoRows } = await import('./lib/demo.js');
+    if (rest[0] === 'clear') {
+      console.log(JSON.stringify(await clearDemoData(ctx)));
+      break;
+    }
     if (rest[0] === 'canvas') {
       const { fixtureCanvasClient } = await import('./ingest/canvas/fixture-client.js');
       const { syncCanvas } = await import('./ingest/canvas/ingest.js');
@@ -84,6 +91,8 @@ switch (cmd) {
           { id: 'd5', content: 'Email advisor about spring schedule', project_id: 'p-school', labels: [], priority: 2, due: { date: day(2).toISOString().slice(0, 10), datetime: day(2, 9).toISOString() } },
           { id: 'd6', content: 'Read CIML ch. 1', project_id: 'p-school', labels: ['homework', 'cmsc422'], priority: 1, due: { date: day(1).toISOString().slice(0, 10), datetime: day(1, 23).toISOString() } },
           { id: 'd7', content: 'Call mom', project_id: 'inbox', labels: [], priority: 4, due: { date: day(0).toISOString().slice(0, 10) } },
+          { id: 'd8', content: 'Wipe counters', project_id: 'p-home', parent_id: 'd3', labels: [], priority: 1, due: null },
+          { id: 'd9', content: 'Mop kitchen', project_id: 'p-home', parent_id: 'd3', labels: [], priority: 1, due: { date: day(1).toISOString().slice(0, 10) } },
         ],
       });
       const counts = await syncTodoist(ctx, api);
@@ -91,8 +100,10 @@ switch (cmd) {
       await setSourceStatus(ctx, 'todoist', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
       console.log(JSON.stringify(counts));
     } else usage();
+    const sourceOf: Record<string, string> = { canvas: 'canvas', gradescope: 'gradescope', gcal: 'gcal', todoist: 'todoist' };
+    const tagged = await tagDemoRows(ctx, sourceOf[rest[0]!]!, demoStartedAt);
     const { runDedup } = await import('./sync/dedup.js');
-    console.log(JSON.stringify({ dedup: await runDedup(ctx) }));
+    console.log(JSON.stringify({ tagged, dedup: await runDedup(ctx), hint: 'remove with: cli demo clear (or Settings → Export / import → Remove demo data)' }));
     break;
   }
   case 'push': {

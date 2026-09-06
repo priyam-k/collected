@@ -23,9 +23,24 @@ export function DataPage() {
       toast.error(e instanceof Error ? e.message : String(e));
     }
   };
+  const clearDemo = async () => {
+    if (!window.confirm('Remove every row created by the demo loaders? Real syncs will refill anything that is genuinely there.')) return;
+    try {
+      const r = await api<{ items: number; content: number }>('/demo', { method: 'DELETE' });
+      await inv(['items'], ['sources'], ['courses']);
+      toast.success(`Removed ${r.items} demo items and ${r.content} content rows`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
+  };
   return (
     <div className="space-y-6">
       <PageTitle sub="Courses, settings, widget instances, and layouts. No credentials.">Export / import</PageTitle>
+      <section className="space-y-2 rounded-md border p-3">
+        <div className="text-sm font-medium">Demo data</div>
+        <p className="text-xs text-muted-foreground">`pnpm cli demo …` loads fixture rows so widgets have something to show before accounts are connected. Once real sources are connected, remove them here.</p>
+        <Button variant="outline" onClick={clearDemo}>Remove demo data</Button>
+      </section>
       <section className="space-y-2">
         <Button variant="outline" onClick={doExport}>Generate export</Button>
         {exported && <Textarea rows={12} readOnly className="font-mono text-xs" value={exported} onFocus={(e) => e.currentTarget.select()} />}
