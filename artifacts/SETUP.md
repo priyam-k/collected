@@ -74,6 +74,38 @@ Everything runs in one container: API, scheduler, and the built frontend. State 
 | **Your Mac** | $0 | Works through the tunnel whenever the lid is open; ingesters miss runs while asleep. Fine as a stopgap. |
 | **Cloudflare Workers + D1** | $0–5/mo | Would need a port: Node-only pieces (googleapis, pino, cookie jar, scheduler) replaced, and the free tier's daily D1 write cap is smaller than one hourly job sync. Not worth it until something else forces a rewrite. |
 
+### Google Cloud e2-micro, step by step
+
+Same Google Cloud project as the OAuth client is fine; the free tier is per billing account, not per project.
+
+1. Console → select the `collected` project → **Billing** → link a billing account (needs a card; new accounts also get trial credit). Compute Engine won't create VMs without billing enabled, but the Always Free discount is applied on the invoice.
+2. **APIs & Services → Library → Compute Engine API → Enable.**
+3. **Compute Engine → VM instances → Create instance.** Name `collected`. Region `us-east1` (any zone). Machine: series **E2**, type **e2-micro**. Boot disk → Change: **Ubuntu 24.04 LTS (x86/64)**, disk type **Standard persistent disk** (not Balanced), size **30 GB**. Leave firewall boxes unchecked (nothing inbound is needed). Create. Ignore the cost estimate panel; it doesn't know about the free tier.
+   The free allowance is one e2-micro's worth of hours per month in `us-west1` / `us-central1` / `us-east1`, 30 GB of standard disk, 1 GB egress per month. Anything else on the account bills normally.
+4. Click **SSH** in the console (browser terminal), or set up `gcloud compute ssh`. Then:
+   ```sh
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER && newgrp docker
+   sudo mkdir -p /srv/collected && sudo chown $USER /srv/collected
+   ```
+5. Get the code onto the box. Easiest is a private GitHub repo: push from the Mac, `git clone` on the VM (use a deploy key or `gh auth login`). Without GitHub: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/`.
+6. `cd /srv/collected && cp .env.example .env` and set `AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty.
+7. `docker compose up -d --build`. The build is slow on 1 GB RAM (several minutes) but the swap keeps it alive. If it dies anyway, build on the Mac instead and ship the image:
+   ```sh
+   docker build --platform linux/amd64 -t collected:latest .
+   docker save collected:latest | gzip | ssh collected-vm 'gunzip | docker load'
+   ssh collected-vm 'cd /srv/collected && docker compose up -d'
+   ```
+   (`docker-compose.yml` names the image `collected:latest`, so compose will use the loaded one instead of rebuilding.)
+8. `docker compose logs -f app` should show `seeded from seed-config.json` and `listening`. Then do the Cloudflare section.
+
+### How the tunnel works
+
+Normally exposing a server means an open port, a public IP, and DNS pointing at it. Cloudflare Tunnel inverts that: `cloudflared` on the box opens a few **outbound** connections to Cloudflare's nearest data centers and keeps them alive. Your DNS record for `collected.priyamkabra.com` points at the tunnel, not at any IP. A browser request lands on Cloudflare's edge, TLS terminates there, Cloudflare Access checks the login, and the request travels down the already-open connection to `cloudflared`, which forwards it to `http://localhost:3000` on the box. The box never accepts an inbound connection, so it works behind NAT, dorm wifi, campus firewalls, or a friend's home router with no port forwarding, no static IP, and no certificates to manage. The connector proves it is yours with the tunnel token; Access adds the "only Priyam" layer and signs a JWT the app verifies on every request.
+
+**On a friend's box**: nothing on their network changes. They give you a user account with Docker access; you run the container and `cloudflared service install <your token>` there. The tunnel, hostname, and login policy all live in your Cloudflare account; `cloudflared` only forwards to the one local port you configured, so nothing else on their machine is reachable through it, and their IP never appears anywhere. If they already run `cloudflared` for their own domain, a second connector with your token runs alongside it. The trust question is the other direction: whoever has root on that box can read the `data/` volume (your Canvas cookie, tokens, key file).
+
 ### VPS (Hetzner or any Ubuntu box)
 1. Any Ubuntu 24.04 box works. Hetzner: `https://console.hetzner.cloud` → new project → Add server, a Falkenstein/Helsinki CX plan is the cheap one. Google Cloud: Compute Engine → Create instance → e2-micro in `us-east1`, Ubuntu 24.04, 30 GB standard disk, then `sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` and add it to `/etc/fstab`. Either way: add your SSH key, firewall inbound 22 only. Nothing else needs to be open; the tunnel is outbound.
 2. SSH in. Install Docker: `curl -fsSL https://get.docker.com | sh`, then `usermod -aG docker $USER`.
