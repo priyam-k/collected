@@ -1,0 +1,67 @@
+thinking of making this platform/dashboard (primarily for me at first but maybe could be expanded/useful for others as well).
+
+as a student, there are a ton of disconnected sources to keep track of constantly which vary a lot based on the specific things ur doing and there’s no one size fits all solution that i can find, so you end up with a bunch of incomplete dashboards/aggregators that kinda work. especially now since code is so cheap, why not use that to make a perfect personalized dashboard that has exactly what i need?
+
+i was thinking to combine things like:
+- todoist for todo list
+- gcal/apple cal for calendar
+- canvas for classes/assignments
+- gradescope for assignments
+- specific assignment details — like textbook links, links to notes, details etc customized based on each class
+- piazza for class discussion/question forum
+- lecture notes linked/pulled 
+- TA duties: piazza notifs, grading responsibilities, office hrs/proctoring responsibilities.
+- job applications: staying on top of newly posted jobs, generating resumes/applications, managing followups/communications (recently saw pinloop.ai looks good on paper)
+- email: important emails/tasks that need to be done
+- maybe discord: somehow scrape my discord to get info abt upcoming events/wtc (most umd clubs r on discord servers)
+- maybe even health/wellness : connect to my bevel/ghealth/applehealth/fitbit air to pull that stuff.
+- maybe even obsidian somehow for notes or even just personal context
+- financial events maybe: rent/tuition etc (not all my financial info)
+
+i think this would be a highly useful comprehensive dashboard so i can ahve everything organized and nothing out of place and one place to look to see everything that id possibly need
+
+Thought for 26s
+The idea is sound, but the thing that kills these projects isn't the concept — it's that you're describing ~12 integrations with wildly different difficulty, and the fragile ones will eat all your time.
+
+Tier them by cost, not by how much you want them:
+
+Real APIs, do these first: Canvas (UMD's Canvas has personal access tokens — genuinely good API), Todoist (you already know it), Google Calendar, Gmail. Obsidian too — it's just markdown on disk, so it's a file walk, not an integration.
+Unofficial/scraper territory: Piazza and Gradescope have community Python libraries that log in with your credentials. They work until they don't, and they break at the worst time. Gradescope may be partly redundant since grades often sync back to Canvas. Also worth checking whether CMSC330 is even on Piazza — a lot of UMD CS has drifted to Ed Discussion.
+Don't: Discord scraping via your user account is self-botting and gets accounts banned, and you can't add a bot to club servers you don't run. Health data is a separate pain (Apple Health has no API; you'd need an export pipeline) and has nothing to do with "what do I need to do today." Financial events are three calendar entries you can type by hand.
+The architecture that survives: one normalized store — items with source, type, due, title, link, status — and each integration is an independent ingester writing into it. A broken Gradescope scraper then degrades to a stale section, not a dead dashboard. Your view layer reads only the store, so you can rewrite the UI without touching ingestion.
+
+The harder question is what this does that ten browser tabs don't. A read-only aggregator of twelve feeds is often worse than the sources, because now you have twelve feeds with no prioritization and a sync layer to maintain. The value is in the collapse: one ranked "what do I actually do in the next 4 hours" list that knows a CMSC330 grading deadline outranks a club event. That's the same instinct behind Todoish, scaled — and it's the part that's actually hard and actually yours.
+
+On expanding it to others: the per-class customization you want (textbook links, notes paths, per-course quirks) is exactly what makes it untransferable. Build it selfishly. Generalizing costs abstraction you don't need in v1.
+
+Concretely: Canvas + Todoist + GCal into one store, one ranked view, ship it this week. If you're still opening it daily in two weeks, add Piazza. If you're not, you learned that cheaply.
+
+well the point is that everything’s linked. and gradescope bc classes r inconsistent with assignments posted on canvas vs gradescope. there’s better campus which does that sync but that’s what i mean by single thing covered. piazza would just be a feed so i can see posts that i could reply to (330 ta) or see relevant posts that are useful for me (class announcement/relevant assignment question). all linked back to source. 
+
+health is nbd bevel is already a nice health ui, even ghealth is pretty good.
+financials yeah that’s just a calendar event basically.
+
+but the entire pt is that it’s a million diff integrations so i have one place to look instead of 10 different things. and i’ll make it for me first and if it makes sense then maybe expand for others too
+
+Thought for 9s
+Fair — the linking is the product, and "index that points back to source" is a different thing from "replacement UI." That resolves most of my objection. Canvas/Gradescope inconsistency is a real problem Better Campus doesn't fully solve, and a TA triage feed for unanswered 330 posts is a genuinely good use case.
+
+The thing that'll actually bite you across twelve integrations is auth, not APIs. Worth knowing before you start:
+
+Piazza and Gradescope both have native email/password accounts separate from UMD SSO. If you set a direct password on each, you skip CAS and Duo entirely. If you're stuck going through SSO, Duo push on every sync makes automation basically unworkable.
+Sessions expire on their own schedule. Store cookies, detect the redirect-to-login, and surface "Gradescope needs re-auth" as a visible state rather than letting the panel go quietly stale. Every panel showing its own last-synced timestamp is the cheapest way to make a dozen fragile ingesters honest.
+Canvas is the easy one — a personal access token from your account settings, no expiry, real REST API.
+Discord is still the one I'd leave out. Scraping with your user token is self-botting under Discord's ToS and it's an account ban, not a rate limit — and you can't add a bot to servers you don't administer. If club events matter, the realistic path is asking club officers to publish a Google Calendar, which some already do.
+
+yeah discord maybe push off for now but was thinking: instead of actually self bottong (using acct as bot) what if i just had it logged in and scraped like normal? or even emulated on a phone and just pull the notifications thread — looks like it’s just idly logged in and pulls from a different surface?
+
+Thought for 14s
+The notification-mirror idea is actually different in kind from the other two — worth separating them.
+
+Browser scraping while logged in is still automated access with a user account. Discord's detection is pattern-based (request timing, ordering, endpoints hit), not based on whether you're technically using a browser. Playwright driving a real Chrome profile is harder to detect than raw token requests, but it's the same category and the same penalty if it lands.
+
+Notification mirroring is genuinely outside Discord's view. An Android app with NotificationListenerService reads notifications the OS has already received via Google's push service. You're never touching Discord's servers — you're reading your own phone's notification tray. Discord has no telemetry there. The catch is what you get: truncated text, no history or backfill, only messages you're actually notified about (so @everyone announcements yes, general channel chatter no), and thin channel/server context. For "club posted an event announcement," that's probably enough. For anything richer, it won't be.
+
+Before building either, check TerpLink — UMD's student org platform has an events feed that a lot of clubs populate as their official listing, and it's a real source rather than a scrape. Combined with asking a couple of officers to share a Google Calendar, you might cover 80% of what you'd get from Discord with none of the fragility.
+
+

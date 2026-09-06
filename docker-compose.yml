@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    image: collected:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data:/data
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TZ: ${TZ:-America/New_York}
+      # Registered in artifacts/SETUP.md; override in .env
+      PUBLIC_URL: ${PUBLIC_URL:-https://collected.priyamkabra.com}

@@ -1,0 +1,12 @@
+packages:
+  - shared
+  - server
+  - web
+
+# pnpm 12 blocks postinstall scripts unless allowed here.
+allowBuilds:
+  esbuild: true
+
+# pnpm 12 delays brand-new releases by default; jose's latest was excluded during install.
+minimumReleaseAgeExclude:
+  - jose@6.2.12
