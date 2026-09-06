@@ -5,6 +5,7 @@ import { CalendarWidget } from './calendar/CalendarWidget';
 import { ClassWidget } from './class/ClassWidget';
 import { ClassesWidget } from './classes/ClassesWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
+import { TodoWidget } from './todo/TodoWidget';
 import { makeStub } from './stubs';
 import type { WidgetDef } from './types';
 
@@ -39,8 +40,7 @@ export const WIDGETS: WidgetDef[] = [
       { label: 'Columns', w: 8, h: 6 },
     ],
     min: { w: 3, h: 3 },
-    Component: makeStub('To-do list arrives in M6.'),
-    comingSoon: 'M6',
+    Component: TodoWidget,
   },
   {
     type: 'classes',

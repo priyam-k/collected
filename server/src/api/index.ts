@@ -12,6 +12,7 @@ import { jobsRoutes } from './jobs.js';
 import { layoutRoutes, widgetRoutes } from './layout.js';
 import { settingsRoutes } from './settings.js';
 import { sourcesRoutes } from './sources.js';
+import { todoistRoutes } from './todoist.js';
 
 export function createApi(ctx: AppContext) {
   const api = new Hono<{ Variables: AuthVariables }>();
@@ -36,6 +37,7 @@ export function createApi(ctx: AppContext) {
   api.route('/settings', settingsRoutes(ctx));
   api.route('/google', googleRoutes(ctx));
   api.route('/calendar', calendarRoutes(ctx));
+  api.route('/todoist', todoistRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 
   api.notFound((c) => c.json({ error: 'not found' }, 404));

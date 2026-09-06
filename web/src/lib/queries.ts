@@ -297,6 +297,41 @@ export function useCreateEvent() {
   });
 }
 
+export interface PushPlan {
+  ops: { op: 'create' | 'update' | 'close' | 'delete'; itemId: string; title: string; taskId?: string; reason: string }[];
+  projectId: string | null;
+  projectName: string;
+  candidates: number;
+  mapped: number;
+  rebuilt: number;
+  skipped: { itemId: string; reason: string }[];
+}
+
+export function useTodoistPush() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (opts: { dryRun?: boolean; force?: boolean }) =>
+      api<{ plan: PushPlan; done?: Record<string, number>; errors?: { error: string }[] }>(`/todoist/push?${opts.dryRun ? 'dryRun=1' : ''}${opts.force ? '&force=1' : ''}`, { method: 'POST' }),
+    onSettled: (_d, _e, v) => (v.dryRun ? Promise.resolve() : inv(['items'], qk.sources, qk.settings)),
+  });
+}
+
+export function useCloseTodoistTask() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (taskId: string) => api(`/todoist/tasks/${encodeURIComponent(taskId)}/close`, { method: 'POST' }),
+    onSettled: () => inv(['items']),
+  });
+}
+
+export function useQuickAddTask() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (text: string) => api<EffectiveItem>('/todoist/tasks/quick', { method: 'POST', json: { text } }),
+    onSettled: () => inv(['items']),
+  });
+}
+
 export function usePatchJobState() {
   const inv = useInvalidate();
   return useMutation({

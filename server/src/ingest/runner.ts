@@ -16,6 +16,20 @@ async function runAfterHooks(ctx: AppContext, id: SourceId): Promise<void> {
     } catch (err) {
       ctx.log.error({ err }, 'dedup failed');
     }
+    try {
+      const { todoistPushConfigSchema } = await import('@collected/shared');
+      const { getSettingParsed } = await import('../lib/settings.js');
+      const cfg = await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema);
+      if (cfg.enabled) {
+        const { todoistApiForCtx } = await import('../ingest/todoist/ingest.js');
+        const { executePush, planPush } = await import('../sync/todoist-push.js');
+        const api = await todoistApiForCtx(ctx);
+        const plan = await planPush(ctx, api, cfg);
+        if (plan.ops.length) await executePush(ctx, api, plan, cfg);
+      }
+    } catch (err) {
+      if (!(err instanceof NotConfiguredError)) ctx.log.error({ err }, 'todoist push after sync failed');
+    }
   }
 }
 
