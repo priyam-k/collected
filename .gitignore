@@ -9,3 +9,5 @@ data/
 .DS_Store
 .pnpm-store/
 coverage/
+local/.venv/
+__pycache__/

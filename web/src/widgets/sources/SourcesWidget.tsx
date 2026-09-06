@@ -82,6 +82,7 @@ export function SourcesWidget({ size }: WidgetProps) {
                   size="icon-sm"
                   variant="ghost"
                   aria-label={`Sync ${SOURCE_LABELS[s.id]}`}
+                  title={`Sync ${SOURCE_LABELS[s.id]} now`}
                   disabled={sync.isPending && sync.variables === s.id}
                   onClick={() => runSync(s)}
                 >

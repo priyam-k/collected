@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useClearSourceConfig, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSources, useSyncSource } from '@/lib/queries';
+import { useClearSourceConfig, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { friendlyDate } from '@/lib/time';
 import { useSearchParams } from 'react-router';
 import { useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -82,8 +84,83 @@ function SourceCard({ source, description, children }: { source: Source; descrip
         <CardDescription>{description}</CardDescription>
         {source.lastError && <p className="text-xs text-destructive">{source.lastError}</p>}
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="space-y-4">
+        {children}
+        <DataViewer source={source} />
+      </CardContent>
     </Card>
+  );
+}
+
+/** Expandable "what did we actually pull" panel: last run counts, rows per course, recent items. */
+function DataViewer({ source }: { source: Source }) {
+  const [open, setOpen] = useState(false);
+  const q = useSourceSummary(source.id, open);
+  const d = q.data;
+  return (
+    <div className="rounded-md border">
+      <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent/50" onClick={() => setOpen((v) => !v)} title="Show what this source has pulled">
+        {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        <span className="font-medium">Data pulled</span>
+        {source.lastRunAt && <span className="text-xs text-muted-foreground">last run {relative(source.lastRunAt)}</span>}
+      </button>
+      {open && (
+        <div className="space-y-3 border-t px-3 py-2 text-sm">
+          {q.isPending && <p className="text-xs text-muted-foreground">Loading…</p>}
+          {d && (
+            <>
+              {d.lastRun ? (
+                <p className="text-xs text-muted-foreground">
+                  Last run {friendlyDate(d.lastRun.at, { withTime: true })} in {(d.lastRun.ms / 1000).toFixed(1)}s ·{' '}
+                  {Object.entries(d.lastRun.counts).map(([k, v]) => `${k} ${v}`).join(' · ') || 'no counts'}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No completed run yet.</p>
+              )}
+              {d.jobs && <p className="text-xs text-muted-foreground">{d.jobs.total} listings stored · {d.jobs.matched} active matches</p>}
+              {(source.id === 'canvas' || source.id === 'gradescope') && (
+                <table className="w-full text-xs">
+                  <thead className="text-left text-muted-foreground">
+                    <tr><th className="py-1 pr-2 font-normal">Course</th><th className="py-1 pr-2 font-normal">{source.id === 'canvas' ? 'Canvas id' : 'Gradescope id'}</th><th className="py-1 pr-2 font-normal">Items</th><th className="py-1 font-normal">Content</th></tr>
+                  </thead>
+                  <tbody>
+                    {d.byCourse.map((c) => (
+                      <tr key={c.courseId} className="border-t">
+                        <td className="py-1 pr-2 font-medium">{c.code}{c.role === 'ta' && <span className="ml-1 text-muted-foreground">TA</span>}</td>
+                        <td className="py-1 pr-2 font-mono">{c.linkedId ?? <span className="text-amber-600 dark:text-amber-400">not matched</span>}</td>
+                        <td className="py-1 pr-2">{Object.entries(c.kinds).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(', ') || '—'}</td>
+                        <td className="py-1">{Object.entries(c.content).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ') || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {Object.keys(d.unassigned).length > 0 && source.id !== 'canvas' && source.id !== 'gradescope' && (
+                <p className="text-xs text-muted-foreground">{Object.entries(d.unassigned).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(' · ')}</p>
+              )}
+              {d.recent.length > 0 ? (
+                <div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">Most recently updated rows</div>
+                  <ul className="max-h-64 space-y-0.5 overflow-auto">
+                    {d.recent.map((r) => (
+                      <li key={r.id} className="flex items-baseline gap-2 text-xs">
+                        <span className="w-20 shrink-0 text-muted-foreground">{r.kind}</span>
+                        {r.url ? <a className="min-w-0 flex-1 truncate hover:underline" href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : <span className="min-w-0 flex-1 truncate">{r.title}</span>}
+                        <span className="shrink-0 text-muted-foreground">{r.courseId ? d.byCourse.find((c) => c.courseId === r.courseId)?.code : r.labels.length ? r.labels.join(',') : ''}</span>
+                        <span className="w-24 shrink-0 text-right text-muted-foreground">{friendlyDate(r.dueAt ?? r.startsAt)}</span>
+                        <span className="w-16 shrink-0 text-right text-muted-foreground">{r.status}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No rows from this source yet.</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

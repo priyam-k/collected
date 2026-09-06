@@ -78,6 +78,44 @@ export function sourcesRoutes(ctx: AppContext) {
     return c.json(toPublic(await getSourceRow(ctx, id.data)));
   });
 
+  /** What a source has pulled: last run counts, items per course, the most recent rows. Feeds the settings data viewer. */
+  r.get('/:id/summary', async (c) => {
+    const id = sourceIdSchema.safeParse(c.req.param('id'));
+    if (!id.success) bad('unknown source', 404);
+    const row = await getSourceRow(ctx, id.data);
+    const { items, courses, courseContent, jobs } = await import('../db/schema.js');
+    const { and, desc, eq, isNull, sql } = await import('drizzle-orm');
+    const perCourse = await ctx.db
+      .select({ courseId: items.courseId, kind: items.kind, n: sql<number>`count(*)` })
+      .from(items)
+      .where(and(eq(items.source, id.data), isNull(items.deletedAt)))
+      .groupBy(items.courseId, items.kind);
+    const courseRows = await ctx.db.select({ id: courses.id, code: courses.code, canvasCourseId: courses.canvasCourseId, gradescopeCourseId: courses.gradescopeCourseId, role: courses.role, archived: courses.archived }).from(courses);
+    const recent = await ctx.db
+      .select({ id: items.id, kind: items.kind, title: items.title, courseId: items.courseId, dueAt: items.dueAt, startsAt: items.startsAt, status: items.status, url: items.url, updatedAt: items.updatedAt, labels: items.labels })
+      .from(items)
+      .where(and(eq(items.source, id.data), isNull(items.deletedAt)))
+      .orderBy(desc(items.updatedAt))
+      .limit(30);
+    const content =
+      id.data === 'canvas' || id.data === 'gradescope'
+        ? await ctx.db.select({ courseId: courseContent.courseId, kind: courseContent.kind, n: sql<number>`count(*)` }).from(courseContent).groupBy(courseContent.courseId, courseContent.kind)
+        : [];
+    const jobStats = id.data === 'jobs' ? await ctx.db.select({ total: sql<number>`count(*)`, matched: sql<number>`sum(case when ${jobs.matchesFilter} and ${jobs.active} then 1 else 0 end)` }).from(jobs) : [];
+    const byCourse = courseRows
+      .filter((k) => !k.archived)
+      .map((k) => ({
+        courseId: k.id,
+        code: k.code,
+        role: k.role,
+        linkedId: id.data === 'canvas' ? k.canvasCourseId : id.data === 'gradescope' ? k.gradescopeCourseId : null,
+        kinds: Object.fromEntries(perCourse.filter((p) => p.courseId === k.id).map((p) => [p.kind, p.n])),
+        content: Object.fromEntries(content.filter((p) => p.courseId === k.id).map((p) => [p.kind, p.n])),
+      }));
+    const unassigned = Object.fromEntries(perCourse.filter((p) => !p.courseId).map((p) => [p.kind, p.n]));
+    return c.json({ id: id.data, status: row.status, lastError: row.lastError, lastRun: (row.meta as { lastRun?: unknown }).lastRun ?? null, byCourse, unassigned, recent, jobs: jobStats[0] ?? null, total: perCourse.reduce((a, p) => a + p.n, 0) });
+  });
+
   /** Run now. Returns the outcome so the UI can toast it. */
   r.post('/:id/sync', async (c) => {
     const id = sourceIdSchema.safeParse(c.req.param('id'));

@@ -4,8 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
-export function CourseDot({ color, className }: { color: string | null | undefined; className?: string }) {
-  return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: color ?? 'var(--muted-foreground)' }} />;
+export function CourseDot({ color, className, title }: { color: string | null | undefined; className?: string; title?: string }) {
+  return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: color ?? 'var(--muted-foreground)' }} title={title} />;
 }
 
 export function HotLinks({ links, compact }: { links: CourseLink[]; compact?: boolean }) {
@@ -81,7 +81,7 @@ export function DueLabel({ item, className }: { item: EffectiveItem; className?:
 export function ItemRow({ item, showCourse }: { item: EffectiveItem; showCourse?: boolean }) {
   const inner = (
     <>
-      {showCourse && item.course && <CourseDot color={item.course.color} />}
+      {showCourse && item.course && <CourseDot color={item.course.color} title={item.course.code} />}
       <span className="min-w-0 flex-1 truncate">{item.title}</span>
       <StatusBadge item={item} />
       <DueLabel item={item} className="shrink-0 text-xs" />

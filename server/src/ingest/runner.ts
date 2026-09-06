@@ -1,7 +1,7 @@
 import type { SourceId, SourceStatus } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { nowIso } from '../lib/time.js';
-import { getSourceRow, mergeSourceMeta, setSourceStatus } from '../lib/sources.js';
+import { UndecryptableConfigError, getSourceRow, mergeSourceMeta, setSourceStatus } from '../lib/sources.js';
 import { NeedsAuthError, NotConfiguredError, type Ingester, type RunResult } from './types.js';
 
 const running = new Set<SourceId>();
@@ -60,7 +60,7 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
     const result = await ing.run(ctx, ac.signal);
     const ms = Date.now() - started;
     await setSourceStatus(ctx, ing.id, 'connected', { lastError: null, lastSuccessAt: nowIso() });
-    if (result.meta) await mergeSourceMeta(ctx, ing.id, result.meta);
+    await mergeSourceMeta(ctx, ing.id, { ...(result.meta ?? {}), lastRun: { at: nowIso(), ms, counts: result.counts ?? {} } });
     log.info({ ms, ...result.counts }, 'sync ok');
     await runAfterHooks(ctx, ing.id);
     return { ok: true, result, ms };
@@ -72,9 +72,9 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
       log.debug('not configured');
       return { ok: false, error: message, status: 'disconnected', ms };
     }
-    if (err instanceof NeedsAuthError) {
+    if (err instanceof NeedsAuthError || err instanceof UndecryptableConfigError) {
       await setSourceStatus(ctx, ing.id, 'needs_auth', { lastError: message });
-      log.warn({ ms }, 'needs auth');
+      log.warn({ ms, reason: message }, 'needs auth');
       return { ok: false, error: message, status: 'needs_auth', ms };
     }
     await setSourceStatus(ctx, ing.id, 'error', { lastError: message.slice(0, 500) });

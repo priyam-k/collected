@@ -74,11 +74,13 @@ export class TodoistHttpApi implements TodoistApi {
   }
   async listCompleted(since: string, until: string) {
     // v1 exposes completed tasks by completion date (3-month window max) with an `items` envelope.
+    // It wants plain `YYYY-MM-DDTHH:MM:SS` bounds, no milliseconds or zone suffix.
+    const fmt = (iso: string) => new Date(iso).toISOString().slice(0, 19);
     const out: TTask[] = [];
     let cursor: string | undefined;
     for (let i = 0; i < 50; i++) {
       const page = await this.req<{ items?: TTask[]; results?: TTask[]; next_cursor?: string | null }>('GET', '/tasks/completed/by_completion_date', {
-        query: { since, until, limit: 200, cursor },
+        query: { since: fmt(since), until: fmt(until), limit: 200, cursor },
       });
       out.push(...(page.items ?? page.results ?? []));
       if (!page.next_cursor) break;

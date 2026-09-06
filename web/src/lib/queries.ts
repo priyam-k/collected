@@ -39,6 +39,22 @@ export function useSources(opts?: Partial<UseQueryOptions<Source[]>>) {
   return useQuery({ queryKey: qk.sources, queryFn: () => api<Source[]>('/sources'), ...poll, ...opts });
 }
 
+export interface SourceSummary {
+  id: SourceId;
+  status: string;
+  lastError: string | null;
+  lastRun: { at: string; ms: number; counts: Record<string, number> } | null;
+  byCourse: { courseId: string; code: string; role: string; linkedId: string | null; kinds: Record<string, number>; content: Record<string, number> }[];
+  unassigned: Record<string, number>;
+  recent: { id: string; kind: string; title: string; courseId: string | null; dueAt: string | null; startsAt: string | null; status: string; url: string | null; updatedAt: string; labels: string[] }[];
+  jobs: { total: number; matched: number } | null;
+  total: number;
+}
+
+export function useSourceSummary(id: SourceId, enabled: boolean) {
+  return useQuery({ queryKey: ['sources', id, 'summary'] as const, queryFn: () => api<SourceSummary>(`/sources/${id}/summary`), enabled, staleTime: 15_000 });
+}
+
 export function useCourses() {
   return useQuery({ queryKey: qk.courses, queryFn: () => api<Course[]>('/courses'), staleTime: 60_000 });
 }

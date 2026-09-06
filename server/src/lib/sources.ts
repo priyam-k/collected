@@ -9,6 +9,13 @@ export async function getSourceRow(ctx: AppContext, id: SourceId): Promise<Sourc
   return row;
 }
 
+export class UndecryptableConfigError extends Error {
+  constructor(id: SourceId) {
+    super(`Stored ${id} credentials were encrypted with a different SECRET_KEY. Re-enter them in Settings → Sources.`);
+    this.name = 'UndecryptableConfigError';
+  }
+}
+
 export async function getSourceConfig<T>(ctx: AppContext, id: SourceId): Promise<T | null> {
   const row = await getSourceRow(ctx, id);
   if (!row.configEnc) return null;
@@ -16,7 +23,7 @@ export async function getSourceConfig<T>(ctx: AppContext, id: SourceId): Promise
     return ctx.crypto.decryptJson<T>(row.configEnc);
   } catch (err) {
     ctx.log.error({ err, source: id }, 'could not decrypt source config (SECRET_KEY changed?)');
-    return null;
+    throw new UndecryptableConfigError(id);
   }
 }
 

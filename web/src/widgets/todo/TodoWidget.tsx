@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
+import { SOURCE_LABELS, todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -95,7 +95,13 @@ export function TodoWidget({ size }: WidgetProps) {
       <ul className="space-y-0.5">
         {s.items.map((it) => (
           <li key={it.id} className="group flex items-start gap-2 rounded px-1 py-1 text-sm hover:bg-accent/60">
-            <Checkbox className="mt-0.5" aria-label={`Complete ${it.title}`} checked={false} onCheckedChange={() => complete(it)} />
+            <Checkbox
+              className="mt-0.5"
+              aria-label={`Complete ${it.title}`}
+              title={it.source === 'todoist' ? 'Complete this task in Todoist' : 'Mark done here only. Canvas / Gradescope are never changed.'}
+              checked={false}
+              onCheckedChange={() => complete(it)}
+            />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {it.course && <CourseDot color={it.course.color} />}
@@ -108,8 +114,11 @@ export function TodoWidget({ size }: WidgetProps) {
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <DueLabel item={it} />
-                {it.course && <span>{it.course.code}</span>}
-                {it.source === 'todoist' && (it.raw as { projectName?: string }).projectName && <span>#{(it.raw as { projectName?: string }).projectName}</span>}
+                {it.course && <span title="Course (the dot is the course color)">{it.course.code}</span>}
+                {it.source === 'todoist' && (it.raw as { projectName?: string }).projectName && <span title="Todoist project">#{(it.raw as { projectName?: string }).projectName}</span>}
+                <span className="ml-auto rounded bg-secondary px-1 text-[10px] uppercase tracking-wide" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>
+                  {it.source === 'canvas_ical' ? 'ical' : it.source}
+                </span>
               </div>
             </div>
           </li>
@@ -159,7 +168,7 @@ export function TodoWidget({ size }: WidgetProps) {
       {todoistOn && size.tier !== 'xs' && (
         <form onSubmit={submitQuickAdd} className="flex shrink-0 items-center gap-1 border-t p-1.5">
           <Input className="h-7 text-xs" placeholder="Add a task… (tomorrow 5pm @grocery #Home)" value={text} onChange={(e) => setText(e.target.value)} />
-          <Button size="icon-xs" type="submit" variant="secondary" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task">
+          <Button size="icon-xs" type="submit" variant="secondary" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)">
             <Plus className="size-3.5" />
           </Button>
         </form>

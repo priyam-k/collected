@@ -67,7 +67,9 @@ export function hashBody(body: NewTaskBody): string {
 }
 
 function taskMatchesBody(task: TTask, body: NewTaskBody): boolean {
-  const taskDue = task.due?.datetime ? new Date(task.due.datetime).toISOString() : task.due?.date ? task.due.date : null;
+  const rawDue = task.due?.datetime || task.due?.date || null;
+  const parsed = rawDue && !/^\d{4}-\d{2}-\d{2}$/.test(rawDue) ? new Date(rawDue) : null;
+  const taskDue = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : rawDue;
   const wantDue = body.due_datetime ?? body.due_date ?? null;
   const sameLabels = [...(task.labels ?? [])].sort().join(',') === [...(body.labels ?? [])].sort().join(',');
   return task.content === body.content && taskDue === wantDue && sameLabels;

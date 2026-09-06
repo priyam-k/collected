@@ -101,3 +101,13 @@ Why: widgets should never show the same homework twice; the preferred side is th
 ## 021 — Gradescope instructor pages are read from embedded React props (2026-09-06)
 
 The instructor assignments table is React-rendered, but its data is embedded server-side as JSON in `data-react-props` on the mount point, so plain HTTP still works. Student pages remain server-rendered tables.
+
+## 022 — Encryption key lives in the data directory (2026-09-06)
+
+`SECRET_KEY` in `.env` is optional; when empty the server reads or creates `DATA_DIR/.secret_key` (mode 0600). Credentials that fail to decrypt flip their source to `needs_auth` with a message naming the cause.
+Why: a recreated `.env` on day one silently lost the key and with it every stored credential. The key belongs next to the database it protects, inside the same Docker volume, and a lost key should be a visible state rather than a quiet "disconnected".
+
+## 023 — Per-source data viewer in settings (2026-09-06)
+
+Every source card has an expandable "Data pulled" panel: last run counts and duration, rows per course with the matched external id, recent rows. Backed by `GET /api/sources/:id/summary`; the runner stores each run's counts in `sources.meta.lastRun`.
+Why: "it says connected" is not evidence. The first real Gradescope sync looked like a no-op until the rows were listed.

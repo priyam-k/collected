@@ -31,11 +31,11 @@ export function CalendarWidget({ size, instance }: WidgetProps) {
     <div className="flex h-full flex-col">
       {!compact && (
         <div className="flex shrink-0 items-center gap-1 border-b px-1.5 py-1">
-          <Button size="icon-xs" variant="ghost" aria-label="Previous" onClick={() => shift(-1)}>
+          <Button size="icon-xs" variant="ghost" aria-label="Previous" title="Previous period" onClick={() => shift(-1)}>
             <ChevronLeft className="size-3.5" />
           </Button>
-          <Button size="xs" variant="ghost" onClick={goToday}>Today</Button>
-          <Button size="icon-xs" variant="ghost" aria-label="Next" onClick={() => shift(1)}>
+          <Button size="xs" variant="ghost" title="Jump back to today" onClick={goToday}>Today</Button>
+          <Button size="icon-xs" variant="ghost" aria-label="Next" title="Next period" onClick={() => shift(1)}>
             <ChevronRight className="size-3.5" />
           </Button>
           <span className="ml-1 truncate text-xs font-medium">
@@ -46,6 +46,7 @@ export function CalendarWidget({ size, instance }: WidgetProps) {
               (['agenda', 'strip', 'week', 'month'] as CalView[]).map((v) => (
                 <button
                   key={v}
+                  title={`${VIEW_LABEL[v]} view (auto-picked from widget size unless you choose one)`}
                   className={cn('rounded px-1.5 py-0.5 text-[11px]', view === v ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}
                   onClick={() => setOverride(v === (pinned ?? autoView(size.width, size.height)) ? null : v)}
                 >

@@ -24,6 +24,7 @@ export async function bootstrap(opts: { quiet?: boolean } = {}): Promise<AppCont
   const { db } = await openDb(env.DATA_DIR);
   await runMigrations(db);
   const ctx: AppContext = { env, db, log, crypto: createCrypto(env.SECRET_KEY), version: readVersion(env.rootDir) };
+  log.debug({ secretKeySource: env.secretKeySource, dataDir: env.DATA_DIR }, 'encryption key loaded');
   await seed(ctx);
   return ctx;
 }

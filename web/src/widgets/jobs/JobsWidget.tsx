@@ -62,13 +62,13 @@ function Card({ job, onState, compact, refCb }: { job: Job; onState: (s: Job['st
         <span className="ml-auto shrink-0">{friendlyDate(job.postedAt)}</span>
       </div>
       <div className="mt-0.5 flex items-center gap-0.5">
-        <Button size="icon-xs" variant="ghost" aria-label={job.state === 'starred' ? 'Unstar' : 'Star'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
+        <Button size="icon-xs" variant="ghost" aria-label={job.state === 'starred' ? 'Unstar' : 'Star'} title={job.state === 'starred' ? 'Remove star' : 'Star: keep this one in the Starred list'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
           <Star className={cn('size-3.5', job.state === 'starred' && 'fill-amber-400 text-amber-400')} />
         </Button>
-        <Button size="icon-xs" variant="ghost" aria-label="Mark applied" onClick={() => onState('applied')} className={cn(job.state === 'applied' && 'text-emerald-500')}>
+        <Button size="icon-xs" variant="ghost" aria-label="Mark applied" title="Mark as applied" onClick={() => onState('applied')} className={cn(job.state === 'applied' && 'text-emerald-500')}>
           <Check className="size-3.5" />
         </Button>
-        <Button size="icon-xs" variant="ghost" aria-label="Hide" onClick={() => onState('hidden')}>
+        <Button size="icon-xs" variant="ghost" aria-label="Hide" title="Hide this listing from the feed" onClick={() => onState('hidden')}>
           <EyeOff className="size-3.5" />
         </Button>
         {job.state === 'applied' && <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-500">applied</span>}
@@ -103,13 +103,13 @@ export function JobsWidget({ size }: WidgetProps) {
           </span>
         )}
         <span className="ml-auto flex items-center gap-0.5">
-          <button className={cn('rounded px-1.5 py-0.5', starredOnly ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')} onClick={() => setStarredOnly((v) => !v)}>
+          <button title="Only starred listings" className={cn('rounded px-1.5 py-0.5', starredOnly ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')} onClick={() => setStarredOnly((v) => !v)}>
             Starred
           </button>
-          <button className={cn('rounded px-1.5 py-0.5', showAll ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')} onClick={() => setShowAll((v) => !v)}>
+          <button title={showAll ? 'Showing every active listing; click for matches only' : 'Showing listings that match your filter; click to see everything'} className={cn('rounded px-1.5 py-0.5', showAll ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')} onClick={() => setShowAll((v) => !v)}>
             {showAll ? 'All listings' : 'Matches'}
           </button>
-          <Link to="/settings/jobs" className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-secondary/60">Filter</Link>
+          <Link to="/settings/jobs" title="Edit the match filter" className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-secondary/60">Filter</Link>
         </span>
       </div>
       <div className={cn('min-h-0 flex-1', tape ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto')}>

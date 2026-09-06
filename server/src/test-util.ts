@@ -18,6 +18,7 @@ export async function testContext(): Promise<AppContext> {
       PORT: 0,
       DATA_DIR: ':memory:',
       SECRET_KEY: 'c'.repeat(64),
+      secretKeySource: 'env',
       AUTH_DISABLED: true,
       PUBLIC_URL: 'http://localhost:5173',
       SCHEDULER_DISABLED: true,

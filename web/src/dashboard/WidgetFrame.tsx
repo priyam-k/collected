@@ -49,13 +49,13 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
       onMouseUp={onMouseUp}
       onTouchEnd={onTouchEnd}
     >
-      <div className={cn('flex h-8 shrink-0 items-center gap-1.5 border-b px-2 text-xs font-medium', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')}>
+      <div className={cn('flex h-8 shrink-0 items-center gap-1.5 border-b px-2 text-xs font-medium', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')} title={editMode ? 'Drag to move' : undefined}>
         {editMode && <GripVertical className="size-3.5 text-muted-foreground" />}
         {Icon && <Icon className="size-3.5 text-muted-foreground" />}
         <span className="truncate">{title}</span>
         <span className="ml-auto flex items-center gap-1">
           {editMode && (
-            <Button size="icon-xs" variant="ghost" aria-label="Hide widget" onMouseDown={(e) => e.stopPropagation()} onClick={onHide}>
+            <Button size="icon-xs" variant="ghost" aria-label="Hide widget" title="Hide this widget (bring it back from Add widget)" onMouseDown={(e) => e.stopPropagation()} onClick={onHide}>
               <EyeOff className="size-3.5" />
             </Button>
           )}

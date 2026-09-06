@@ -6,11 +6,13 @@ Nothing external is required before coding starts. Everything below is needed th
 
 ```sh
 npm i -g pnpm && pnpm install
-cp .env.example .env    # set SECRET_KEY=$(openssl rand -hex 32), AUTH_DISABLED=true, LOCAL_HELPER_KEY=$(openssl rand -hex 16)
+cp .env.example .env    # then set AUTH_DISABLED=true and LOCAL_HELPER_KEY=$(openssl rand -hex 16); leave SECRET_KEY empty
 pnpm dev                # http://localhost:5173
 ```
 
-`.env.example` ships with `AUTH_DISABLED=false` on purpose: copying it verbatim onto the VPS must never disable the login check. Only the local `.env` sets it to `true`.
+`.env.example` ships with `AUTH_DISABLED=false` on purpose: copying it verbatim onto the VPS must never disable the login check. Only the local `.env` sets it to `true`. If the server prints `Invalid environment`, that line tells you exactly which variable to fix.
+
+**The encryption key.** Stored credentials (Canvas cookie, Gradescope password, tokens) are encrypted with a key that lives in `data/.secret_key`, created automatically on first boot and kept next to the database (inside the Docker volume in production). Leave `SECRET_KEY` empty in `.env`. If you ever recreate `.env` nothing is lost. If you delete `data/` or that key file, every credential must be re-entered; the Sources page will say so.
 
 pnpm 12 blocks install scripts by default; `pnpm-workspace.yaml` allow-lists `esbuild`. SQLite comes from `@libsql/client` (prebuilt for every Node version), so there is nothing to compile.
 
@@ -28,11 +30,11 @@ All of these are entered in the app's Settings page (or `.env` for the Google cl
 Paste the API token into Settings → Sources → Todoist.
 
 ### Canvas
-Either run the local helper, which reads the cookie from Chrome and posts it to the running app:
+Either run the local helper, which reads the cookie from Chrome and posts it to the running app (it creates `local/.venv` and installs its one dependency the first time; expect a Keychain prompt):
 
 ```sh
-python3 -m venv local/.venv && local/.venv/bin/pip install -r local/requirements.txt
-local/.venv/bin/python local/canvas_cookie.py            # expects the dev server on :3000
+pnpm canvas-cookie                    # expects the dev server on :3000
+pnpm canvas-cookie -- --dry-run       # just list what it found
 ```
 
 or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `_normandy_session` (and `canvas_session` if present) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
@@ -44,7 +46,7 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
 1. `https://console.cloud.google.com` → New project, name it `collected`.
 2. APIs & Services → Library → enable **Google Calendar API**.
 3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events` and `.../auth/calendar.readonly`. Add yourself as a test user.
-4. **Publish the app** (Publishing status → In production). Ignore the "needs verification" notice; unverified is fine for a personal app. This is what stops refresh tokens from expiring after 7 days.
+4. **Publish the app** (Publishing status → In production). Ignore the "needs verification" notice; unverified is fine for a personal app. This is what stops refresh tokens from expiring after 7 days. You can defer this: in Testing status everything works, but the connection silently dies after 7 days and you reconnect from Settings → Sources. Google may show "ineligible test user" while adding yourself; if your address is listed under Test users afterwards, it took.
 5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs (the app builds the URI from `PUBLIC_URL`, which is the Vite server in dev):
    - `http://localhost:5173/api/google/callback`
    - `http://localhost:3000/api/google/callback`
@@ -67,7 +69,7 @@ Nothing. Public GitHub files.
    /srv/backups/
    ```
    Run **one** `cloudflared` on the host as a systemd service (`cloudflared service install <token>`), not one per project. It routes every hostname to a local port. Each project's compose stays independent.
-4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, the Cloudflare and Google values from below), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
+4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, the Cloudflare and Google values from below; leave `SECRET_KEY` empty so the key is created inside the `/data` volume), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
 5. Host cron: nightly `sqlite3 /srv/collected/data/collected.db ".backup /srv/backups/collected-$(date +%F).db"` and delete files older than 14 days. Enable Hetzner weekly snapshots if you want a second copy.
 
 Alternative if you'd rather not run a box: Fly.io with a 1 GB volume. Same Dockerfile, `fly launch`, and cloudflared runs as a second process. Slightly more magic, slightly less flexible for hosting other projects.

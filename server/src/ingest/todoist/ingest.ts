@@ -5,16 +5,24 @@ import { upsertItems } from '../../lib/items.js';
 import { getSourceConfig } from '../../lib/sources.js';
 import { addDays, isoOrNull } from '../../lib/time.js';
 import { markerIn } from '../../sync/todoist-push.js';
+import { wallClockToIso } from '../gradescope/parse.js';
 import { NotConfiguredError, type Ingester } from '../types.js';
 import { isClosed, type TLabel, type TProject, type TSection, type TTask, type TodoistApi } from './api.js';
 import { TodoistHttpApi } from './client.js';
 
-/** Todoist due → ISO. `datetime` may be RFC3339 (Z) or a floating local time; `date` alone is all-day. */
+/**
+ * Todoist due → ISO. In API v1 `due.date` is either `YYYY-MM-DD` (all-day) or a floating `YYYY-MM-DDTHH:MM:SS`
+ * (with `due.timezone` when one was set); older payloads carry `due.datetime` (RFC3339). Never throws.
+ */
 export function dueToIso(due: TTask['due']): { dueAt: string | null; allDay: boolean } {
   if (!due) return { dueAt: null, allDay: false };
-  if (due.datetime) return { dueAt: isoOrNull(due.datetime), allDay: false };
-  if (due.date) return { dueAt: new Date(`${due.date}T23:59:00`).toISOString(), allDay: true };
-  return { dueAt: null, allDay: false };
+  const raw = due.datetime || due.date || '';
+  if (!raw) return { dueAt: null, allDay: false };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return { dueAt: isoOrNull(`${raw}T23:59:00`), allDay: true };
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)) return { dueAt: isoOrNull(raw), allDay: false };
+  const local = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?/);
+  if (local) return { dueAt: due.timezone ? wallClockToIso(`${local[1]}T${local[2]}`, due.timezone) : isoOrNull(raw), allDay: false };
+  return { dueAt: isoOrNull(raw), allDay: false };
 }
 
 export function taskToRow(t: TTask, ctx: { projects: Map<string, TProject>; sections: Map<string, TSection> }): NewItemRow {

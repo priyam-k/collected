@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=22.12" },
+  "engines": {
+    "node": ">=22.12"
+  },
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
@@ -12,7 +14,8 @@
     "test": "pnpm -r test",
     "sync": "pnpm --filter server sync",
     "cli": "pnpm --filter server cli",
-    "db:generate": "pnpm --filter server db:generate"
+    "db:generate": "pnpm --filter server db:generate",
+    "canvas-cookie": "python3 local/canvas_cookie.py"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

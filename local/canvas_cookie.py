@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Read the Canvas session cookie from a local browser and hand it to collected.
 
-    python3 -m venv local/.venv && local/.venv/bin/pip install -r local/requirements.txt
-    local/.venv/bin/python local/canvas_cookie.py                       # -> http://localhost:3000
-    local/.venv/bin/python local/canvas_cookie.py --target https://collected.priyamkabra.com
+    python3 local/canvas_cookie.py                                  # -> http://localhost:3000 (creates local/.venv on first run)
+    python3 local/canvas_cookie.py --target https://collected.priyamkabra.com
+    pnpm canvas-cookie                                              # same thing
 
 The helper key is read from --key, $LOCAL_HELPER_KEY, or LOCAL_HELPER_KEY= in the repo's .env.
 Nothing about the cookie is printed.
@@ -18,10 +18,29 @@ import sys
 import urllib.error
 import urllib.request
 
+import subprocess
+
+
+def ensure_venv() -> None:
+    """Create local/.venv with the requirements on first run, then re-exec inside it."""
+    here = pathlib.Path(__file__).resolve().parent
+    venv = here / ".venv"
+    py = venv / "bin" / "python"
+    if pathlib.Path(sys.prefix).resolve() == venv.resolve():
+        return  # already inside
+    if not py.exists():
+        print(f"creating {venv} and installing requirements (one-time)…")
+        subprocess.check_call([sys.executable, "-m", "venv", str(venv)])
+        subprocess.check_call([str(py), "-m", "pip", "install", "-q", "-r", str(here / "requirements.txt")])
+    os.execv(str(py), [str(py), str(pathlib.Path(__file__).resolve()), *sys.argv[1:]])
+
+
+ensure_venv()
+
 try:
     import browser_cookie3  # type: ignore
 except ImportError:  # pragma: no cover
-    sys.exit("browser_cookie3 not installed. Run: local/.venv/bin/pip install -r local/requirements.txt")
+    sys.exit("browser_cookie3 missing inside local/.venv; delete local/.venv and run again")
 
 BROWSERS = ["chrome", "chromium", "brave", "edge", "arc", "vivaldi", "opera", "safari", "firefox"]
 

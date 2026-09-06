@@ -22,7 +22,7 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 - [ ] Canvas iCal: paste your personal feed URL (Canvas → Calendar → Calendar Feed) as the fallback.
 - [ ] Gradescope: enter the native email + password in Settings → Sources, then `pnpm sync gradescope`. Confirm CMSC330 shows the grading queue and CMSC422/MATH423 get Gradescope ids. Then set `submits_via` per course (Settings → Courses) and check the linked-assignments list.
 - [ ] Google Calendar: create the OAuth client (SETUP.md Phase 1; register both `http://localhost:5173/api/google/callback` and `http://localhost:3000/api/google/callback` plus the prod URI), put the id/secret in `.env`, restart `pnpm dev`, then Settings → Sources → Connect Google Calendar. Tick the calendars you want. Try the + button in the calendar widget; the event should appear in Google within a second.
-- [ ] Todoist: paste the API token in Settings → Sources, `pnpm sync todoist`, check the to-do widget sections (Settings → Todoist sync → sections). Then **Preview** the push, read the list, and only then **Push now** / enable the automatic push. Close one pushed task by hand in Todoist and confirm the next preview leaves it alone.
+- [ ] Todoist: paste the API token in Settings → Sources (again, if you did it before the key change), `pnpm sync todoist`, check the to-do widget sections (Settings → Todoist sync → sections). Then **Preview** the push, read the list, and only then **Push now** / enable the automatic push. Close one pushed task by hand in Todoist and confirm the next preview leaves it alone.
 - [ ] Jobs: the widget is live against the real Simplify feed already. Star a few, tune Settings → Jobs if the matches feel off (the exclude regex is the lever).
 - [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` / `pnpm cli demo gcal` / `pnpm cli demo todoist` any time you want fixture data in a fresh database. The dev database currently holds demo rows for Canvas, Gradescope, Google Calendar, and Todoist; `rm -rf data/` and restart to start clean before connecting real accounts.
 
@@ -44,7 +44,8 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 
 ## Environment notes
 
-- Docker Desktop on the Mac cannot pull images (Docker Hub requests hang inside the Docker VM; the host reaches Docker Hub fine). The Dockerfile is written but untested until Docker Desktop networking is fixed (try restarting Docker Desktop, or Settings → Resources → Network). The VPS build in M9 does not depend on this.
+- Docker Desktop on the Mac intermittently hangs on registry pulls. When it works, `docker build -t collected:dev . && docker run --rm -p 127.0.0.1:3100:3000 -e AUTH_DISABLED=true -v collected-data:/data collected:dev` boots the production image: verified 2026-09-06 (health, SPA, API, manifest, key file in the volume, non-root user, survives restart).
+- The encryption key now lives in `data/.secret_key` (auto-created) instead of only in `.env`, after a recreated `.env` lost the original key. Credentials entered before that change (Gradescope, Todoist) must be re-entered once; the Sources page says so per source.
 
 ## Open questions
 
