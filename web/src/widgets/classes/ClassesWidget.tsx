@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
+import { ChevronRight } from 'lucide-react';
 import { useCourses, useItems } from '@/lib/queries';
+import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
@@ -10,6 +12,7 @@ import { CourseDot, DueLabel, HotLinks, StatusBadge, nextMeeting, windowFromNow 
 /** One row per course: next due, hotlinks, upcoming count. */
 export function ClassesWidget({ size }: WidgetProps) {
   const coursesQ = useCourses();
+  const { open } = usePane();
   const win = useMemo(() => windowFromNow(21), []);
   const itemsQ = useItems({ kind: ['assignment'], from: win.from, to: win.to, limit: 500 });
 
@@ -39,13 +42,21 @@ export function ClassesWidget({ size }: WidgetProps) {
             const meeting = nextMeeting(c.schedule);
             return (
               <tr key={c.id} className="border-b last:border-0">
-                <td className="w-0 whitespace-nowrap py-1.5 pl-3 pr-2 align-top">
-                  <div className="flex items-center gap-2">
-                    <CourseDot color={c.color} />
-                    <span className="font-medium">{c.code}</span>
-                    {c.role === 'ta' && <span className="rounded bg-secondary px-1 text-[10px] uppercase text-muted-foreground">TA</span>}
-                  </div>
-                  {!compact && c.name && <div className="max-w-[16rem] truncate pl-4 text-xs text-muted-foreground">{c.name}</div>}
+                <td className="w-0 whitespace-nowrap py-1 pl-1.5 pr-2 align-top">
+                  <button
+                    className="group/course block w-full rounded px-1.5 py-0.5 text-left hover:bg-accent/60"
+                    title={`Open ${c.code}: assignments, files, announcements`}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => open({ kind: 'course', courseId: c.id })}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CourseDot color={c.color} />
+                      <span className="font-medium">{c.code}</span>
+                      {c.role === 'ta' && <span className="rounded bg-secondary px-1 text-[10px] uppercase text-muted-foreground">TA</span>}
+                      <ChevronRight className="size-3 text-muted-foreground opacity-0 group-hover/course:opacity-100" />
+                    </div>
+                    {!compact && c.name && <div className="max-w-[16rem] truncate pl-4 text-xs text-muted-foreground">{c.name}</div>}
+                  </button>
                 </td>
                 <td className="py-1.5 pr-2 align-top">
                   {next ? (

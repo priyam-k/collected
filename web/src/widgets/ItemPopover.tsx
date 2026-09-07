@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCloseTodoistTask, useSetOverride } from '@/lib/queries';
+import { usePane } from '@/panes/PaneContext';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +56,7 @@ function when(item: EffectiveItem): string {
 export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: () => void }) {
   const setOverride = useSetOverride();
   const closeTask = useCloseTodoistTask();
+  const pane = usePane();
   const raw = item.raw as { location?: string | null; calendarName?: string | null; projectName?: string | null; sectionName?: string | null; statusText?: string | null; parentId?: string | null };
   const desc = item.description ? stripHtml(item.description) : '';
   const canComplete = !item.effectiveDone && !item.informational && (item.kind === 'assignment' || item.kind === 'task');
@@ -74,7 +76,11 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
           <div className={cn('font-medium leading-snug', item.effectiveDone && 'line-through opacity-70')}>{item.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             <span className="capitalize">{item.kind}</span>
-            {item.course && <span>· {item.course.code}</span>}
+            {item.course && (
+              <button className="hover:text-foreground hover:underline" title="Open the course" onClick={() => { onClose?.(); pane.open({ kind: 'course', courseId: item.course!.id }); }}>
+                · {item.course.code}
+              </button>
+            )}
             {raw.calendarName && <span>· {raw.calendarName}</span>}
             {raw.projectName && <span>· #{raw.projectName}{raw.sectionName ? ` / ${raw.sectionName}` : ''}</span>}
           </div>

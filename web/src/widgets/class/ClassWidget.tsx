@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { ClipboardCheck, Download, FileText, Megaphone } from 'lucide-react';
+import { ClipboardCheck, Download, FileText, Maximize2, Megaphone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { usePane } from '@/panes/PaneContext';
 import { canvasFileUrl } from '@/lib/canvas';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
@@ -16,6 +18,7 @@ export interface ClassWidgetConfig {
 
 export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) {
   const courseId = instance.config.courseId;
+  const { open } = usePane();
   const coursesQ = useCourses();
   const course = coursesQ.data?.find((c) => c.id === courseId);
   const win = useMemo(() => windowFromNow(14), []);
@@ -42,13 +45,18 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-auto p-2.5 text-sm">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        {course.name && size.tier !== 'xs' && <span className="truncate text-muted-foreground">{course.name}</span>}
-        {meeting && (
-          <span className="text-xs text-muted-foreground">
+      <div className="flex items-baseline gap-x-2 gap-y-0.5">
+        <button className="min-w-0 flex-1 truncate text-left text-muted-foreground hover:text-foreground hover:underline" title="Open the course: every assignment, module, file, and announcement" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>
+          {course.name && size.tier !== 'xs' ? course.name : course.code}
+        </button>
+        {meeting && size.tier !== 'xs' && (
+          <span className="shrink-0 truncate text-xs text-muted-foreground">
             {isTa && meeting.kind === 'discussion' ? 'Your discussion' : meeting.kind === 'office_hours' ? 'Office hours' : 'Next'} · {meeting.label}
           </span>
         )}
+        <Button size="icon-xs" variant="ghost" className="shrink-0" aria-label="Open course" title="Open the course pane" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>
+          <Maximize2 className="size-3" />
+        </Button>
       </div>
       {(course.links.length > 0 || syllabus) && (
         <HotLinks links={[...(syllabus?.url ? [{ label: 'Syllabus', url: syllabus.url }] : []), ...course.links]} compact={size.tier === 'xs'} />
