@@ -80,9 +80,16 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
 
 1. Console → select the `collected` project → **Billing** → link a billing account (needs a card; new accounts also get trial credit). Compute Engine won't create VMs without billing enabled, but the Always Free discount is applied on the invoice.
 2. **APIs & Services → Library → Compute Engine API → Enable.**
-3. **Compute Engine → VM instances → Create instance.** Name `collected`. Region `us-east1` (any zone). Machine: series **E2**, type **e2-micro**. Boot disk → Change: **Ubuntu 24.04 LTS (x86/64)**, disk type **Standard persistent disk** (not Balanced), size **30 GB**. Leave firewall boxes unchecked (nothing inbound is needed). Create. Ignore the cost estimate panel; it doesn't know about the free tier.
+3. **Compute Engine → VM instances → Create instance.** Name `collected`. Region `us-east1` (any zone). Machine: series **E2**, type **e2-micro**. Boot disk → Change: **Ubuntu 24.04 LTS (x86/64)**, disk type **Standard persistent disk** (not Balanced), size **30 GB**. Leave firewall boxes unchecked (nothing inbound is needed). The newer Console wizard adds several more pages before Create — none change the price except one:
+   - **Backups**: defaults to a **Snapshot schedule**, which bills for snapshot storage (small, but not $0). Switch to **No backups** — the nightly `sqlite3 .backup` in Phase 2 already covers what actually matters.
+   - **Networking / Network performance**: leave every default (no HTTP/HTTPS firewall rules, Tier_1 networking bandwidth unchecked, default NIC). All free.
+   - **Observability**: Ops Agent checked is fine to leave on — Cloud Logging/Monitoring's own free allowance (50 GiB logs/month) is far more than one low-traffic personal VM produces.
+   - **Security / Confidential VM / Shielded VM / Advanced / Metadata**: defaults are all free (default service account, Confidential VM disabled, vTPM + Integrity Monitoring on, no deletion protection, Google-managed encryption key). Nothing to change.
+
+   Create. Ignore the cost estimate panel (it'll show a few dollars a month, e.g. "2 vCPU + 1 GB memory") — that's e2-micro's normal burst spec priced without the Always Free discount, which the estimator doesn't know about.
    The free allowance is one e2-micro's worth of hours per month in `us-west1` / `us-central1` / `us-east1`, 30 GB of standard disk, 1 GB egress per month. Anything else on the account bills normally.
-4. Click **SSH** in the console (browser terminal), or set up `gcloud compute ssh`. Then:
+4. Click **SSH** in the console (browser terminal) for this first session — it's enough to run the block below. Browser SSH can drop the connection if you tab away for a while; if it disconnects mid-`curl`, just reopen SSH and re-run the block (the swap lines are safe to repeat; `swapon --show` confirms if swap already succeeded). For every session after this one, prefer a real terminal: `gcloud compute ssh <instance-name>` (e.g. `gcloud compute ssh collected`) — the instance name is required but the zone usually isn't, since gcloud looks it up as long as the name is unique across your zones; first run auto-generates an SSH key and pushes it to the instance's metadata, no manual setup. Set a default zone once (`gcloud config set compute/zone <zone>`) to skip any zone prompt entirely, or always pass `--zone=<zone>` if you'd rather be explicit.
+
    ```sh
    sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
