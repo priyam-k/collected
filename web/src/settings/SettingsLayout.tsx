@@ -8,6 +8,8 @@ import { JobsPage } from './JobsPage';
 import { LayoutPage } from './LayoutPage';
 import { DataPage } from './DataPage';
 
+// Absolute paths on purpose: inside a `/settings/*` splat route, a relative `to` resolves against the current
+// URL, so clicking tabs used to build /settings/sources/courses/todoist.
 const NAV = [
   { to: 'sources', label: 'Sources' },
   { to: 'courses', label: 'Courses' },
@@ -31,7 +33,7 @@ export function SettingsLayout() {
           {NAV.map((n) => (
             <NavLink
               key={n.to}
-              to={n.to}
+              to={`/settings/${n.to}`}
               className={({ isActive }) =>
                 cn('whitespace-nowrap rounded-md px-3 py-1.5 text-sm', isActive ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')
               }
@@ -42,7 +44,7 @@ export function SettingsLayout() {
         </nav>
         <div className="min-w-0">
           <Routes>
-            <Route index element={<Navigate to="sources" replace />} />
+            <Route index element={<Navigate to="/settings/sources" replace />} />
             <Route path="sources" element={<SourcesPage />} />
             <Route path="courses" element={<CoursesPage />} />
             <Route path="todoist" element={<TodoistPage />} />
