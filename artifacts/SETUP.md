@@ -96,7 +96,24 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
    curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER && newgrp docker
    sudo mkdir -p /srv/collected && sudo chown $USER /srv/collected
    ```
-5. Get the code onto the box. Easiest is a private GitHub repo: push from the Mac, `git clone` on the VM (use a deploy key or `gh auth login`). Without GitHub: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/`.
+5. Get the code onto the box. Same repo as local — `.gitignore` already excludes `.env`, `data/`, `node_modules`, and `*.db`, so cloning it brings no secrets along. Recommended: a deploy key, an SSH keypair scoped to just this repo (read-only, doesn't touch your GitHub account), generated on the VM:
+   ```sh
+   ssh-keygen -t ed25519 -C "collected-vm" -f ~/.ssh/collected_deploy -N ""
+   cat ~/.ssh/collected_deploy.pub
+   ```
+   Copy that into GitHub → the repo → **Settings → Deploy keys → Add deploy key**, leave "Allow write access" unchecked. Then point git at it and clone:
+   ```sh
+   cat >> ~/.ssh/config <<'EOF'
+   Host github.com
+     IdentityFile ~/.ssh/collected_deploy
+     IdentitiesOnly yes
+   EOF
+   chmod 600 ~/.ssh/config
+   git clone git@github.com:priyam-k/collected.git /srv/collected
+   ```
+   (Clones straight into `/srv/collected`, which already exists and is owned by you — don't `mkdir` it again first.) Future updates are just `git pull` on the box. `gh auth login` is the alternative if the box will need broader GitHub access later, but it authenticates your whole account rather than one repo, so it's more than this single-purpose VM needs.
+
+   Without GitHub at all: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/` from the Mac — no key setup, but no real git history on the box either, and every future update means re-running it by hand.
 6. `cd /srv/collected && cp .env.example .env` and set `AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty.
 7. `docker compose up -d --build`. The build is slow on 1 GB RAM (several minutes) but the swap keeps it alive. If it dies anyway, build on the Mac instead and ship the image:
    ```sh
