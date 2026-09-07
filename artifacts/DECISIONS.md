@@ -120,3 +120,18 @@ Why: the feed changes a few dozen rows an hour; rewriting 16k identical rows was
 ## 025 — `/api/health` is unauthenticated (2026-09-07)
 
 Docker's HEALTHCHECK calls it from inside the container with no Access JWT; it returned 401 and the container sat at `unhealthy` forever. Externally the route is still behind Cloudflare Access on the hostname. It exposes only `ok`, `version`, `now`, `authDisabled`.
+
+## 026 — One app-wide side pane instead of more widgets (2026-09-07)
+
+Detail views (a whole course, a job with its tracker fields) open in a single right-hand sheet from anywhere; widgets stay summaries. Popovers remain for one-item detail.
+Why: the first week of use showed the grid filling with one widget per thing to look at. A pane keeps the dashboard glanceable and gives each entity one place with everything, without a routing layer.
+
+## 027 — The tracker lives on `job_state`, not a separate `applications` table (2026-09-07)
+
+Stages extended to saved / applied / screen / interviewing / offer / rejected / ghosted / withdrawn, plus `applied_at`, `next_action`, `next_action_at`. Jobs added by hand are `jobs` rows with `source = manual`.
+Why: a feed listing and a hand-added lead need the same fields and the same widget; a second table would have meant a union everywhere. `applications` stays in the schema unused rather than a migration that drops it for nothing.
+
+## 028 — Canvas files open through `public_url`, never proxied (2026-09-07)
+
+`/api/canvas/files/:id/open` fetches the file's `public_url` with the stored session and redirects the browser to it.
+Why: every Canvas file URL ends at InstFS with `download=1`, so the browser saves instead of rendering. `public_url` is the same InstFS link without the flag, served inline by the CDN. The token is single-use, so the server must not follow it; redirecting keeps the box's egress at zero for files, which matters on a 1 GB/month allowance.

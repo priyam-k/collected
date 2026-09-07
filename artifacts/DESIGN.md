@@ -108,10 +108,10 @@ Unique on (`source`, `external_id`). Soft-delete when a source stops returning a
 **jobs**
 `id`, `source` (simplify | vanshb03), `external_id`, `company`, `title`, `locations` (JSON), `url`, `terms` (JSON), `sponsorship`, `degrees` (JSON), `posted_at`, `active`, `matches_filter`, `score?` (v2), `first_seen_at`, `updated_at`.
 
-**job_state**
-`job_id`, `state` (new | starred | hidden | applied | interviewing | rejected | offer), `notes?`, `resume_path?`, `updated_at`.
+**job_state** — the tracker. One row per job the user touched.
+`job_id`, `state` (new | starred | hidden | applied | screen | interviewing | offer | rejected | ghosted | withdrawn), `notes?`, `resume_path?`, `seen_at?`, `applied_at?` (YYYY-MM-DD, stamped once when the state first reaches applied or later), `next_action?`, `next_action_at?`, `updated_at`. `new` is untracked, `hidden` is dismissed from the feed; everything else shows in the Applications widget. Jobs added by hand are `jobs` rows with `source = manual`; they never appear in the feed and can be deleted, unlike feed rows, which are hidden so the next sync doesn't resurrect them.
 
-**applications** (v1.5) — anything applied to, even outside the feed. `company`, `title`, `url`, `applied_at`, `status`, `contact?`, `next_action?`, `next_action_at?`, `notes`.
+**applications** — unused placeholder from the v1 plan; the tracker lives on `job_state` (DECISIONS 027).
 
 **widget_instances** — `id`, `type`, `config` (JSON), `hidden`.
 **layouts** — `breakpoint` (lg | md | sm), `layout` (JSON array of `{i, x, y, w, h}`).
@@ -188,6 +188,10 @@ type WidgetDef = {
 
 Adding a widget = adding a folder and a registry entry.
 
+**Side pane**: widgets stay small; detail lives in one app-wide right-hand sheet (`web/src/panes/`). `usePane().open({ kind, ... })` from anywhere. Kinds: `course` (schedule, links, every assignment split to-do/done or upcoming/past for TA courses, modules and files, announcements, syllabus), `job` (posting details plus the tracker fields, saved on blur), `job-new` (manual entry form). Courses open from the classes overview, the class widget header, and the course code in item popovers; jobs open from feed and tracker cards.
+
+**Canvas files**: file links never point at Canvas's download URL. `/api/canvas/files/:id/open` asks Canvas for the file's `public_url` (an InstFS link without `download=1`) and redirects; the CDN serves it inline, so PDFs render in the browser. `?download=1` forces a download. Module items of type File carry the file id in `raw.contentId` and use the same route.
+
 **Reflow**: every widget root sets `container-type: size`, so widget CSS uses `@container` queries against its own box. A `useWidgetSize()` hook (ResizeObserver) also returns `{ w, h, cols, rows, tier: 'xs'|'sm'|'md'|'lg', aspect: 'tall'|'square'|'wide' }` for structural switches. Presets in the add tray snap to sizes each widget was designed for; free resize within min/max still works.
 
 **v1 widgets and their tiers**
@@ -196,7 +200,9 @@ Adding a widget = adding a folder and a registry entry.
 - **todo** (unified items of kind task/assignment, grouped by section = label): narrow = one section with tabs; wide = sections as columns. Homework section is fed by effective assignments plus Todoist tasks carrying the homework label. Check-off writes an override for source items and closes the task for Todoist items. Quick-add box uses Todoist's natural-language parser.
 - **sources**: xs = colored dots; md = table with status, last success, error, and per-source actions (sync now, reconnect).
 - **class** (multi-instance, config: course_id): header with code + color + next meeting; hotlinks row from `courses.links`; upcoming assignments; recent announcements; for TA role: grading queue and discussion time. sm = links + next due; lg = full.
-- **jobs**: short and wide = horizontal tape of matches; otherwise a card grid (1–3 columns by width). Star / hide / applied actions; starred-only and all-listings toggles; header shows new / match / active counts. Cards on screen for two seconds are marked seen, which drives the "new" count.
+- **classes**: one row per course (code, next due, hotlinks, next meeting). Clicking a course opens the course pane.
+- **jobs**: short and wide = horizontal tape of matches; otherwise a card grid (1–3 columns by width). Star / hide / applied actions; starred-only and all-listings toggles; header shows new / match / active counts. Cards on screen for two seconds are marked seen, which drives the "new" count. Clicking a card opens the job pane; the external-link icon goes to the posting.
+- **tracker** ("Applications"): every job with a tracked state. Wide = a board with a column per open stage (saved, applied, screen, interviewing, offer) and an optional closed column; narrow = one list with stage pills. Cards open the job pane; a stage select on each card moves it without opening. "Add" opens the manual-entry form.
 - **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor, todoist sync options, job filter, layout reset, JSON export/import.
 
 ## API
@@ -216,7 +222,9 @@ POST /api/calendar/events              (write-through to GCal)
 
 GET/PUT /api/courses  /api/courses/:id
 GET/PUT /api/layout   GET/PUT /api/widgets
-GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state
+GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state   { state?, notes?, appliedAt?, nextAction?, nextActionAt?, resumePath? }
+GET  /api/jobs/tracked  GET /api/jobs/:id  POST /api/jobs (manual entry)  DELETE /api/jobs/:id (manual only)
+GET  /api/canvas/files/:id/open?download  (302 to a one-shot inline link)
 GET/PUT /api/settings
 GET  /api/export  POST /api/import     (courses, settings, layout, widgets)
 GET  /api/health

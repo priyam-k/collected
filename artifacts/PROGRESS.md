@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-07. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, and the first deploy's I/O problem is fixed (DECISIONS 024/025). Next: connect the sources on prod, the backup cron, then two weeks of real use.
+Last updated: 2026-09-07. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025), and the first-use backlog (course pane, applications tracker, inline files, settings nav) is built locally but not shipped. Next: ship the image, connect the sources on prod, the backup cron, then two weeks of real use.
 
 ## Milestones
 
@@ -33,12 +33,17 @@ Last updated: 2026-09-07. Status: M1–M8 done, M9 in progress: the e2-micro is 
 
 ## Backlog from first real use (2026-09-07)
 
-Noted during the deploy; none of these block M9. Do them locally, push, then build on the Mac and ship the image (SETUP.md Phase 2 step 7). The box cannot build.
+Done the same day, on the Mac, not yet shipped to the box (build on the Mac and ship the image, SETUP.md Phase 2 step 7):
 
-- **Settings nav appends instead of replacing.** Clicking tabs builds `/settings/sources/courses/todoist`; the links need absolute paths (or `relative="path"`) so each click replaces the segment.
-- **Interactive, denser UI.** Widget stacking instead of one widget per course; clicking a class opens a detail view (assignments, links, files, announcements, hotlinks) rather than needing a widget for each thing.
-- **UI overhaul** once the above shape is settled.
-- **File previews.** Canvas file links currently download; try a preview (Canvas hosts the files, so a `/preview` or inline URL shape may exist) instead of fetching everything.
+- [x] Settings nav appended path segments on every click. Links are absolute now.
+- [x] Course pane: click a course anywhere (overview, class widget, item popover) for schedule, links, every assignment, modules and files, announcements, syllabus.
+- [x] Job pane + Applications widget: stages, applied date, next action, notes, resume path; manual entries; board or list. The widget is on the dashboard already (added while testing; hide it from edit mode if unwanted).
+- [x] Canvas files open inline (PDFs render in the tab) via `/api/canvas/files/:id/open`; a download icon keeps the old behaviour.
+
+Still open:
+
+- **Widget stacking** (several widgets in one grid slot with tabs) and the broader **UI overhaul**. The pane removed most of the pressure; revisit after two weeks of use.
+- The first real use of the tracker will show whether `screen` and `ghosted` earn their place or should fold into neighbours.
 
 ## Deferred from the v1 plan
 
