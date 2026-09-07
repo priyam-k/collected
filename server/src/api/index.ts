@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { accessAuth, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { calendarRoutes } from './calendar.js';
+import { canvasRoutes } from './canvas.js';
 import { coursesRoutes } from './courses.js';
 import { googleRoutes } from './google.js';
 import { exportRoutes } from './export.js';
@@ -42,6 +43,7 @@ export function createApi(ctx: AppContext) {
   api.route('/settings', settingsRoutes(ctx));
   api.route('/google', googleRoutes(ctx));
   api.route('/calendar', calendarRoutes(ctx));
+  api.route('/canvas', canvasRoutes(ctx));
   api.route('/todoist', todoistRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 

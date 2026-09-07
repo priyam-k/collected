@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { ClipboardCheck, FileText, Megaphone } from 'lucide-react';
+import { ClipboardCheck, Download, FileText, Megaphone } from 'lucide-react';
+import { canvasFileUrl } from '@/lib/canvas';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { EmptyState } from '@/widgets/Placeholder';
@@ -118,9 +119,12 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
           </h4>
           <ul className="space-y-0.5">
             {files.map((f) => (
-              <li key={f.id} className="flex items-baseline gap-2">
-                <a href={f.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">
+              <li key={f.id} className="group/file flex items-baseline gap-2">
+                <a href={canvasFileUrl(f.externalId)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title="Open in a new tab (PDFs render inline)">
                   {f.title}
+                </a>
+                <a href={canvasFileUrl(f.externalId, { download: true })} className="shrink-0 text-muted-foreground opacity-0 group-hover/file:opacity-100" title="Download" aria-label={`Download ${f.title}`}>
+                  <Download className="size-3" />
                 </a>
                 <span className="shrink-0 text-xs text-muted-foreground">{friendlyDate(String(f.raw.updatedAt ?? f.updatedAt))}</span>
               </li>
