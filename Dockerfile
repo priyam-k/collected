@@ -14,7 +14,9 @@ FROM deps AS build-web
 COPY tsconfig.base.json ./
 COPY shared ./shared
 COPY web ./web
-RUN pnpm --filter web build
+# vite only: `pnpm --filter web build` also runs `tsc --noEmit`, which needs ~500 MB and stalled for 15+ minutes on the
+# 1 GB e2-micro. Type-check locally (`pnpm -r typecheck`) before building an image.
+RUN pnpm --filter web exec vite build
 
 FROM deps AS build-server
 COPY tsconfig.base.json ./

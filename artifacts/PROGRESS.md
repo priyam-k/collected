@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exists (artifacts/SETUP.md Phase 2), then two weeks of real use.
+Last updated: 2026-09-07. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, and the first deploy's I/O problem is fixed (DECISIONS 024/025). Next: connect the sources on prod, the backup cron, then two weeks of real use.
 
 ## Milestones
 
@@ -14,6 +14,11 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 - [x] **M7 — Jobs.** Simplify listings.json poller, deterministic filter from seed-config, jobs widget (tape + list), star/hide/applied state.
 - [x] **M8 — Polish.** Mobile stack layout, PWA manifest, visibility-aware polling, empty/error states on every widget, keyboard shortcut for edit mode.
 - [ ] **M9 — Deploy.** VPS, tunnel, Access, backups. Prod connect of all sources.
+  - [x] Google Cloud e2-micro (`collected-instance-2`, `us-east1-c`), Docker, repo cloned with a deploy key, Cloudflare Tunnel + Access, `collected.priyamkabra.com` resolves (2026-09-07).
+  - [x] First-deploy fixes (2026-09-07): jobs sync batched and diffed, health probe unauthenticated, Node heap capped, web/server build stages split, image built on the Mac and shipped as a tarball. Container healthy, cloudflared quiet, public URL answering in ~100 ms.
+  - [ ] Disable the Ops Agent on the box (command in SETUP.md step 3). Not done yet.
+  - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
+  - [ ] Backup cron (SETUP.md VPS step 5).
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.
 
 ## Post-run checklist (needs you)
@@ -25,6 +30,15 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 - [ ] Todoist: paste the API token in Settings → Sources (again, if you did it before the key change), `pnpm sync todoist`, check the to-do widget sections (Settings → Todoist sync → sections). Then **Preview** the push, read the list, and only then **Push now** / enable the automatic push. Close one pushed task by hand in Todoist and confirm the next preview leaves it alone.
 - [ ] Jobs: the widget is live against the real Simplify feed already. Star a few, tune Settings → Jobs if the matches feel off (the exclude regex is the lever).
 - [ ] Try `pnpm cli demo canvas` / `pnpm cli demo gradescope` / `pnpm cli demo gcal` / `pnpm cli demo todoist` any time you want fixture data in a fresh database. Demo rows are tagged and removable with `pnpm cli demo clear` or Settings → Export / import → Remove demo data (done on 2026-09-06; the dev database now holds only real Google Calendar and Todoist rows plus the job feed).
+
+## Backlog from first real use (2026-09-07)
+
+Noted during the deploy; none of these block M9. Do them locally, push, then build on the Mac and ship the image (SETUP.md Phase 2 step 7). The box cannot build.
+
+- **Settings nav appends instead of replacing.** Clicking tabs builds `/settings/sources/courses/todoist`; the links need absolute paths (or `relative="path"`) so each click replaces the segment.
+- **Interactive, denser UI.** Widget stacking instead of one widget per course; clicking a class opens a detail view (assignments, links, files, announcements, hotlinks) rather than needing a widget for each thing.
+- **UI overhaul** once the above shape is settled.
+- **File previews.** Canvas file links currently download; try a preview (Canvas hosts the files, so a `/preview` or inline URL shape may exist) instead of fetching everything.
 
 ## Deferred from the v1 plan
 
@@ -44,6 +58,7 @@ Last updated: 2026-09-06. Status: M1–M8 done. Next: M9 deploy once the VPS exi
 
 ## Environment notes
 
+- Prod box: e2-micro, 1 GB RAM + 2 GB swap, 30 GB standard disk (~45 write IOPS). `gcloud compute ssh collected-instance-2 --zone us-east1-c`. Everything lives in `/srv/collected`; `data/` is owned by uid 1000 (see SETUP.md step 6).
 - Docker Desktop on the Mac intermittently hangs on registry pulls. When it works, `docker build -t collected:dev . && docker run --rm -p 127.0.0.1:3100:3000 -e AUTH_DISABLED=true -v collected-data:/data collected:dev` boots the production image: verified 2026-09-06 (health, SPA, API, manifest, key file in the volume, non-root user, survives restart).
 - The encryption key now lives in `data/.secret_key` (auto-created) instead of only in `.env`, after a recreated `.env` lost the original key. Credentials entered before that change (Gradescope, Todoist) must be re-entered once; the Sources page says so per source.
 

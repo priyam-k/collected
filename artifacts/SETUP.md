@@ -83,11 +83,15 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
 3. **Compute Engine → VM instances → Create instance.** Name `collected`. Region `us-east1` (any zone). Machine: series **E2**, type **e2-micro**. Boot disk → Change: **Ubuntu 24.04 LTS (x86/64)**, disk type **Standard persistent disk** (not Balanced), size **30 GB**. Leave firewall boxes unchecked (nothing inbound is needed). The newer Console wizard adds several more pages before Create — none change the price except one:
    - **Backups**: defaults to a **Snapshot schedule**, which bills for snapshot storage (small, but not $0). Switch to **No backups** — the nightly `sqlite3 .backup` in Phase 2 already covers what actually matters.
    - **Networking / Network performance**: leave every default (no HTTP/HTTPS firewall rules, Tier_1 networking bandwidth unchecked, default NIC). All free.
-   - **Observability**: Ops Agent checked is fine to leave on — Cloud Logging/Monitoring's own free allowance (50 GiB logs/month) is far more than one low-traffic personal VM produces.
+   - **Observability**: **uncheck Ops Agent.** Its two collectors (`otelopscol`, `fluent-bit`) hold ~80 MB RAM and a few percent CPU permanently, which is real money on a 1 GB box that already swaps. If it's already installed, turn it off:
+     ```sh
+     sudo systemctl disable --now google-cloud-ops-agent google-cloud-ops-agent-opentelemetry-collector google-cloud-ops-agent-fluent-bit
+     ```
    - **Security / Confidential VM / Shielded VM / Advanced / Metadata**: defaults are all free (default service account, Confidential VM disabled, vTPM + Integrity Monitoring on, no deletion protection, Google-managed encryption key). Nothing to change.
 
    Create. Ignore the cost estimate panel (it'll show a few dollars a month, e.g. "2 vCPU + 1 GB memory") — that's e2-micro's normal burst spec priced without the Always Free discount, which the estimator doesn't know about.
    The free allowance is one e2-micro's worth of hours per month in `us-west1` / `us-central1` / `us-east1`, 30 GB of standard disk, 1 GB egress per month. Anything else on the account bills normally.
+   Know what you're getting: e2-micro is a shared-core VM (0.25 vCPU sustained, bursts to 2) and a 30 GB *standard* persistent disk does roughly 45 write IOPS and 3 MB/s. Anything that fsyncs per row crawls, and swapping onto that disk stalls the whole box, cloudflared included. The app is written for it (batched writes, WAL with `synchronous=NORMAL`, a 384 MB V8 heap cap in compose), but keep other processes off the box.
 4. Click **SSH** in the console (browser terminal) for this first session — it's enough to run the block below. Browser SSH can drop the connection if you tab away for a while; if it disconnects mid-`curl`, just reopen SSH and re-run the block (the swap lines are safe to repeat; `swapon --show` confirms if swap already succeeded). For every session after this one, prefer a real terminal: `gcloud compute ssh <instance-name>` (e.g. `gcloud compute ssh collected`) — the instance name is required but the zone usually isn't, since gcloud looks it up as long as the name is unique across your zones; first run auto-generates an SSH key and pushes it to the instance's metadata, no manual setup. Set a default zone once (`gcloud config set compute/zone <zone>`) to skip any zone prompt entirely, or always pass `--zone=<zone>` if you'd rather be explicit.
 
    ```sh
@@ -115,14 +119,19 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
 
    Without GitHub at all: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/` from the Mac — no key setup, but no real git history on the box either, and every future update means re-running it by hand.
 6. `cd /srv/collected && cp .env.example .env` and set `AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty.
-7. `docker compose up -d --build`. The build is slow on 1 GB RAM (several minutes) but the swap keeps it alive. If it dies anyway, build on the Mac instead and ship the image:
+   Then create the data directory owned by the container's user: `mkdir -p data && sudo chown 1000:1000 data`. The image runs as `node` (uid 1000) and the bind mount in `docker-compose.yml` replaces the ownership baked into the image; skip this and the app crash-loops with `EACCES: permission denied, open '/data/.secret_key'`. (On Ubuntu images uid 1000 is the `ubuntu` account, which is why the files show up as owned by `ubuntu`.)
+7. Build the image on the Mac and ship it. The box cannot build it: `tsc` plus Vite need ~500 MB and on 1 GB with a 0.25-vCPU share the build sat in `tsc` for 15 minutes, swapped the box into the ground, and took SSH down with it (2026-09-07). From the repo on the Mac:
    ```sh
+   pnpm -r typecheck                                   # the image build skips tsc on purpose; check here
    docker build --platform linux/amd64 -t collected:latest .
-   docker save collected:latest | gzip | ssh collected-vm 'gunzip | docker load'
-   ssh collected-vm 'cd /srv/collected && docker compose up -d'
+   docker save collected:latest | gzip -1 > /tmp/collected.tar.gz   # ~110 MB
+   gcloud compute scp /tmp/collected.tar.gz collected-instance-2:/tmp/ --zone us-east1-c
+   gcloud compute ssh collected-instance-2 --zone us-east1-c --command \
+     'gunzip -c /tmp/collected.tar.gz | docker load && cd /srv/collected && docker compose up -d'
    ```
-   (`docker-compose.yml` names the image `collected:latest`, so compose will use the loaded one instead of rebuilding.)
-8. `docker compose logs -f app` should show `seeded from seed-config.json` and `listening`. Then do the Cloudflare section.
+   Upload takes under a minute. `docker-compose.yml` names the image `collected:latest`, so `up -d` (no `--build`) uses the loaded one. If Docker Desktop's registry hang bites, the base image `node:24-bookworm-slim` is already cached locally for amd64 after the first successful build.
+8. `docker compose logs -f app` should show `seeded from seed-config.json` and `listening`, and `docker compose ps` should say `healthy` within about a minute (the health probe is the one API route that doesn't need an Access JWT). Five seconds after boot every ingester runs once; the jobs feed is ~16k rows and its first run writes them all, later runs write only what changed. Then do the Cloudflare section.
+9. Updating later: `git pull` on the box (for the compose file and seed config), then repeat step 7 from the Mac. Never `--build` on the box.
 
 ### How the tunnel works
 

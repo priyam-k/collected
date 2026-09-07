@@ -111,3 +111,12 @@ Why: a recreated `.env` on day one silently lost the key and with it every store
 
 Every source card has an expandable "Data pulled" panel: last run counts and duration, rows per course with the matched external id, recent rows. Backed by `GET /api/sources/:id/summary`; the runner stores each run's counts in `sources.meta.lastRun`.
 Why: "it says connected" is not evidence. The first real Gradescope sync looked like a no-op until the rows were listed.
+
+## 024 — Ingesters diff before they write; SQLite runs WAL + synchronous=NORMAL (2026-09-07)
+
+The first prod deploy on the e2-micro exposed the jobs ingester running two autocommit statements per listing, ~32k fsyncs an hour on a disk that does ~45 a second. Each run took 10–17 minutes, the box swapped, and cloudflared's QUIC connections timed out, which is what "host error" at the edge was. Now `upsertListings` loads the stored fingerprints, writes only new or changed rows in one transaction, and reports `changed` in the run counts. `openDb` sets `synchronous=NORMAL`, so fsyncs happen at checkpoints instead of every commit.
+Why: the feed changes a few dozen rows an hour; rewriting 16k identical rows was pure I/O. NORMAL under WAL can lose the last commits on power loss but cannot corrupt, and every row here is re-fetchable from its source. The same rule applies to any future ingester: batch, diff, one transaction per run.
+
+## 025 — `/api/health` is unauthenticated (2026-09-07)
+
+Docker's HEALTHCHECK calls it from inside the container with no Access JWT; it returned 401 and the container sat at `unhealthy` forever. Externally the route is still behind Cloudflare Access on the hostname. It exposes only `ok`, `version`, `now`, `authDisabled`.
