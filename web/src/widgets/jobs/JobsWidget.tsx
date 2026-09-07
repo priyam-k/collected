@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Check, EyeOff, ExternalLink, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Job } from '@collected/shared';
+import { JOB_STATE_LABELS, type Job } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { useJobStats, useJobs, useMarkJobsSeen, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { usePane } from '@/panes/PaneContext';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 
@@ -44,6 +45,7 @@ function useMarkSeenWhenVisible(jobs: Job[]) {
 }
 
 function Card({ job, onState, compact, refCb }: { job: Job; onState: (s: Job['state']) => void; compact?: boolean; refCb: (el: HTMLElement | null) => void }) {
+  const { open } = usePane();
   return (
     <div
       ref={refCb}
@@ -51,11 +53,13 @@ function Card({ job, onState, compact, refCb }: { job: Job; onState: (s: Job['st
       className={cn('group relative flex min-w-0 flex-col gap-0.5 rounded-md border bg-card p-2 text-sm', compact ? 'w-56 shrink-0' : 'w-full', !job.seenAt && 'border-primary/40', job.state === 'starred' && 'bg-amber-500/5')}
     >
       <div className="flex items-start gap-1">
-        <a href={job.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 hover:underline">
+        <button className="min-w-0 flex-1 text-left hover:underline" title="Details and tracking" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'job', jobId: job.id })}>
           <div className="truncate font-medium">{job.company}</div>
-          <div className={cn('text-xs text-muted-foreground', compact ? 'truncate' : 'truncate')} title={job.title}>{job.title}</div>
+          <div className="truncate text-xs text-muted-foreground" title={job.title}>{job.title}</div>
+        </button>
+        <a href={job.url} target="_blank" rel="noreferrer" className="mt-0.5 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100" title="Open the posting" aria-label="Open the posting">
+          <ExternalLink className="size-3" />
         </a>
-        <ExternalLink className="mt-0.5 size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100" />
       </div>
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <span className="truncate">{job.locations.slice(0, 2).join(' · ')}{job.locations.length > 2 ? ` +${job.locations.length - 2}` : ''}</span>
@@ -71,8 +75,11 @@ function Card({ job, onState, compact, refCb }: { job: Job; onState: (s: Job['st
         <Button size="icon-xs" variant="ghost" aria-label="Hide" title="Hide this listing from the feed" onClick={() => onState('hidden')}>
           <EyeOff className="size-3.5" />
         </Button>
-        {job.state === 'applied' && <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-500">applied</span>}
-        {job.category && job.state !== 'applied' && <span className="ml-auto truncate text-[10px] text-muted-foreground">{job.category}</span>}
+        {job.state !== 'new' && job.state !== 'starred' && job.state !== 'hidden' ? (
+          <span className="ml-auto text-[10px] uppercase tracking-wide text-emerald-500">{JOB_STATE_LABELS[job.state]}</span>
+        ) : (
+          job.category && <span className="ml-auto truncate text-[10px] text-muted-foreground">{job.category}</span>
+        )}
       </div>
     </div>
   );

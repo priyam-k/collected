@@ -29,8 +29,26 @@ export type CourseRole = (typeof COURSE_ROLES)[number];
 export const SUBMITS_VIA = ['canvas', 'gradescope', 'both'] as const;
 export type SubmitsVia = (typeof SUBMITS_VIA)[number];
 
-export const JOB_STATES = ['new', 'starred', 'hidden', 'applied', 'interviewing', 'rejected', 'offer'] as const;
+export const JOB_STATES = ['new', 'starred', 'hidden', 'applied', 'screen', 'interviewing', 'offer', 'rejected', 'ghosted', 'withdrawn'] as const;
 export type JobStateValue = (typeof JOB_STATES)[number];
+/** Stages the tracker shows, in pipeline order. `new` is untracked, `hidden` is dismissed from the feed. */
+export const TRACKED_STATES: readonly JobStateValue[] = ['starred', 'applied', 'screen', 'interviewing', 'offer', 'rejected', 'ghosted', 'withdrawn'];
+export const OPEN_STAGES: readonly JobStateValue[] = ['starred', 'applied', 'screen', 'interviewing', 'offer'];
+export const CLOSED_STAGES: readonly JobStateValue[] = ['rejected', 'ghosted', 'withdrawn'];
+/** States that imply an application went out; moving into one stamps applied_at if it is empty. */
+export const APPLIED_STAGES: readonly JobStateValue[] = ['applied', 'screen', 'interviewing', 'offer'];
+export const JOB_STATE_LABELS: Record<JobStateValue, string> = {
+  new: 'New',
+  starred: 'Saved',
+  hidden: 'Hidden',
+  applied: 'Applied',
+  screen: 'Screen',
+  interviewing: 'Interviewing',
+  offer: 'Offer',
+  rejected: 'Rejected',
+  ghosted: 'Ghosted',
+  withdrawn: 'Withdrawn',
+};
 
 export const LINK_METHODS = ['auto', 'manual'] as const;
 export type LinkMethod = (typeof LINK_METHODS)[number];
@@ -153,6 +171,12 @@ export interface Job {
   state: JobStateValue;
   notes: string | null;
   seenAt: string | null;
+  /** Tracker fields (job_state). */
+  appliedAt: string | null; // YYYY-MM-DD
+  nextAction: string | null;
+  nextActionAt: string | null; // YYYY-MM-DD
+  resumePath: string | null;
+  stateUpdatedAt: string | null;
 }
 
 export interface WidgetInstance {

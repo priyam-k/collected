@@ -1,4 +1,4 @@
-import { Briefcase, CalendarDays, CheckSquare, GraduationCap, LayoutList, Plug } from 'lucide-react';
+import { Briefcase, CalendarDays, CheckSquare, ClipboardList, GraduationCap, LayoutList, Plug } from 'lucide-react';
 import type { WidgetInstance } from '@collected/shared';
 import type { TitleContext } from './types';
 import { CalendarWidget } from './calendar/CalendarWidget';
@@ -7,6 +7,7 @@ import { ClassesWidget } from './classes/ClassesWidget';
 import { JobsWidget } from './jobs/JobsWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
 import { TodoWidget } from './todo/TodoWidget';
+import { TrackerWidget } from './tracker/TrackerWidget';
 import type { WidgetDef } from './types';
 
 /**
@@ -88,6 +89,19 @@ export const WIDGETS: WidgetDef[] = [
     ],
     min: { w: 3, h: 3 },
     Component: JobsWidget,
+  },
+  {
+    type: 'tracker',
+    name: 'Applications',
+    description: 'Everything you saved or applied to, by stage. Add jobs that are not in the feed.',
+    icon: ClipboardList,
+    requires: [],
+    presets: [
+      { label: 'List', w: 4, h: 7 },
+      { label: 'Board', w: 12, h: 6 },
+    ],
+    min: { w: 3, h: 3 },
+    Component: TrackerWidget,
   },
   {
     type: 'sources',

@@ -146,6 +146,10 @@ export const jobState = sqliteTable('job_state', {
   notes: text('notes'),
   resumePath: text('resume_path'),
   seenAt: text('seen_at'),
+  // Tracker fields. Dates are YYYY-MM-DD (a day, not an instant).
+  appliedAt: text('applied_at'),
+  nextAction: text('next_action'),
+  nextActionAt: text('next_action_at'),
   updatedAt: text('updated_at').notNull().$defaultFn(nowIso).$onUpdateFn(nowIso),
 });
 

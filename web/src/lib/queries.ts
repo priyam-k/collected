@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@ta
 import type {
   Course,
   CourseInput,
+  ManualJobInput,
   EffectiveItem,
   HealthResponse,
   ItemKind,
@@ -24,6 +25,8 @@ export const qk = {
   items: (params: Record<string, string | undefined>) => ['items', params] as const,
   jobs: (params: Record<string, string | undefined>) => ['jobs', params] as const,
   jobStats: ['jobs', 'stats'] as const,
+  job: (id: string) => ['jobs', 'one', id] as const,
+  trackedJobs: ['jobs', 'tracked'] as const,
   courseContent: (id: string) => ['courses', id, 'content'] as const,
 };
 
@@ -180,9 +183,18 @@ export function useJobs(p: JobsParams, enabled = true) {
 export function useJobStats() {
   return useQuery({
     queryKey: qk.jobStats,
-    queryFn: () => api<{ total: number; active: number; matched: number; unseen: number }>('/jobs/stats'),
+    queryFn: () => api<{ total: number; active: number; matched: number; unseen: number; tracked: number }>('/jobs/stats'),
     ...poll,
   });
+}
+
+export function useJob(id: string | null) {
+  return useQuery({ queryKey: qk.job(id ?? ''), queryFn: () => api<Job>(`/jobs/${encodeURIComponent(id!)}`), enabled: !!id, staleTime: 15_000 });
+}
+
+/** Everything saved or applied to, feed and manual, most recently touched first. */
+export function useTrackedJobs() {
+  return useQuery({ queryKey: qk.trackedJobs, queryFn: () => api<Job[]>('/jobs/tracked'), ...poll });
 }
 
 /* ---------- mutations ---------- */
@@ -356,11 +368,38 @@ export function useMarkJobsSeen() {
   });
 }
 
+export interface JobStatePatch {
+  id: string;
+  state?: JobStateValue;
+  notes?: string | null;
+  appliedAt?: string | null;
+  nextAction?: string | null;
+  nextActionAt?: string | null;
+  resumePath?: string | null;
+}
+
 export function usePatchJobState() {
+  const qc = useQueryClient();
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: ({ id, state, notes }: { id: string; state?: JobStateValue; notes?: string | null }) =>
-      api(`/jobs/${encodeURIComponent(id)}/state`, { method: 'PATCH', json: { state, notes } }),
+    mutationFn: ({ id, ...body }: JobStatePatch) => api<Job>(`/jobs/${encodeURIComponent(id)}/state`, { method: 'PATCH', json: body }),
+    onSuccess: (job) => qc.setQueryData(qk.job(job.id), job),
+    onSettled: () => inv(['jobs']),
+  });
+}
+
+export function useCreateJob() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (body: ManualJobInput) => api<Job>('/jobs', { method: 'POST', json: body }),
+    onSettled: () => inv(['jobs']),
+  });
+}
+
+export function useDeleteJob() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (id: string) => api<{ ok: true }>(`/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSettled: () => inv(['jobs']),
   });
 }

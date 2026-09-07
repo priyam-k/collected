@@ -113,10 +113,28 @@ export const overrideInputSchema = z.object({
   note: z.string().nullable().optional(),
 });
 
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
+
 export const jobStatePatchSchema = z.object({
   state: z.enum(JOB_STATES).optional(),
   notes: z.string().nullable().optional(),
+  appliedAt: isoDay.nullable().optional(),
+  nextAction: z.string().nullable().optional(),
+  nextActionAt: isoDay.nullable().optional(),
+  resumePath: z.string().nullable().optional(),
 });
+
+/** A job you add by hand (not from the feed): referral, career fair, a company site. */
+export const manualJobInputSchema = z.object({
+  company: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  url: z.union([z.string().url(), z.literal('')]).default(''),
+  locations: z.array(z.string().trim().min(1)).default([]),
+  state: z.enum(JOB_STATES).default('applied'),
+  appliedAt: isoDay.nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+export type ManualJobInput = z.infer<typeof manualJobInputSchema>;
 
 export const sourceIdSchema = z.enum(SOURCE_IDS);
 

@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { CoursePane } from './CoursePane';
+import { JobPane } from './JobPane';
 
 /** Everything that can open in the app-wide side pane. Widgets stay small; the pane is where detail lives. */
-export type Pane = { kind: 'course'; courseId: string };
+export type Pane = { kind: 'course'; courseId: string } | { kind: 'job'; jobId: string } | { kind: 'job-new' };
 
 interface PaneApi {
   pane: Pane | null;
@@ -37,6 +38,8 @@ export function PaneProvider({ children }: { children: ReactNode }) {
       <Sheet open={visible} onOpenChange={(o) => !o && close()}>
         <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl md:max-w-2xl" onOpenAutoFocus={(e) => e.preventDefault()}>
           {pane?.kind === 'course' && <CoursePane courseId={pane.courseId} />}
+          {pane?.kind === 'job' && <JobPane jobId={pane.jobId} />}
+          {pane?.kind === 'job-new' && <JobPane jobId={null} />}
         </SheetContent>
       </Sheet>
     </Ctx.Provider>

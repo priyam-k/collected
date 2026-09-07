@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, ne, sql } from 'drizzle-orm';
 import { jobsFilterSchema, type JobsSource } from '@collected/shared';
 import type { AppContext } from '../../context.js';
 import { jobState, jobs } from '../../db/schema.js';
@@ -190,7 +190,7 @@ export async function upsertListings(
 /** Re-evaluates matches_filter for every stored job (after the user edits the filter). */
 export async function recomputeMatches(ctx: AppContext): Promise<{ total: number; matched: number }> {
   const filter = compileFilter(await getSettingParsed(ctx, 'jobs.filter', jobsFilterSchema));
-  const rows = await ctx.db.select().from(jobs);
+  const rows = await ctx.db.select().from(jobs).where(ne(jobs.source, 'manual'));
   let matched = 0;
   const flip: { id: string; m: boolean }[] = [];
   for (const r of rows) {
