@@ -27,6 +27,15 @@ describe('jobs ingester', () => {
     expect(rows.every((r) => r.title.endsWith('(updated)'))).toBe(true);
     const st = await ctx.db.select().from(jobState);
     expect(st.find((s) => s.jobId === starred)?.state).toBe('starred');
+    expect(second.changed).toBe(listings.length);
+
+    // Identical feed again: nothing is rewritten, so updated_at stays put.
+    const stampsBefore = new Map(rows.map((r) => [r.id, r.updatedAt]));
+    await new Promise((r) => setTimeout(r, 5));
+    const third = await upsertListings(ctx, 'simplify', listings.map((l) => ({ ...l, title: l.title + ' (updated)' })));
+    expect(third.changed).toBe(0);
+    expect(third.created).toBe(0);
+    for (const r of await ctx.db.select().from(jobs)) expect(r.updatedAt).toBe(stampsBefore.get(r.id));
   });
 
   it('recomputes matches after a filter change', async () => {

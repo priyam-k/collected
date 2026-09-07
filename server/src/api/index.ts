@@ -17,10 +17,15 @@ import { todoistRoutes } from './todoist.js';
 export function createApi(ctx: AppContext) {
   const api = new Hono<{ Variables: AuthVariables }>();
 
-  // The Canvas cookie drop-off authenticates itself (helper key or Access); everything else needs Access.
+  // Two paths skip Access: the Canvas cookie drop-off authenticates itself (helper key or Access), and the health
+  // probe is what Docker's HEALTHCHECK calls from inside the container with no JWT. Externally both still sit
+  // behind the Access login wall on the hostname. Everything else needs Access.
   const guard = accessAuth(ctx.env);
   api.use('*', async (c, next) => {
-    if (c.req.path === '/api/sources/canvas/cookie' && c.req.method === 'POST') {
+    const open =
+      (c.req.path === '/api/sources/canvas/cookie' && c.req.method === 'POST') ||
+      (c.req.path === '/api/health' && c.req.method === 'GET');
+    if (open) {
       c.set('user', null);
       return next();
     }

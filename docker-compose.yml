@@ -13,3 +13,5 @@ services:
       TZ: ${TZ:-America/New_York}
       # Registered in artifacts/SETUP.md; override in .env
       PUBLIC_URL: ${PUBLIC_URL:-https://collected.priyamkabra.com}
+      # Keeps V8 collecting instead of growing into swap on a 1 GB box; steady state is well under 100 MB.
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=384}
