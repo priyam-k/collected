@@ -1,18 +1,19 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, Link2, Megaphone, Settings } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, Link2, Megaphone, Percent, Settings } from 'lucide-react';
 import type { Course, CourseLink, EffectiveItem, Meeting } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { canvasFileUrl, canvasOrigin } from '@/lib/canvas';
-import { useCourseContent, useCourses, useItems, type CourseContentRow } from '@/lib/queries';
+import { useCourseContent, useCourseGrades, useCourses, useItems, type CourseContentRow } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { CourseDot, DueLabel, HotLinks, ItemRow, StatusBadge, manualRaw, meetingExceptions, nextMeeting } from '@/widgets/shared';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { CourseDates } from './CourseDates';
+import { CourseGrades } from './CourseGrades';
 
 const DAY_LABEL: Record<Meeting['day'], string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
 const KIND_LABEL: Record<string, string> = { lecture: 'Lecture', discussion: 'Discussion', office_hours: 'Office hours' };
@@ -196,6 +197,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   const announcementsQ = useItems({ kind: ['announcement'], course: courseId, limit: 50 });
   const manualQ = useItems({ kind: ['event'], source: ['manual'], course: courseId, limit: 300, includeDone: true });
   const contentQ = useCourseContent(courseId);
+  const gradesQ = useCourseGrades(courseId);
   const [tab, setTab] = useState(initialTab ?? 'overview');
 
   const assignments = useMemo(() => (assignmentsQ.data ?? []).slice().sort((a, b) => dueMs(a) - dueMs(b)), [assignmentsQ.data]);
@@ -260,6 +262,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
         <TabsList variant="line" className="w-full justify-start overflow-x-auto border-b px-2">
           <TabsTrigger value="overview" className="flex-none">Overview</TabsTrigger>
           <TabsTrigger value="assignments" className="flex-none">Assignments <span className="text-muted-foreground">{assignments.length}</span></TabsTrigger>
+          {!isTa && <TabsTrigger value="grades" className="flex-none">Grades{gradesQ.data?.current != null && <span className="text-muted-foreground">{gradesQ.data.current.toFixed(1)}%</span>}</TabsTrigger>}
           <TabsTrigger value="dates" className="flex-none">Dates <span className="text-muted-foreground">{manualEvents.length}</span></TabsTrigger>
           <TabsTrigger value="files" className="flex-none">Files <span className="text-muted-foreground">{files.length + moduleItems.length}</span></TabsTrigger>
           <TabsTrigger value="announcements" className="flex-none">Announcements <span className="text-muted-foreground">{announcements.length}</span></TabsTrigger>
@@ -272,6 +275,19 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
               {assignmentsQ.isPending ? <div className="h-8 animate-pulse rounded bg-muted/40" /> : first.length ? <div className="-mx-1">{first.slice(0, 6).map((it) => <ItemRow key={it.id} item={it} />)}</div> : <Empty>{isTa ? 'Nothing coming up.' : 'Nothing left. Nice.'}</Empty>}
             </Section>
             {isTa && <Section title="Grading" icon={<ClipboardCheck className="size-3" />}><GradingList rows={grading} /></Section>}
+            {!isTa && (
+              <Section title="Grade" icon={<Percent className="size-3" />} action={<button className="text-xs text-muted-foreground hover:underline" onClick={() => setTab('grades')}>details</button>}>
+                {gradesQ.data ? (
+                  <div className="flex flex-wrap items-baseline gap-x-3 px-1 text-sm">
+                    <span className="text-xl font-semibold tabular-nums">{gradesQ.data.current == null ? '—' : `${gradesQ.data.current.toFixed(1)}%`}</span>
+                    <span className="text-xs text-muted-foreground">{gradesQ.data.current == null ? 'nothing graded yet' : gradesQ.data.weighted ? 'weighted' : 'by points'} · {gradesQ.data.graded} of {gradesQ.data.total} graded</span>
+                    {gradesQ.data.categories.filter((c) => c.percent != null).slice(0, 4).map((c) => (
+                      <span key={c.id} className="text-xs text-muted-foreground">{c.name} <span className="tabular-nums text-foreground">{c.percent!.toFixed(0)}%</span></span>
+                    ))}
+                  </div>
+                ) : <div className="h-6 animate-pulse rounded bg-muted/40" />}
+              </Section>
+            )}
             <Section title="Dates" icon={<CalendarDays className="size-3" />} action={<button className="text-xs text-muted-foreground hover:underline" onClick={() => setTab('dates')}>all</button>}>
               {upcomingDates.length ? (
                 <ul className="space-y-0.5">
@@ -323,6 +339,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
             </Section>
           </TabsContent>
 
+          {!isTa && <TabsContent value="grades"><CourseGrades course={course} /></TabsContent>}
           <TabsContent value="dates"><CourseDates course={course} assignments={assignments} /></TabsContent>
 
           <TabsContent value="files" className="space-y-4">

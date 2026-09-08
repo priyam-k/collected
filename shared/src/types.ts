@@ -104,6 +104,75 @@ export interface CourseSchedule {
   office_hours?: Meeting[];
 }
 
+/** One bucket of a course's grade: a Canvas assignment group, or a hand-made category matched by group id or title. */
+export interface GradeCategory {
+  id: string;
+  name: string;
+  /** Percent of the final grade, or null when the course is unweighted. */
+  weight: number | null;
+  /** Canvas assignment group ids that feed this category. */
+  groupIds: string[];
+  /** Case-insensitive regex on assignment titles, for courses without useful Canvas groups (Gradescope-only). */
+  match: string | null;
+  dropLowest: number;
+}
+
+export interface GradingConfig {
+  /** auto = Canvas assignment groups and Canvas's weighting flag; manual = the categories below. */
+  mode: 'auto' | 'manual';
+  categories: GradeCategory[];
+}
+
+export interface GradedAssignment {
+  id: string;
+  title: string;
+  source: SourceId;
+  dueAt: string | null;
+  status: ItemStatus;
+  score: number | null;
+  points: number | null;
+  excused: boolean;
+  omitFromFinal: boolean;
+  /** True when a drop rule removed it from the category total. */
+  dropped: boolean;
+  url: string | null;
+}
+
+export interface GradeCategoryResult {
+  id: string;
+  name: string;
+  weight: number | null;
+  earned: number;
+  possible: number;
+  percent: number | null;
+  graded: number;
+  total: number;
+  dropLowest: number;
+  assignments: GradedAssignment[];
+}
+
+export interface CanvasGradeSummary {
+  currentScore: number | null;
+  finalScore: number | null;
+  currentGrade: string | null;
+  finalGrade: string | null;
+  applyWeights: boolean;
+}
+
+export interface CourseGrades {
+  courseId: string;
+  mode: 'auto' | 'manual';
+  weighted: boolean;
+  /** Our number: weighted across categories with graded work, else points earned over points possible. */
+  current: number | null;
+  unweighted: number | null;
+  canvas: CanvasGradeSummary | null;
+  categories: GradeCategoryResult[];
+  uncategorized: GradedAssignment[];
+  graded: number;
+  total: number;
+}
+
 export interface Course {
   id: string;
   term: string;
@@ -119,6 +188,7 @@ export interface Course {
   schedule: CourseSchedule;
   notes: string | null;
   archived: boolean;
+  grading: GradingConfig | null;
   createdAt: string;
   updatedAt: string;
 }

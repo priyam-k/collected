@@ -11,12 +11,15 @@ import {
   announcementToRow,
   assignmentToRow,
   filesToContent,
+  gradeGroupsToContent,
+  gradeSummaryToContent,
   matchCourses,
   modulesToContent,
   plannerToRow,
   syllabusToContent,
   type CanvasAnnouncement,
   type CanvasAssignment,
+  type CanvasAssignmentGroup,
   type CanvasCourse,
   type CanvasFile,
   type CanvasModule,
@@ -36,16 +39,20 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
   const baseUrl = client.baseUrl;
   const ours = await ctx.db.select().from(courses).where(eq(courses.archived, false));
 
-  const canvasCourses = await client.getAll<CanvasCourse>('/api/v1/courses', { enrollment_state: 'active', 'include[]': ['term'] }, { signal });
+  const canvasCourses = await client.getAll<CanvasCourse>('/api/v1/courses', { enrollment_state: 'active', 'include[]': ['term', 'total_scores'] }, { signal });
   const { matched, autoFilled } = matchCourses(ours, canvasCourses);
   for (const f of autoFilled) {
     await ctx.db.update(courses).set({ canvasCourseId: f.canvasCourseId }).where(eq(courses.id, f.courseId));
     ctx.log.info({ course: f.courseId, canvasCourseId: f.canvasCourseId }, 'canvas course id auto-filled');
   }
   const ctxByCanvasId = new Map<string, CourseCtx>();
+  const canvasCourseById = new Map<string, CanvasCourse>();
   for (const c of ours) {
     const k = matched.get(c.id);
-    if (k) ctxByCanvasId.set(String(k.id), { courseId: c.id, role: c.role as CourseCtx['role'] });
+    if (k) {
+      ctxByCanvasId.set(String(k.id), { courseId: c.id, role: c.role as CourseCtx['role'] });
+      canvasCourseById.set(String(k.id), k);
+    }
   }
   const trackedCourseIds = [...ctxByCanvasId.values()].map((c) => c.courseId);
   const counts: Record<string, number> = { canvasCourses: canvasCourses.length, matchedCourses: ctxByCanvasId.size, autoFilled: autoFilled.length };
@@ -122,12 +129,18 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
     const detail = await client.tryGet<{ syllabus_body?: string | null }>(`/api/v1/courses/${canvasId}`, { 'include[]': ['syllabus_body'] }, signal);
     const mods = await client.tryGetAll<CanvasModule>(`/api/v1/courses/${canvasId}/modules`, { 'include[]': ['items'] }, { signal, maxPages: 3 });
     const files = await client.tryGetAll<CanvasFile>(`/api/v1/courses/${canvasId}/files`, { sort: 'updated_at', order: 'desc', per_page: 30 }, { signal, maxPages: 1 });
+    // Grades: assignment groups (weights, drop rules) and Canvas's own totals for the enrollment. Not for TA courses.
+    const groups = cc.role === 'ta' ? [] : await client.tryGetAll<CanvasAssignmentGroup>(`/api/v1/courses/${canvasId}/assignment_groups`, {}, { signal, maxPages: 2 });
+    const canvasCourse = canvasCourseById.get(canvasId);
+    const syllabus = syllabusToContent(detail?.syllabus_body, cc.courseId, canvasId, baseUrl);
     const contentRows = [
-      ...(syllabusToContent(detail?.syllabus_body, cc.courseId, canvasId, baseUrl) ? [syllabusToContent(detail?.syllabus_body, cc.courseId, canvasId, baseUrl)!] : []),
+      ...(syllabus ? [syllabus] : []),
       ...modulesToContent(mods, cc.courseId, baseUrl),
       ...filesToContent(files, cc.courseId),
+      ...gradeGroupsToContent(groups, cc.courseId),
+      ...(canvasCourse && cc.role !== 'ta' ? [gradeSummaryToContent(canvasCourse, cc.courseId, baseUrl)] : []),
     ];
-    content += await replaceCourseContent(ctx, cc.courseId, ['syllabus', 'module_item', 'file'], contentRows);
+    content += await replaceCourseContent(ctx, cc.courseId, ['syllabus', 'module_item', 'file', 'grade_group', 'grade_summary'], contentRows);
   }
   counts.content = content;
   counts.requests = client.requestCount;

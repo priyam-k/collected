@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { CourseLink, CourseSchedule, LayoutItem } from '@collected/shared';
+import type { CourseLink, CourseSchedule, GradingConfig, LayoutItem } from '@collected/shared';
 
 const nowIso = () => new Date().toISOString();
 
@@ -37,6 +37,8 @@ export const courses = sqliteTable(
     schedule: text('schedule', { mode: 'json' }).$type<CourseSchedule>().notNull().$defaultFn(() => ({})),
     notes: text('notes'),
     archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+    // null = auto (Canvas groups). Nullable so the column could be added to existing rows.
+    grading: text('grading', { mode: 'json' }).$type<GradingConfig | null>(),
     ...timestamps,
   },
   (t) => [

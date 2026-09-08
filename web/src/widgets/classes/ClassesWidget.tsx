@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
-import { useCourses, useItems } from '@/lib/queries';
+import { useCourses, useGradesSummary, useItems } from '@/lib/queries';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
@@ -16,6 +16,7 @@ export function ClassesWidget({ size }: WidgetProps) {
   const win = useMemo(() => windowFromNow(21), []);
   const itemsQ = useItems({ kind: ['assignment'], from: win.from, to: win.to, limit: 500 });
   const manualQ = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 200 });
+  const gradesQ = useGradesSummary();
 
   if (coursesQ.isError) return <ErrorState error={coursesQ.error} onRetry={() => coursesQ.refetch()} />;
   const courses = (coursesQ.data ?? []).filter((c) => !c.archived);
@@ -54,6 +55,11 @@ export function ClassesWidget({ size }: WidgetProps) {
                       <CourseDot color={c.color} />
                       <span className="font-medium">{c.code}</span>
                       {c.role === 'ta' && <span className="rounded bg-secondary px-1 text-[10px] uppercase text-muted-foreground">TA</span>}
+                      {gradesQ.data?.[c.id]?.current != null && (
+                        <span className="rounded bg-secondary px-1 text-[10px] tabular-nums text-muted-foreground" title={`Current grade (${gradesQ.data[c.id]!.weighted ? 'weighted' : 'by points'}, ${gradesQ.data[c.id]!.graded} graded)`}>
+                          {gradesQ.data[c.id]!.current!.toFixed(1)}%
+                        </span>
+                      )}
                       <ChevronRight className="size-3 text-muted-foreground opacity-0 group-hover/course:opacity-100" />
                     </div>
                     {!compact && c.name && <div className="max-w-[16rem] truncate pl-4 text-xs text-muted-foreground">{c.name}</div>}

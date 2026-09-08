@@ -5,11 +5,32 @@
     "course_code": "CMSC422",
     "workflow_state": "available",
     "enrollment_term_id": 4801,
-    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
-    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
-    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_AAAA.ics" },
+    "term": {
+      "id": 4801,
+      "name": "Fall 2026",
+      "start_at": null,
+      "end_at": null,
+      "workflow_state": "active"
+    },
+    "enrollments": [
+      {
+        "type": "student",
+        "role": "StudentEnrollment",
+        "role_id": 2395,
+        "enrollment_state": "active",
+        "user_id": 0,
+        "computed_current_score": 91.5,
+        "computed_final_score": 60.2,
+        "computed_current_grade": null,
+        "computed_final_grade": null
+      }
+    ],
+    "calendar": {
+      "ics": "https://umd.instructure.com/feeds/calendars/course_AAAA.ics"
+    },
     "time_zone": "America/New_York",
-    "default_view": "modules"
+    "default_view": "modules",
+    "apply_assignment_group_weights": true
   },
   {
     "id": 1408293,
@@ -18,12 +39,32 @@
     "sis_course_id": "202608-CMSC330-1VGM4WM",
     "workflow_state": "available",
     "enrollment_term_id": 4801,
-    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
+    "term": {
+      "id": 4801,
+      "name": "Fall 2026",
+      "start_at": null,
+      "end_at": null,
+      "workflow_state": "active"
+    },
     "enrollments": [
-      { "type": "ta", "role": "TaEnrollment", "role_id": 2397, "enrollment_state": "active", "user_id": 0 },
-      { "type": "ta", "role": "TaEnrollment", "role_id": 2397, "enrollment_state": "active", "user_id": 0 }
+      {
+        "type": "ta",
+        "role": "TaEnrollment",
+        "role_id": 2397,
+        "enrollment_state": "active",
+        "user_id": 0
+      },
+      {
+        "type": "ta",
+        "role": "TaEnrollment",
+        "role_id": 2397,
+        "enrollment_state": "active",
+        "user_id": 0
+      }
     ],
-    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_BBBB.ics" },
+    "calendar": {
+      "ics": "https://umd.instructure.com/feeds/calendars/course_BBBB.ics"
+    },
     "time_zone": "America/New_York",
     "default_view": "wiki"
   },
@@ -33,9 +74,25 @@
     "course_code": "CMSC330",
     "workflow_state": "available",
     "enrollment_term_id": 4715,
-    "term": { "id": 4715, "name": "Spring 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
-    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
-    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_CCCC.ics" },
+    "term": {
+      "id": 4715,
+      "name": "Spring 2026",
+      "start_at": null,
+      "end_at": null,
+      "workflow_state": "active"
+    },
+    "enrollments": [
+      {
+        "type": "student",
+        "role": "StudentEnrollment",
+        "role_id": 2395,
+        "enrollment_state": "active",
+        "user_id": 0
+      }
+    ],
+    "calendar": {
+      "ics": "https://umd.instructure.com/feeds/calendars/course_CCCC.ics"
+    },
     "time_zone": "America/New_York",
     "default_view": "modules"
   },
@@ -45,9 +102,25 @@
     "course_code": "MATH423",
     "workflow_state": "available",
     "enrollment_term_id": 4801,
-    "term": { "id": 4801, "name": "Fall 2026", "start_at": null, "end_at": null, "workflow_state": "active" },
-    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
-    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_DDDD.ics" },
+    "term": {
+      "id": 4801,
+      "name": "Fall 2026",
+      "start_at": null,
+      "end_at": null,
+      "workflow_state": "active"
+    },
+    "enrollments": [
+      {
+        "type": "student",
+        "role": "StudentEnrollment",
+        "role_id": 2395,
+        "enrollment_state": "active",
+        "user_id": 0
+      }
+    ],
+    "calendar": {
+      "ics": "https://umd.instructure.com/feeds/calendars/course_DDDD.ics"
+    },
     "time_zone": "America/New_York",
     "default_view": "modules"
   },
@@ -57,9 +130,25 @@
     "course_code": "CS Ugrad Adv 26-27",
     "workflow_state": "available",
     "enrollment_term_id": 212,
-    "term": { "id": 212, "name": "Default Term", "start_at": null, "end_at": null, "workflow_state": "active" },
-    "enrollments": [{ "type": "student", "role": "StudentEnrollment", "role_id": 2395, "enrollment_state": "active", "user_id": 0 }],
-    "calendar": { "ics": "https://umd.instructure.com/feeds/calendars/course_EEEE.ics" },
+    "term": {
+      "id": 212,
+      "name": "Default Term",
+      "start_at": null,
+      "end_at": null,
+      "workflow_state": "active"
+    },
+    "enrollments": [
+      {
+        "type": "student",
+        "role": "StudentEnrollment",
+        "role_id": 2395,
+        "enrollment_state": "active",
+        "user_id": 0
+      }
+    ],
+    "calendar": {
+      "ics": "https://umd.instructure.com/feeds/calendars/course_EEEE.ics"
+    },
     "time_zone": "America/New_York",
     "default_view": "wiki"
   }

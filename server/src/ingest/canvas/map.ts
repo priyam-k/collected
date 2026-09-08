@@ -11,8 +11,25 @@ export interface CanvasCourse {
   sis_course_id?: string | null;
   workflow_state?: string;
   term?: { id: number | string; name: string } | null;
-  enrollments?: { type: string; role?: string; enrollment_state?: string }[];
+  enrollments?: {
+    type: string;
+    role?: string;
+    enrollment_state?: string;
+    computed_current_score?: number | null;
+    computed_final_score?: number | null;
+    computed_current_grade?: string | null;
+    computed_final_grade?: string | null;
+  }[];
   calendar?: { ics?: string };
+  apply_assignment_group_weights?: boolean;
+}
+
+export interface CanvasAssignmentGroup {
+  id: number | string;
+  name: string;
+  position?: number;
+  group_weight?: number | null;
+  rules?: { drop_lowest?: number; drop_highest?: number; never_drop?: (number | string)[] };
 }
 
 export interface CanvasSubmission {
@@ -43,6 +60,9 @@ export interface CanvasAssignment {
   has_submitted_submissions?: boolean;
   submission?: CanvasSubmission | null;
   updated_at?: string;
+  assignment_group_id?: number | string;
+  omit_from_final_grade?: boolean;
+  grading_type?: string;
 }
 
 export interface PlannerItem {
@@ -241,6 +261,48 @@ export function assignmentToRow(a: CanvasAssignment, course: CourseCtx, baseUrl:
       submittedAt: a.submission?.submitted_at ?? null,
       late: !!a.submission?.late,
       updatedAt: a.updated_at ?? null,
+      // grades
+      groupId: a.assignment_group_id == null ? null : String(a.assignment_group_id),
+      omitFromFinal: !!a.omit_from_final_grade,
+      gradingType: a.grading_type ?? null,
+      excused: !!a.submission?.excused,
+      grade: a.submission?.grade ?? null,
+    },
+  };
+}
+
+export function gradeGroupsToContent(groups: CanvasAssignmentGroup[], courseId: string): ContentRow[] {
+  return groups.map((g) => ({
+    id: `${courseId}:grade_group:${g.id}`,
+    courseId,
+    kind: 'grade_group',
+    externalId: String(g.id),
+    moduleName: null,
+    title: g.name,
+    url: null,
+    position: g.position ?? 0,
+    raw: { weight: g.group_weight ?? null, rules: g.rules ?? {} },
+  }));
+}
+
+/** Canvas's own totals for the course, from the enrollment (`include[]=total_scores`). */
+export function gradeSummaryToContent(course: CanvasCourse, courseId: string, baseUrl: string): ContentRow {
+  const e = (course.enrollments ?? []).find((x) => x.computed_current_score !== undefined || x.computed_final_score !== undefined) ?? course.enrollments?.[0];
+  return {
+    id: `${courseId}:grade_summary:summary`,
+    courseId,
+    kind: 'grade_summary',
+    externalId: 'summary',
+    moduleName: null,
+    title: 'Grades',
+    url: `${baseUrl}/courses/${course.id}/grades`,
+    position: 0,
+    raw: {
+      currentScore: e?.computed_current_score ?? null,
+      finalScore: e?.computed_final_score ?? null,
+      currentGrade: e?.computed_current_grade ?? null,
+      finalGrade: e?.computed_final_grade ?? null,
+      applyWeights: !!course.apply_assignment_group_weights,
     },
   };
 }

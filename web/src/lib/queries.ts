@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type {
   Course,
+  CourseGrades,
   CourseInput,
   ManualEventInput,
   ManualJobInput,
@@ -29,6 +30,8 @@ export const qk = {
   job: (id: string) => ['jobs', 'one', id] as const,
   trackedJobs: ['jobs', 'tracked'] as const,
   courseContent: (id: string) => ['courses', id, 'content'] as const,
+  grades: ['grades'] as const,
+  courseGrades: (id: string) => ['grades', id] as const,
 };
 
 /** Widgets poll on this cadence while the tab is visible. */
@@ -91,6 +94,17 @@ export function useCourseContent(courseId: string | undefined) {
     enabled: !!courseId,
     staleTime: 5 * 60_000,
   });
+}
+
+export type GradesSummary = Record<string, { current: number | null; weighted: boolean; graded: number; total: number; canvasCurrent: number | null }>;
+
+/** Current grade per course, for overview rows. */
+export function useGradesSummary() {
+  return useQuery({ queryKey: qk.grades, queryFn: () => api<GradesSummary>('/grades'), ...poll, staleTime: 60_000 });
+}
+
+export function useCourseGrades(courseId: string | undefined) {
+  return useQuery({ queryKey: qk.courseGrades(courseId ?? ''), queryFn: () => api<CourseGrades>(`/grades/${encodeURIComponent(courseId!)}`), enabled: !!courseId, staleTime: 30_000 });
 }
 
 export interface CourseLinksResponse {
@@ -256,7 +270,7 @@ export function useSaveCourse() {
   return useMutation({
     mutationFn: ({ id, ...body }: Partial<CourseInput> & { id?: string }) =>
       id ? api<Course>(`/courses/${id}`, { method: 'PUT', json: body }) : api<Course>('/courses', { method: 'POST', json: body }),
-    onSettled: () => inv(qk.courses, qk.widgets),
+    onSettled: () => inv(qk.courses, qk.widgets, qk.grades),
   });
 }
 

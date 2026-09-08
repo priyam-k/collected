@@ -18,6 +18,19 @@ export const courseScheduleSchema = z.object({
 
 export const courseLinkSchema = z.object({ label: z.string().min(1), url: z.string().url() });
 
+export const gradeCategorySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1),
+  weight: z.number().min(0).max(100).nullable().default(null),
+  groupIds: z.array(z.string()).default([]),
+  match: z.string().nullable().default(null),
+  dropLowest: z.number().int().min(0).default(0),
+});
+export const gradingConfigSchema = z.object({
+  mode: z.enum(['auto', 'manual']).default('auto'),
+  categories: z.array(gradeCategorySchema).default([]),
+});
+
 export const courseInputSchema = z.object({
   term: z.string().min(1),
   code: z.string().min(1).transform((s) => s.toUpperCase().replace(/\s+/g, '')),
@@ -32,6 +45,7 @@ export const courseInputSchema = z.object({
   schedule: courseScheduleSchema.default({}),
   notes: z.string().nullable().optional(),
   archived: z.boolean().default(false),
+  grading: gradingConfigSchema.nullable().optional(),
 });
 export type CourseInput = z.infer<typeof courseInputSchema>;
 

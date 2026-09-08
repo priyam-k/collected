@@ -7,6 +7,7 @@ import { canvasRoutes } from './canvas.js';
 import { coursesRoutes } from './courses.js';
 import { googleRoutes } from './google.js';
 import { exportRoutes } from './export.js';
+import { gradesRoutes } from './grades.js';
 import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
 import { jobsRoutes } from './jobs.js';
@@ -44,6 +45,7 @@ export function createApi(ctx: AppContext) {
   api.route('/google', googleRoutes(ctx));
   api.route('/calendar', calendarRoutes(ctx));
   api.route('/canvas', canvasRoutes(ctx));
+  api.route('/grades', gradesRoutes(ctx));
   api.route('/todoist', todoistRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 

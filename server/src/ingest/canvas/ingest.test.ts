@@ -39,7 +39,10 @@ describe('syncCanvas over fixtures', () => {
 
     const content = await ctx.db.select().from(courseContent).where(eq(courseContent.courseId, '2026-fall-cmsc422-0101'));
     const kinds = content.reduce<Record<string, number>>((m, r) => ({ ...m, [r.kind]: (m[r.kind] ?? 0) + 1 }), {});
-    expect(kinds).toEqual({ syllabus: 1, module_item: 4, file: 3 });
+    expect(kinds).toEqual({ syllabus: 1, module_item: 4, file: 3, grade_group: 3, grade_summary: 1 });
+    const summary = content.find((r) => r.kind === 'grade_summary')!;
+    expect(summary.raw).toMatchObject({ currentScore: 91.5, applyWeights: true });
+    expect(content.find((r) => r.kind === 'grade_group' && r.externalId === '2391940')?.raw).toMatchObject({ weight: 24, rules: { drop_lowest: 1 } });
   });
 
   it('is idempotent and soft-deletes assignments Canvas stops returning', async () => {

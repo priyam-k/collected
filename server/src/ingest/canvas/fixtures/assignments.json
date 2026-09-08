@@ -10,12 +10,29 @@
     "lock_at": "2026-09-08T03:59:59Z",
     "points_possible": 16,
     "published": true,
-    "submission_types": ["online_quiz"],
+    "submission_types": [
+      "online_quiz"
+    ],
     "is_quiz_assignment": true,
     "quiz_id": 1895452,
     "has_submitted_submissions": true,
     "updated_at": "2026-09-01T14:43:44Z",
-    "submission": { "assignment_id": 7775093, "attempt": null, "cached_due_date": "2026-09-08T03:59:59Z", "excused": null, "grade": null, "late": false, "missing": false, "score": null, "submitted_at": null, "user_id": 0, "workflow_state": "unsubmitted" }
+    "submission": {
+      "assignment_id": 7775093,
+      "attempt": null,
+      "cached_due_date": "2026-09-08T03:59:59Z",
+      "excused": null,
+      "grade": null,
+      "late": false,
+      "missing": false,
+      "score": null,
+      "submitted_at": null,
+      "user_id": 0,
+      "workflow_state": "unsubmitted"
+    },
+    "assignment_group_id": 2384654,
+    "omit_from_final_grade": false,
+    "grading_type": "points"
   },
   {
     "id": 7775094,
@@ -28,12 +45,28 @@
     "lock_at": null,
     "points_possible": 100,
     "published": true,
-    "submission_types": ["external_tool"],
+    "submission_types": [
+      "external_tool"
+    ],
     "is_quiz_assignment": false,
     "quiz_id": null,
     "has_submitted_submissions": true,
     "updated_at": "2026-09-03T10:00:00Z",
-    "submission": { "assignment_id": 7775094, "attempt": 1, "excused": null, "grade": "95", "late": false, "missing": false, "score": 95, "submitted_at": "2026-09-05T20:11:00Z", "user_id": 0, "workflow_state": "graded" }
+    "submission": {
+      "assignment_id": 7775094,
+      "attempt": 1,
+      "excused": null,
+      "grade": "95",
+      "late": false,
+      "missing": false,
+      "score": 95,
+      "submitted_at": "2026-09-05T20:11:00Z",
+      "user_id": 0,
+      "workflow_state": "graded"
+    },
+    "assignment_group_id": 2391941,
+    "omit_from_final_grade": false,
+    "grading_type": "points"
   },
   {
     "id": 7775095,
@@ -46,12 +79,28 @@
     "lock_at": null,
     "points_possible": 5,
     "published": true,
-    "submission_types": ["online_text_entry"],
+    "submission_types": [
+      "online_text_entry"
+    ],
     "is_quiz_assignment": false,
     "quiz_id": null,
     "has_submitted_submissions": true,
     "updated_at": "2026-09-03T10:00:00Z",
-    "submission": { "assignment_id": 7775095, "attempt": 1, "excused": null, "grade": null, "late": true, "missing": false, "score": null, "submitted_at": "2026-09-04T05:00:00Z", "user_id": 0, "workflow_state": "submitted" }
+    "submission": {
+      "assignment_id": 7775095,
+      "attempt": 1,
+      "excused": null,
+      "grade": null,
+      "late": true,
+      "missing": false,
+      "score": null,
+      "submitted_at": "2026-09-04T05:00:00Z",
+      "user_id": 0,
+      "workflow_state": "submitted"
+    },
+    "assignment_group_id": 2384654,
+    "omit_from_final_grade": false,
+    "grading_type": "points"
   },
   {
     "id": 7775096,
@@ -62,7 +111,12 @@
     "due_at": null,
     "points_possible": 10,
     "published": false,
-    "submission_types": ["none"],
-    "submission": null
+    "submission_types": [
+      "none"
+    ],
+    "submission": null,
+    "assignment_group_id": 2391941,
+    "omit_from_final_grade": false,
+    "grading_type": "points"
   }
 ]

@@ -1,0 +1,25 @@
+[
+  {
+    "id": 2384654,
+    "name": "Assignments",
+    "position": 1,
+    "group_weight": 16,
+    "rules": {}
+  },
+  {
+    "id": 2391940,
+    "name": "Projects",
+    "position": 2,
+    "group_weight": 24,
+    "rules": {
+      "drop_lowest": 1
+    }
+  },
+  {
+    "id": 2391941,
+    "name": "Exams",
+    "position": 3,
+    "group_weight": 60,
+    "rules": {}
+  }
+]
