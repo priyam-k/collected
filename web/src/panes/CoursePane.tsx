@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, Link2, Megaphone, Percent, Settings } from 'lucide-react';
-import type { Course, CourseLink, EffectiveItem, Meeting } from '@collected/shared';
+import { meetingLabel, type Course, type CourseLink, type EffectiveItem, type Meeting } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -16,7 +16,6 @@ import { CourseDates } from './CourseDates';
 import { CourseGrades } from './CourseGrades';
 
 const DAY_LABEL: Record<Meeting['day'], string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
-const KIND_LABEL: Record<string, string> = { lecture: 'Lecture', discussion: 'Discussion', office_hours: 'Office hours' };
 
 function fmtTime(t: string): string {
   const [h, m] = t.split(':').map(Number);
@@ -158,7 +157,7 @@ function ScheduleList({ course }: { course: Course }) {
         const isNext = next?.kind === kind && next.label === label;
         return (
           <li key={i} className={cn('flex items-center gap-2 rounded px-1 py-0.5', isNext && 'bg-accent/60')}>
-            <span className="w-24 shrink-0 text-xs text-muted-foreground">{KIND_LABEL[kind] ?? kind}</span>
+            <span className="w-24 shrink-0 text-xs text-muted-foreground">{meetingLabel(kind)}</span>
             <span className="min-w-0 flex-1 truncate">{label}</span>
             {isNext && <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">next</span>}
           </li>
@@ -253,7 +252,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
         </div>
         <SheetDescription>
           {course.name ?? course.term}
-          {meeting && <span className="ml-2 text-xs">Next: {KIND_LABEL[meeting.kind] ?? meeting.kind} {meeting.label}</span>}
+          {meeting && <span className="ml-2 text-xs">Next: {meetingLabel(meeting.kind)} {meeting.label}</span>}
         </SheetDescription>
         {links.length > 0 && <HotLinks links={links} />}
       </SheetHeader>

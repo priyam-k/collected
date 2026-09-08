@@ -4,6 +4,7 @@ import { ClipboardCheck, Download, FileText, Maximize2, Megaphone } from 'lucide
 import { Button } from '@/components/ui/button';
 import { usePane } from '@/panes/PaneContext';
 import { canvasFileUrl } from '@/lib/canvas';
+import { meetingLabel } from '@collected/shared';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { EmptyState } from '@/widgets/Placeholder';
@@ -52,7 +53,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
         </button>
         {meeting && size.tier !== 'xs' && (
           <span className="shrink-0 truncate text-xs text-muted-foreground">
-            {isTa && meeting.kind === 'discussion' ? 'Your discussion' : meeting.kind === 'office_hours' ? 'Office hours' : 'Next'} · {meeting.label}
+            {isTa && meeting.kind === 'discussion' ? 'Your discussion' : meeting.kind === 'lecture' ? 'Next' : meetingLabel(meeting.kind)} · {meeting.label}
           </span>
         )}
         <Button size="icon-xs" variant="ghost" className="shrink-0" aria-label="Open course" title="Open the course pane" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
+import { meetingLabel } from '@collected/shared';
 import { useCourses, useGradesSummary, useItems } from '@/lib/queries';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
@@ -82,7 +83,7 @@ export function ClassesWidget({ size }: WidgetProps) {
                 {!compact && (
                   <td className={cn('py-1.5 pr-3 align-top', size.tier === 'md' ? 'max-w-[14rem]' : 'max-w-[24rem]')}>
                     <HotLinks links={c.links} compact />
-                    {meeting && <div className="mt-0.5 text-xs text-muted-foreground">{meeting.kind === 'discussion' ? 'Discussion' : meeting.kind === 'office_hours' ? 'Office hours' : 'Lecture'} {meeting.label}</div>}
+                    {meeting && <div className="mt-0.5 text-xs text-muted-foreground">{meetingLabel(meeting.kind)} {meeting.label}</div>}
                   </td>
                 )}
               </tr>

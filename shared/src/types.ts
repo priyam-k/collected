@@ -28,8 +28,17 @@ export const COURSE_EVENT_LABELS: Record<CourseEventKind, string> = {
   virtual: 'Virtual class',
   other: 'Note',
 };
-export const MEETING_KINDS = ['lecture', 'discussion', 'office_hours'] as const;
-export type MeetingKind = (typeof MEETING_KINDS)[number];
+/** Built-in session kinds. A schedule can carry any other key too (`seminar`, `studio`, `recitation`…). */
+export const MEETING_KINDS = ['lecture', 'discussion', 'lab', 'office_hours'] as const;
+export type MeetingKind = string;
+export const MEETING_LABELS: Record<string, string> = { lecture: 'Lecture', discussion: 'Discussion', lab: 'Lab', office_hours: 'Office hours' };
+/** "office_hours" → "Office hours", "lab" → "Lab", "tutorial_section" → "Tutorial section". */
+export function meetingLabel(kind: string): string {
+  const known = MEETING_LABELS[kind];
+  if (known) return known;
+  const words = kind.replace(/[_-]+/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Session';
+}
 
 /** `items.raw` for a manual course event. */
 export interface ManualEventRaw {
@@ -98,11 +107,8 @@ export interface Meeting {
   location?: string;
 }
 
-export interface CourseSchedule {
-  lecture?: Meeting[];
-  discussion?: Meeting[];
-  office_hours?: Meeting[];
-}
+/** Keyed by session kind: the built-in ones plus anything the user adds. Keys are lowercase snake_case. */
+export type CourseSchedule = Record<string, Meeting[]>;
 
 /** One bucket of a course's grade: a Canvas assignment group, or a hand-made category matched by group id or title. */
 export interface GradeCategory {

@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, ExternalLink, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { COURSE_EVENT_KINDS, COURSE_EVENT_LABELS, MEETING_KINDS, type Course, type CourseEventKind, type EffectiveItem, type ManualEventInput, type Meeting, type MeetingKind } from '@collected/shared';
+import { COURSE_EVENT_KINDS, COURSE_EVENT_LABELS, meetingLabel, type Course, type CourseEventKind, type EffectiveItem, type ManualEventInput, type Meeting, type MeetingKind } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,6 @@ import { ItemPopover } from '@/widgets/ItemPopover';
 import { manualRaw } from '@/widgets/shared';
 
 const DAY_INDEX: Record<Meeting['day'], number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-const MEETING_LABEL: Record<MeetingKind, string> = { lecture: 'Lecture', discussion: 'Discussion', office_hours: 'Office hours' };
 const KIND_TONE: Record<CourseEventKind, string> = {
   exam: 'bg-red-500',
   final: 'bg-red-600',
@@ -34,7 +33,7 @@ function fmtTime(t: string): string {
 /** Scheduled sessions on a given date, from the weekly schedule. */
 function sessionsOn(course: Course, date: Date): { kind: MeetingKind; meeting: Meeting }[] {
   const out: { kind: MeetingKind; meeting: Meeting }[] = [];
-  for (const kind of MEETING_KINDS) for (const m of course.schedule[kind] ?? []) if (DAY_INDEX[m.day] === date.getDay()) out.push({ kind, meeting: m });
+  for (const [kind, list] of Object.entries(course.schedule)) for (const m of list ?? []) if (DAY_INDEX[m.day] === date.getDay()) out.push({ kind, meeting: m });
   return out;
 }
 
@@ -48,7 +47,7 @@ function EventForm({ course, draft, onChange, onSaved, onCancel }: { course: Cou
   const sessions = sessionsOn(course, parseISO(draft.date));
   const sessionTag = draft.kind === 'cancelled' || draft.kind === 'virtual';
   const pickSession = (kind: CourseEventKind, s?: { kind: MeetingKind; meeting: Meeting }) => {
-    const label = s ? MEETING_LABEL[s.kind].toLowerCase() : 'class';
+    const label = s ? meetingLabel(s.kind).toLowerCase() : 'class';
     onChange({
       ...draft,
       kind,
@@ -96,7 +95,7 @@ function EventForm({ course, draft, onChange, onSaved, onCancel }: { course: Cou
           <span className="text-muted-foreground">Which session:</span>
           {sessions.map((s) => (
             <button key={s.kind + s.meeting.start} type="button" onClick={() => pickSession(draft.kind, s)} className={cn('rounded-md border px-2 py-0.5', draft.meetingKind === s.kind && draft.start === s.meeting.start ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
-              {MEETING_LABEL[s.kind]} {fmtTime(s.meeting.start)}
+              {meetingLabel(s.kind)} {fmtTime(s.meeting.start)}
             </button>
           ))}
         </div>
@@ -265,14 +264,14 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
           <h4 className="text-sm font-medium">{friendlyDate(`${selected}T12:00:00`)}, {format(selectedDate, 'MMM d')}</h4>
           {sessions.map((s) => (
             <span key={s.kind + s.meeting.start} className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-muted-foreground">
-              {MEETING_LABEL[s.kind]} {fmtTime(s.meeting.start)}–{fmtTime(s.meeting.end)}
+              {meetingLabel(s.kind)} {fmtTime(s.meeting.start)}–{fmtTime(s.meeting.end)}
             </span>
           ))}
           <span className="ml-auto flex items-center gap-1">
             {sessions.length > 0 && (
               <>
-                <Button size="xs" variant="secondary" onClick={() => startDraft({ kind: 'cancelled', meetingKind: sessions[0]!.kind, title: `${course.code} ${MEETING_LABEL[sessions[0]!.kind].toLowerCase()} cancelled`, allDay: false, start: sessions[0]!.meeting.start, end: sessions[0]!.meeting.end })}>Cancelled</Button>
-                <Button size="xs" variant="secondary" onClick={() => startDraft({ kind: 'virtual', meetingKind: sessions[0]!.kind, title: `${course.code} ${MEETING_LABEL[sessions[0]!.kind].toLowerCase()} online`, allDay: false, start: sessions[0]!.meeting.start, end: sessions[0]!.meeting.end })}>Virtual</Button>
+                <Button size="xs" variant="secondary" onClick={() => startDraft({ kind: 'cancelled', meetingKind: sessions[0]!.kind, title: `${course.code} ${meetingLabel(sessions[0]!.kind).toLowerCase()} cancelled`, allDay: false, start: sessions[0]!.meeting.start, end: sessions[0]!.meeting.end })}>Cancelled</Button>
+                <Button size="xs" variant="secondary" onClick={() => startDraft({ kind: 'virtual', meetingKind: sessions[0]!.kind, title: `${course.code} ${meetingLabel(sessions[0]!.kind).toLowerCase()} online`, allDay: false, start: sessions[0]!.meeting.start, end: sessions[0]!.meeting.end })}>Virtual</Button>
               </>
             )}
             <Button size="xs" onClick={() => startDraft()}><Plus className="size-3" /> Add date</Button>

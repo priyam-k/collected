@@ -207,7 +207,7 @@ Adding a widget = adding a folder and a registry entry.
 - **classes**: one row per course (code, current grade, next due, hotlinks, next meeting). Clicking a course opens the course pane.
 - **jobs**: short and wide = horizontal tape of matches; otherwise a card grid (1–3 columns by width). Star / hide / applied actions; starred-only and all-listings toggles; header shows new / match / active counts. Cards on screen for two seconds are marked seen, which drives the "new" count. Clicking a card opens the job pane; the external-link icon goes to the posting.
 - **tracker** ("Applications"): every job with a tracked state. Wide = a board with a column per open stage (saved, applied, screen, interviewing, offer) and an optional closed column; narrow = one list with stage pills. Cards open the job pane; a stage select on each card moves it without opening. "Add" opens the manual-entry form.
-- **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor (schedule drawn on a week grid, JSON one click away), todoist sync options, job filter, layout reset, JSON export/import.
+- **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor (schedule drawn on a week grid, JSON one click away; session kinds are open, lecture / discussion / lab / office_hours built in and any snake_case key accepted, labelled by `meetingLabel()`), todoist sync options, job filter, layout reset, JSON export/import.
 
 ## API
 

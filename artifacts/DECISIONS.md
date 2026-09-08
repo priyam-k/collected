@@ -150,3 +150,8 @@ Why: Canvas's own number is one opaque float, and half the courses don't apply w
 
 The schedule is drawn on a week grid; dates are picked on a month calendar. Both write the same JSON/rows the API takes, and the raw JSON stays one click away in the course dialog.
 Why: the grid can't express every edge (odd minutes, one-off rooms), and the JSON is what export/import and the seed use. Keeping both means the easy path is easy and nothing is unreachable.
+
+## 032 — Session kinds are an open set (2026-09-08)
+
+`CourseSchedule` is `Record<string, Meeting[]>`; the schema accepts any lowercase snake_case key. Lecture, discussion, lab, and office hours are the built-in chips; the editor adds a chip for any key the schedule already carries or the user types.
+Why: the fixed three-key object silently stripped a typed-in `lab`, which read as a bug. Courses have seminars, studios, recitations; a closed enum would keep growing. Labels derive from the key, so nothing else needs a lookup table.

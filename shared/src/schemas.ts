@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COURSE_EVENT_KINDS, COURSE_ROLES, INGESTED_SOURCE_IDS, JOB_STATES, MEETING_KINDS, SUBMITS_VIA, BREAKPOINTS } from './types.js';
+import { COURSE_EVENT_KINDS, COURSE_ROLES, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS } from './types.js';
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
@@ -10,11 +10,9 @@ export const meetingSchema = z.object({
   location: z.string().optional(),
 });
 
-export const courseScheduleSchema = z.object({
-  lecture: z.array(meetingSchema).optional(),
-  discussion: z.array(meetingSchema).optional(),
-  office_hours: z.array(meetingSchema).optional(),
-});
+/** Any kind works as a key; unknown kinds used to be stripped silently, which is how a typed-in `lab` vanished. */
+export const meetingKindSchema = z.string().regex(/^[a-z][a-z0-9_]*$/, 'kind must be lowercase letters, digits, underscores');
+export const courseScheduleSchema = z.record(meetingKindSchema, z.array(meetingSchema));
 
 export const courseLinkSchema = z.object({ label: z.string().min(1), url: z.string().url() });
 
@@ -165,7 +163,7 @@ export const manualEventInputSchema = z
     end: hhmm.nullable().optional(),
     location: z.string().trim().nullable().optional(),
     note: z.string().trim().nullable().optional(),
-    meetingKind: z.enum(MEETING_KINDS).nullable().optional(),
+    meetingKind: meetingKindSchema.nullable().optional(),
   })
   .refine((v) => !v.end || !!v.start, { message: 'end needs a start', path: ['end'] })
   .refine((v) => !v.start || !v.end || v.end > v.start, { message: 'end must be after start', path: ['end'] });

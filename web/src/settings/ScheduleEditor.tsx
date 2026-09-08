@@ -1,16 +1,22 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Trash2 } from 'lucide-react';
-import type { CourseSchedule, Meeting } from '@collected/shared';
+import { Plus, Trash2 } from 'lucide-react';
+import { MEETING_KINDS, meetingLabel, type CourseSchedule, type Meeting } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-type Kind = keyof CourseSchedule;
-const KINDS: { key: Kind; label: string; tone: string }[] = [
-  { key: 'lecture', label: 'Lecture', tone: 'bg-sky-500/25 border-sky-500/60 text-sky-900 dark:text-sky-100' },
-  { key: 'discussion', label: 'Discussion', tone: 'bg-violet-500/25 border-violet-500/60 text-violet-900 dark:text-violet-100' },
-  { key: 'office_hours', label: 'Office hours', tone: 'bg-amber-500/25 border-amber-500/60 text-amber-900 dark:text-amber-100' },
+const TONES: Record<string, string> = {
+  lecture: 'bg-sky-500/25 border-sky-500/60 text-sky-900 dark:text-sky-100',
+  discussion: 'bg-violet-500/25 border-violet-500/60 text-violet-900 dark:text-violet-100',
+  lab: 'bg-emerald-500/25 border-emerald-500/60 text-emerald-900 dark:text-emerald-100',
+  office_hours: 'bg-amber-500/25 border-amber-500/60 text-amber-900 dark:text-amber-100',
+};
+const EXTRA_TONES = [
+  'bg-rose-500/25 border-rose-500/60 text-rose-900 dark:text-rose-100',
+  'bg-teal-500/25 border-teal-500/60 text-teal-900 dark:text-teal-100',
+  'bg-fuchsia-500/25 border-fuchsia-500/60 text-fuchsia-900 dark:text-fuchsia-100',
+  'bg-lime-500/25 border-lime-500/60 text-lime-900 dark:text-lime-100',
 ];
 const DAYS: Meeting['day'][] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABEL: Record<Meeting['day'], string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -31,36 +37,47 @@ const fmt = (t: string): string => {
   const mm = m % 60;
   return `${h % 12 || 12}${mm ? `:${String(mm).padStart(2, '0')}` : ''}${h >= 12 ? 'p' : 'a'}`;
 };
+/** "Lab section" → "lab_section" */
+const slug = (s: string): string => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').replace(/^[^a-z]+/, '');
 
 interface Block {
-  kind: Kind;
+  kind: string;
   index: number;
   meeting: Meeting;
 }
 
 /**
  * Drag over a day column to add a meeting of the selected kind; click a block to adjust times, location, kind,
- * or remove it. 15-minute drag snap; the time fields accept any minute.
+ * or remove it. 15-minute drag snap; the time fields accept any minute. Kinds are open: the built-in four plus
+ * whatever the schedule already carries or you add here.
  */
 export function ScheduleEditor({ value, onChange }: { value: CourseSchedule; onChange(next: CourseSchedule): void }) {
-  const [kind, setKind] = useState<Kind>('lecture');
-  const [drag, setDrag] = useState<{ day: Meeting['day']; from: number; to: number } | null>(null);
+  const [extraKinds, setExtraKinds] = useState<string[]>([]);
+  const kinds = useMemo(() => {
+    const out: string[] = [...MEETING_KINDS];
+    for (const k of [...Object.keys(value), ...extraKinds]) if (!out.includes(k)) out.push(k);
+    return out;
+  }, [value, extraKinds]);
+  const toneFor = (kind: string): string => TONES[kind] ?? EXTRA_TONES[Math.max(0, kinds.indexOf(kind) - MEETING_KINDS.length) % EXTRA_TONES.length]!;
+  const [kind, setKind] = useState<string>('lecture');
+  const [newKind, setNewKind] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ day: Meeting['day']; from: number; to: number; moved: boolean } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const blocks = useMemo<Block[]>(() => {
     const out: Block[] = [];
-    for (const k of KINDS) (value[k.key] ?? []).forEach((m, i) => out.push({ kind: k.key, index: i, meeting: m }));
+    for (const k of kinds) (value[k] ?? []).forEach((m, i) => out.push({ kind: k, index: i, meeting: m }));
     return out;
-  }, [value]);
+  }, [value, kinds]);
 
-  const update = (b: Block, patch: Partial<Meeting> | null, newKind?: Kind) => {
+  const update = (b: Block, patch: Partial<Meeting> | null, newKindKey?: string) => {
     const next: CourseSchedule = { ...value, [b.kind]: (value[b.kind] ?? []).filter((_, i) => i !== b.index) };
     if (patch !== null) {
       const meeting = { ...b.meeting, ...patch };
-      const target = newKind ?? b.kind;
+      const target = newKindKey ?? b.kind;
       next[target] = [...(next[target] ?? []), meeting].sort((a, c) => DAYS.indexOf(a.day) - DAYS.indexOf(c.day) || toMin(a.start) - toMin(c.start));
     }
-    for (const k of KINDS) if (!next[k.key]?.length) delete next[k.key];
+    for (const k of Object.keys(next)) if (!next[k]?.length) delete next[k];
     onChange(next);
   };
 
@@ -77,25 +94,36 @@ export function ScheduleEditor({ value, onChange }: { value: CourseSchedule; onC
   };
 
   const onDown = (e: ReactPointerEvent) => {
-    if ((e.target as HTMLElement).closest('[data-block]')) return;
+    // React bubbles events from portals (the block popover) up to this handler; only real grid cells start a drag.
+    const target = e.target as HTMLElement;
+    if (!gridRef.current?.contains(target) || target.closest('[data-block]') || e.button !== 0) return;
     const hit = slotAt(e);
     if (!hit) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDrag({ day: hit.day, from: hit.slot, to: hit.slot });
+    setDrag({ day: hit.day, from: hit.slot, to: hit.slot, moved: false });
   };
   const onMove = (e: ReactPointerEvent) => {
     if (!drag) return;
     const hit = slotAt(e);
-    if (hit) setDrag({ ...drag, to: hit.slot });
+    if (hit && hit.slot !== drag.to) setDrag({ ...drag, to: hit.slot, moved: true });
   };
   const onUp = () => {
     if (!drag) return;
+    setDrag(null);
+    if (!drag.moved) return; // a plain click adds nothing; drag to create
     const a = Math.min(drag.from, drag.to);
     const b = Math.max(drag.from, drag.to) + 1;
     const start = toHHMM(HOUR_START * 60 + a * SLOT_MIN);
     const end = toHHMM(HOUR_START * 60 + b * SLOT_MIN);
     onChange({ ...value, [kind]: [...(value[kind] ?? []), { day: drag.day, start, end }] });
-    setDrag(null);
+  };
+
+  const addKind = () => {
+    const k = slug(newKind ?? '');
+    setNewKind(null);
+    if (!k) return;
+    if (!kinds.includes(k)) setExtraKinds((x) => [...x, k]);
+    setKind(k);
   };
 
   const top = (t: string) => ((toMin(t) - HOUR_START * 60) / SLOT_MIN) * SLOT_PX;
@@ -106,11 +134,26 @@ export function ScheduleEditor({ value, onChange }: { value: CourseSchedule; onC
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1 text-xs">
         <span className="text-muted-foreground">Drag on a day to add:</span>
-        {KINDS.map((k) => (
-          <button key={k.key} type="button" onClick={() => setKind(k.key)} className={cn('rounded-md border px-2 py-0.5', kind === k.key ? k.tone + ' font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
-            {k.label}
+        {kinds.map((k) => (
+          <button key={k} type="button" onClick={() => setKind(k)} className={cn('rounded-md border px-2 py-0.5', kind === k ? toneFor(k) + ' font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
+            {meetingLabel(k)}
           </button>
         ))}
+        {newKind === null ? (
+          <button type="button" onClick={() => setNewKind('')} className="rounded-md border border-dashed px-2 py-0.5 text-muted-foreground hover:bg-secondary/60" title="Add a kind of session: seminar, studio, recitation…">
+            <Plus className="inline size-3" /> kind
+          </button>
+        ) : (
+          <Input
+            autoFocus
+            className="h-6 w-32 text-xs"
+            placeholder="seminar"
+            value={newKind}
+            onChange={(e) => setNewKind(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addKind(); } if (e.key === 'Escape') setNewKind(null); }}
+            onBlur={addKind}
+          />
+        )}
         <span className="ml-auto text-muted-foreground">Click a block to edit.</span>
       </div>
       <div className="select-none overflow-hidden rounded-md border text-[10px]">
@@ -132,23 +175,23 @@ export function ScheduleEditor({ value, onChange }: { value: CourseSchedule; onC
                 {hours.map((h) => <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - HOUR_START) * 4 * SLOT_PX }} />)}
               </div>
             ))}
-            {drag && (
+            {drag && drag.moved && (
               <div
-                className={cn('pointer-events-none absolute rounded border', KINDS.find((k) => k.key === kind)!.tone)}
+                className={cn('pointer-events-none absolute rounded border', toneFor(kind))}
                 style={{ left: `${(DAYS.indexOf(drag.day) / 7) * 100}%`, width: `${100 / 7}%`, top: Math.min(drag.from, drag.to) * SLOT_PX, height: (Math.abs(drag.to - drag.from) + 1) * SLOT_PX }}
               />
             )}
             {blocks.map((b) => (
-              <BlockEditor key={`${b.kind}-${b.index}-${b.meeting.day}-${b.meeting.start}`} block={b} onChange={update}>
+              <BlockEditor key={`${b.kind}-${b.index}`} block={b} kinds={kinds} toneFor={toneFor} onChange={update}>
                 <button
                   type="button"
                   data-block
-                  className={cn('absolute overflow-hidden rounded border px-1 text-left leading-tight hover:brightness-110', KINDS.find((k) => k.key === b.kind)!.tone)}
+                  className={cn('absolute overflow-hidden rounded border px-1 text-left leading-tight hover:brightness-110', toneFor(b.kind))}
                   style={{ left: `calc(${(DAYS.indexOf(b.meeting.day) / 7) * 100}% + 2px)`, width: `calc(${100 / 7}% - 4px)`, top: top(b.meeting.start), height: height(b.meeting) }}
-                  title={`${KINDS.find((k) => k.key === b.kind)!.label} ${fmt(b.meeting.start)}–${fmt(b.meeting.end)}${b.meeting.location ? ` · ${b.meeting.location}` : ''}`}
+                  title={`${meetingLabel(b.kind)} ${fmt(b.meeting.start)}–${fmt(b.meeting.end)}${b.meeting.location ? ` · ${b.meeting.location}` : ''}`}
                 >
                   <div className="truncate font-medium">{fmt(b.meeting.start)}–{fmt(b.meeting.end)}</div>
-                  {height(b.meeting) > 2 * SLOT_PX && <div className="truncate">{b.meeting.location ?? KINDS.find((k) => k.key === b.kind)!.label}</div>}
+                  {height(b.meeting) > 2 * SLOT_PX && <div className="truncate">{b.meeting.location ?? meetingLabel(b.kind)}</div>}
                 </button>
               </BlockEditor>
             ))}
@@ -159,16 +202,18 @@ export function ScheduleEditor({ value, onChange }: { value: CourseSchedule; onC
   );
 }
 
-function BlockEditor({ block, onChange, children }: { block: Block; onChange(b: Block, patch: Partial<Meeting> | null, newKind?: Kind): void; children: React.ReactNode }) {
+function BlockEditor({ block, kinds, toneFor, onChange, children }: { block: Block; kinds: string[]; toneFor(k: string): string; onChange(b: Block, patch: Partial<Meeting> | null, newKind?: string): void; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
   const m = block.meeting;
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-64 space-y-2 p-3 text-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <div className="flex gap-1">
-          {KINDS.map((k) => (
-            <button key={k.key} type="button" onClick={() => onChange(block, {}, k.key)} className={cn('rounded-md border px-1.5 py-0.5 text-xs', block.kind === k.key ? k.tone + ' font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
-              {k.label}
+      {/* Stop pointer events here so the grid never sees clicks inside the editor (it would start a drag). */}
+      <PopoverContent className="w-64 space-y-2 p-3 text-sm" onOpenAutoFocus={(e) => e.preventDefault()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap gap-1">
+          {kinds.map((k) => (
+            <button key={k} type="button" onClick={() => onChange(block, {}, k)} className={cn('rounded-md border px-1.5 py-0.5 text-xs', block.kind === k ? toneFor(k) + ' font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
+              {meetingLabel(k)}
             </button>
           ))}
         </div>
@@ -184,7 +229,7 @@ function BlockEditor({ block, onChange, children }: { block: Block; onChange(b: 
           <span className="text-muted-foreground">Where</span>
           <Input className="h-7 text-xs" placeholder="IRB 0324" value={m.location ?? ''} onChange={(e) => onChange(block, { location: e.target.value || undefined })} />
         </div>
-        <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={() => onChange(block, null)}>
+        <Button type="button" size="xs" variant="ghost" className="text-destructive" onClick={() => { setOpen(false); onChange(block, null); }}>
           <Trash2 className="size-3" /> Remove
         </Button>
       </PopoverContent>
