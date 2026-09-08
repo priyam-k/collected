@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@ta
 import type {
   Course,
   CourseInput,
+  ManualEventInput,
   ManualJobInput,
   EffectiveItem,
   HealthResponse,
@@ -312,6 +313,30 @@ export function useSetOverride() {
   return useMutation({
     mutationFn: ({ id, ...body }: { id: string; hidden?: boolean; done?: boolean; snoozedUntil?: string | null; note?: string | null }) =>
       api(`/items/${encodeURIComponent(id)}/override`, { method: 'POST', json: body }),
+    onSettled: () => inv(['items']),
+  });
+}
+
+export function useCreateManualEvent() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (body: ManualEventInput) => api<{ id: string; externalId: string }>('/items/manual', { method: 'POST', json: body }),
+    onSettled: () => inv(['items']),
+  });
+}
+
+export function useUpdateManualEvent() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: ({ externalId, ...body }: ManualEventInput & { externalId: string }) => api(`/items/manual/${encodeURIComponent(externalId)}`, { method: 'PUT', json: body }),
+    onSettled: () => inv(['items']),
+  });
+}
+
+export function useDeleteManualEvent() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (externalId: string) => api<{ ok: true }>(`/items/manual/${encodeURIComponent(externalId)}`, { method: 'DELETE' }),
     onSettled: () => inv(['items']),
   });
 }

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Check, ExternalLink, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { SOURCE_LABELS, type EffectiveItem } from '@collected/shared';
+import { COURSE_EVENT_LABELS, SOURCE_LABELS, type EffectiveItem, type ManualEventRaw } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -58,6 +58,7 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
   const closeTask = useCloseTodoistTask();
   const pane = usePane();
   const raw = item.raw as { location?: string | null; calendarName?: string | null; projectName?: string | null; sectionName?: string | null; statusText?: string | null; parentId?: string | null };
+  const manual = item.source === 'manual' ? (item.raw as unknown as ManualEventRaw) : null;
   const desc = item.description ? stripHtml(item.description) : '';
   const canComplete = !item.effectiveDone && !item.informational && (item.kind === 'assignment' || item.kind === 'task');
   const complete = () => {
@@ -75,7 +76,7 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
         <div className="min-w-0 flex-1">
           <div className={cn('font-medium leading-snug', item.effectiveDone && 'line-through opacity-70')}>{item.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-            <span className="capitalize">{item.kind}</span>
+            <span className="capitalize">{manual ? COURSE_EVENT_LABELS[manual.eventKind] : item.kind}</span>
             {item.course && (
               <button className="hover:text-foreground hover:underline" title="Open the course" onClick={() => { onClose?.(); pane.open({ kind: 'course', courseId: item.course!.id }); }}>
                 · {item.course.code}
@@ -114,6 +115,11 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
         {canComplete && (
           <Button size="sm" variant="ghost" onClick={complete} title={item.source === 'todoist' ? 'Complete in Todoist' : 'Mark done here only; the source is never changed'}>
             <Check className="size-3.5" /> Done
+          </Button>
+        )}
+        {manual && item.courseId && (
+          <Button size="sm" variant="ghost" onClick={() => { onClose?.(); pane.open({ kind: 'course', courseId: item.courseId!, tab: 'dates' }); }} title="Edit in the course's dates">
+            Edit
           </Button>
         )}
       </div>

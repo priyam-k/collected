@@ -9,7 +9,7 @@ import { friendlyDate } from '@/lib/time';
 import { EmptyState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { ItemPopover } from '@/widgets/ItemPopover';
-import { HotLinks, ItemRow, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { HotLinks, ItemRow, meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
 
 export interface ClassWidgetConfig {
   courseId?: string;
@@ -25,6 +25,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
   const upcoming = useItems({ kind: ['assignment'], course: courseId, from: win.from, to: win.to, limit: 50, includeInformational: true }, !!courseId);
   const announcements = useItems({ kind: ['announcement'], course: courseId, limit: 5 }, !!courseId && size.tier !== 'xs' && size.tier !== 'sm');
   const content = useCourseContent(courseId);
+  const manual = useItems({ kind: ['event'], source: ['manual'], course: courseId, from: win.from, to: win.to, limit: 50 }, !!courseId);
 
   if (!courseId) return <EmptyState>This widget has no course. Remove it and add it again from the tray.</EmptyState>;
   if (coursesQ.isSuccess && !course)
@@ -35,7 +36,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
     );
   if (!course) return null;
 
-  const meeting = nextMeeting(course.schedule);
+  const meeting = nextMeeting(course.schedule, meetingExceptions(manual.data ?? []));
   const files = (content.data ?? []).filter((r) => r.kind === 'file').slice(0, 5);
   const grading = (content.data ?? []).filter((r) => r.kind === 'grading');
   const syllabus = (content.data ?? []).find((r) => r.kind === 'syllabus');

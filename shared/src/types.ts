@@ -1,6 +1,10 @@
 // Vocabulary shared by server and web. Keep in sync with artifacts/DESIGN.md.
 
-export const SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'todoist', 'jobs'] as const;
+/** Sources with an ingester and a row in `sources`. */
+export const INGESTED_SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'todoist', 'jobs'] as const;
+export type IngestedSourceId = (typeof INGESTED_SOURCE_IDS)[number];
+/** Every value `items.source` can take. `manual` is you: exam dates, cancelled sessions, notes. */
+export const SOURCE_IDS = [...INGESTED_SOURCE_IDS, 'manual'] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 
 export const SOURCE_LABELS: Record<SourceId, string> = {
@@ -10,7 +14,33 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   gcal: 'Google Calendar',
   todoist: 'Todoist',
   jobs: 'Job feed',
+  manual: 'Manual',
 };
+
+/** What a hand-entered course date is. Cancelled/virtual attach to a scheduled session; the rest are dates in their own right. */
+export const COURSE_EVENT_KINDS = ['exam', 'quiz', 'final', 'cancelled', 'virtual', 'other'] as const;
+export type CourseEventKind = (typeof COURSE_EVENT_KINDS)[number];
+export const COURSE_EVENT_LABELS: Record<CourseEventKind, string> = {
+  exam: 'Exam',
+  quiz: 'Quiz',
+  final: 'Final',
+  cancelled: 'Class cancelled',
+  virtual: 'Virtual class',
+  other: 'Note',
+};
+export const MEETING_KINDS = ['lecture', 'discussion', 'office_hours'] as const;
+export type MeetingKind = (typeof MEETING_KINDS)[number];
+
+/** `items.raw` for a manual course event. */
+export interface ManualEventRaw {
+  eventKind: CourseEventKind;
+  date: string; // YYYY-MM-DD
+  start: string | null; // HH:MM local, null = all day
+  end: string | null;
+  location: string | null;
+  note: string | null;
+  meetingKind: MeetingKind | null; // which session a cancelled/virtual tag applies to
+}
 
 export const SOURCE_STATUSES = ['disconnected', 'connected', 'needs_auth', 'error'] as const;
 export type SourceStatus = (typeof SOURCE_STATUSES)[number];
@@ -94,7 +124,7 @@ export interface Course {
 }
 
 export interface Source {
-  id: SourceId;
+  id: IngestedSourceId;
   enabled: boolean;
   status: SourceStatus;
   lastRunAt: string | null;

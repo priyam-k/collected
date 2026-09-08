@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { COURSE_ROLES, JOB_STATES, SOURCE_IDS, SUBMITS_VIA, BREAKPOINTS } from './types.js';
+import { COURSE_EVENT_KINDS, COURSE_ROLES, INGESTED_SOURCE_IDS, JOB_STATES, MEETING_KINDS, SUBMITS_VIA, BREAKPOINTS } from './types.js';
+
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
 export const meetingSchema = z.object({
   day: z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
@@ -113,8 +115,6 @@ export const overrideInputSchema = z.object({
   note: z.string().nullable().optional(),
 });
 
-const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
-
 export const jobStatePatchSchema = z.object({
   state: z.enum(JOB_STATES).optional(),
   notes: z.string().nullable().optional(),
@@ -136,7 +136,26 @@ export const manualJobInputSchema = z.object({
 });
 export type ManualJobInput = z.infer<typeof manualJobInputSchema>;
 
-export const sourceIdSchema = z.enum(SOURCE_IDS);
+export const sourceIdSchema = z.enum(INGESTED_SOURCE_IDS);
+
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/, 'expected HH:MM');
+
+/** A hand-entered course date: exam, quiz, final, a cancelled or virtual session, or a note on a day. */
+export const manualEventInputSchema = z
+  .object({
+    courseId: z.string().nullable().default(null),
+    kind: z.enum(COURSE_EVENT_KINDS).default('other'),
+    title: z.string().trim().min(1),
+    date: isoDay,
+    start: hhmm.nullable().optional(),
+    end: hhmm.nullable().optional(),
+    location: z.string().trim().nullable().optional(),
+    note: z.string().trim().nullable().optional(),
+    meetingKind: z.enum(MEETING_KINDS).nullable().optional(),
+  })
+  .refine((v) => !v.end || !!v.start, { message: 'end needs a start', path: ['end'] })
+  .refine((v) => !v.start || !v.end || v.end > v.start, { message: 'end must be after start', path: ['end'] });
+export type ManualEventInput = z.infer<typeof manualEventInputSchema>;
 
 // Per-source config bodies (secrets). Stored encrypted; never returned by the API.
 export const sourceConfigSchemas = {

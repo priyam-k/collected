@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, Link2, Megaphone, Settings } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, Link2, Megaphone, Settings } from 'lucide-react';
 import type { Course, CourseLink, EffectiveItem, Meeting } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,9 @@ import { canvasFileUrl, canvasOrigin } from '@/lib/canvas';
 import { useCourseContent, useCourses, useItems, type CourseContentRow } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { CourseDot, DueLabel, HotLinks, ItemRow, StatusBadge, nextMeeting } from '@/widgets/shared';
+import { CourseDot, DueLabel, HotLinks, ItemRow, StatusBadge, manualRaw, meetingExceptions, nextMeeting } from '@/widgets/shared';
 import { ItemPopover } from '@/widgets/ItemPopover';
+import { CourseDates } from './CourseDates';
 
 const DAY_LABEL: Record<Meeting['day'], string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
 const KIND_LABEL: Record<string, string> = { lecture: 'Lecture', discussion: 'Discussion', office_hours: 'Office hours' };
@@ -188,13 +189,14 @@ function GradingList({ rows }: { rows: CourseContentRow[] }) {
 }
 
 /** The whole course in one place: schedule, links, every assignment, modules and files, announcements, syllabus. */
-export function CoursePane({ courseId }: { courseId: string }) {
+export function CoursePane({ courseId, initialTab }: { courseId: string; initialTab?: string }) {
   const coursesQ = useCourses();
   const course = coursesQ.data?.find((c) => c.id === courseId);
   const assignmentsQ = useItems({ kind: ['assignment'], course: courseId, includeDone: true, includeInformational: true, limit: 500 });
   const announcementsQ = useItems({ kind: ['announcement'], course: courseId, limit: 50 });
+  const manualQ = useItems({ kind: ['event'], source: ['manual'], course: courseId, limit: 300, includeDone: true });
   const contentQ = useCourseContent(courseId);
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState(initialTab ?? 'overview');
 
   const assignments = useMemo(() => (assignmentsQ.data ?? []).slice().sort((a, b) => dueMs(a) - dueMs(b)), [assignmentsQ.data]);
   const announcements = useMemo(() => (announcementsQ.data ?? []).slice().sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? '')), [announcementsQ.data]);
@@ -225,7 +227,13 @@ export function CoursePane({ courseId }: { courseId: string }) {
   const first = isTa ? assignments.filter((a) => !a.dueAt || !isPast(a.dueAt)) : assignments.filter((a) => !a.effectiveDone);
   const second = isTa ? assignments.filter((a) => a.dueAt && isPast(a.dueAt)).reverse() : assignments.filter((a) => a.effectiveDone).slice().sort((a, b) => dueMs(b) - dueMs(a));
   const [firstLabel, secondLabel] = isTa ? ['Upcoming', 'Past'] : ['To do', 'Done'];
-  const meeting = nextMeeting(course.schedule);
+  const manualEvents = manualQ.data ?? [];
+  const meeting = nextMeeting(course.schedule, meetingExceptions(manualEvents));
+  const todayKey = new Date().toLocaleDateString('en-CA');
+  const upcomingDates = manualEvents
+    .filter((it) => { const r = manualRaw(it); return r && r.date >= todayKey && r.eventKind !== 'cancelled' && r.eventKind !== 'virtual'; })
+    .sort((a, b) => manualRaw(a)!.date.localeCompare(manualRaw(b)!.date))
+    .slice(0, 4);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -252,6 +260,7 @@ export function CoursePane({ courseId }: { courseId: string }) {
         <TabsList variant="line" className="w-full justify-start overflow-x-auto border-b px-2">
           <TabsTrigger value="overview" className="flex-none">Overview</TabsTrigger>
           <TabsTrigger value="assignments" className="flex-none">Assignments <span className="text-muted-foreground">{assignments.length}</span></TabsTrigger>
+          <TabsTrigger value="dates" className="flex-none">Dates <span className="text-muted-foreground">{manualEvents.length}</span></TabsTrigger>
           <TabsTrigger value="files" className="flex-none">Files <span className="text-muted-foreground">{files.length + moduleItems.length}</span></TabsTrigger>
           <TabsTrigger value="announcements" className="flex-none">Announcements <span className="text-muted-foreground">{announcements.length}</span></TabsTrigger>
           {syllabus && <TabsTrigger value="syllabus" className="flex-none">Syllabus</TabsTrigger>}
@@ -263,6 +272,26 @@ export function CoursePane({ courseId }: { courseId: string }) {
               {assignmentsQ.isPending ? <div className="h-8 animate-pulse rounded bg-muted/40" /> : first.length ? <div className="-mx-1">{first.slice(0, 6).map((it) => <ItemRow key={it.id} item={it} />)}</div> : <Empty>{isTa ? 'Nothing coming up.' : 'Nothing left. Nice.'}</Empty>}
             </Section>
             {isTa && <Section title="Grading" icon={<ClipboardCheck className="size-3" />}><GradingList rows={grading} /></Section>}
+            <Section title="Dates" icon={<CalendarDays className="size-3" />} action={<button className="text-xs text-muted-foreground hover:underline" onClick={() => setTab('dates')}>all</button>}>
+              {upcomingDates.length ? (
+                <ul className="space-y-0.5">
+                  {upcomingDates.map((it) => {
+                    const r = manualRaw(it)!;
+                    return (
+                      <li key={it.id}>
+                        <ItemPopover item={it}>
+                          <span className="flex items-baseline gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent/60">
+                            <span className="w-16 shrink-0 text-xs text-muted-foreground">{friendlyDate(`${r.date}T12:00:00`)}</span>
+                            <span className="min-w-0 flex-1 truncate">{it.title}</span>
+                            {r.start && <span className="shrink-0 text-xs text-muted-foreground">{r.start}</span>}
+                          </span>
+                        </ItemPopover>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <Empty>No exam or quiz dates yet. <button className="underline" onClick={() => setTab('dates')}>Add some.</button></Empty>}
+            </Section>
             <Section title="Announcements" icon={<Megaphone className="size-3" />} action={<button className="text-xs text-muted-foreground hover:underline" onClick={() => setTab('announcements')}>all</button>}>
               {announcements.length ? (
                 <ul className="space-y-0.5">
@@ -293,6 +322,8 @@ export function CoursePane({ courseId }: { courseId: string }) {
               {second.length ? <div className="-mx-1 opacity-80">{second.map((it) => <AssignmentRow key={it.id} item={it} />)}</div> : <Empty>Nothing here.</Empty>}
             </Section>
           </TabsContent>
+
+          <TabsContent value="dates"><CourseDates course={course} assignments={assignments} /></TabsContent>
 
           <TabsContent value="files" className="space-y-4">
             <Section title="Modules">{contentQ.isPending ? <div className="h-8 animate-pulse rounded bg-muted/40" /> : <Modules rows={moduleItems} />}</Section>

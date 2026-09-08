@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { count, eq } from 'drizzle-orm';
-import { SOURCE_IDS, jobsFilterSchema, seedConfigSchema, todoistPushConfigSchema } from '@collected/shared';
+import { INGESTED_SOURCE_IDS, jobsFilterSchema, seedConfigSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from './context.js';
 import { courses, settings, sources, widgetInstances } from './db/schema.js';
 
@@ -17,7 +17,7 @@ const COURSE_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#
 export async function seed(ctx: AppContext): Promise<void> {
   const { db, log, env } = ctx;
 
-  for (const id of SOURCE_IDS) {
+  for (const id of INGESTED_SOURCE_IDS) {
     await db.insert(sources).values({ id }).onConflictDoNothing();
   }
 

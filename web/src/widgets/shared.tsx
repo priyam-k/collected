@@ -1,5 +1,6 @@
+import { format } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
-import type { CourseLink, CourseSchedule, EffectiveItem, ItemStatus, Meeting } from '@collected/shared';
+import type { CourseEventKind, CourseLink, CourseSchedule, EffectiveItem, ItemStatus, ManualEventRaw, Meeting, MeetingKind } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -39,23 +40,52 @@ function fmtTime(t: string): string {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: m ? '2-digit' : undefined });
 }
 
-/** The next occurrence of any meeting in the schedule, relative to now. */
-export function nextMeeting(schedule: CourseSchedule): { label: string; kind: string; when: Date } | null {
+/** A cancelled or virtual session: a manual event on a day, optionally pinned to one meeting kind. */
+export interface MeetingException {
+  date: string; // YYYY-MM-DD
+  meetingKind: MeetingKind | null;
+  eventKind: CourseEventKind;
+}
+
+export const manualRaw = (it: EffectiveItem): ManualEventRaw | null => (it.source === 'manual' ? (it.raw as unknown as ManualEventRaw) : null);
+
+export function meetingExceptions(items: EffectiveItem[]): MeetingException[] {
+  const out: MeetingException[] = [];
+  for (const it of items) {
+    const raw = manualRaw(it);
+    if (raw && (raw.eventKind === 'cancelled' || raw.eventKind === 'virtual')) out.push({ date: raw.date, meetingKind: raw.meetingKind, eventKind: raw.eventKind });
+  }
+  return out;
+}
+
+export interface NextMeeting {
+  label: string;
+  kind: string;
+  when: Date;
+  /** The session is happening online (a "virtual class" event covers it). */
+  virtual: boolean;
+}
+
+/** The next occurrence of any meeting in the schedule, relative to now, skipping cancelled sessions. */
+export function nextMeeting(schedule: CourseSchedule, exceptions: MeetingException[] = []): NextMeeting | null {
   const now = new Date();
-  let best: { label: string; kind: string; when: Date } | null = null;
+  let best: NextMeeting | null = null;
+  const covers = (x: MeetingException, kind: string, d: Date) => x.date === format(d, 'yyyy-MM-dd') && (x.meetingKind === null || x.meetingKind === kind);
   for (const [kind, list] of Object.entries(schedule) as [string, Meeting[] | undefined][]) {
     for (const m of list ?? []) {
       const [h, min] = m.end.split(':').map(Number);
-      for (let add = 0; add < 8; add++) {
+      for (let add = 0; add < 15; add++) {
         const d = new Date(now);
         d.setDate(now.getDate() + add);
         if (d.getDay() !== DAY_INDEX[m.day]) continue;
         d.setHours(h ?? 0, min ?? 0, 0, 0);
         if (d < now) continue;
+        if (exceptions.some((x) => x.eventKind === 'cancelled' && covers(x, kind, d))) continue;
+        const virtual = exceptions.some((x) => x.eventKind === 'virtual' && covers(x, kind, d));
         const [sh, sm] = m.start.split(':').map(Number);
         const start = new Date(d);
         start.setHours(sh ?? 0, sm ?? 0, 0, 0);
-        if (!best || start < best.when) best = { kind, when: start, label: `${DAY_LABEL[m.day]} ${fmtTime(m.start)}–${fmtTime(m.end)}${m.location ? ` · ${m.location}` : ''}` };
+        if (!best || start < best.when) best = { kind, when: start, virtual, label: `${DAY_LABEL[m.day]} ${fmtTime(m.start)}–${fmtTime(m.end)}${virtual ? ' · online' : m.location ? ` · ${m.location}` : ''}` };
         break;
       }
     }

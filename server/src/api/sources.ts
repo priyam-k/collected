@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { SOURCE_IDS, sourceConfigSchemas, sourceIdSchema, type Source, type SourceId } from '@collected/shared';
+import { INGESTED_SOURCE_IDS, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { sources } from '../db/schema.js';
@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 
 function toPublic(row: typeof sources.$inferSelect): Source {
   return {
-    id: row.id as SourceId,
+    id: row.id as IngestedSourceId,
     enabled: row.enabled,
     status: row.status as Source['status'],
     lastRunAt: row.lastRunAt,
@@ -29,8 +29,8 @@ export function sourcesRoutes(ctx: AppContext) {
 
   r.get('/', async (c) => {
     const rows = await ctx.db.select().from(sources);
-    const order = new Map(SOURCE_IDS.map((id, i) => [id, i]));
-    rows.sort((a, b) => (order.get(a.id as SourceId) ?? 99) - (order.get(b.id as SourceId) ?? 99));
+    const order = new Map(INGESTED_SOURCE_IDS.map((id, i) => [id, i]));
+    rows.sort((a, b) => (order.get(a.id as IngestedSourceId) ?? 99) - (order.get(b.id as IngestedSourceId) ?? 99));
     return c.json(rows.map(toPublic));
   });
 

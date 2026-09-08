@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { ItemPopover } from '@/widgets/ItemPopover';
-import { CourseDot, DueLabel, HotLinks, StatusBadge, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { CourseDot, DueLabel, HotLinks, StatusBadge, meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
 
 /** One row per course: next due, hotlinks, upcoming count. */
 export function ClassesWidget({ size }: WidgetProps) {
@@ -15,6 +15,7 @@ export function ClassesWidget({ size }: WidgetProps) {
   const { open } = usePane();
   const win = useMemo(() => windowFromNow(21), []);
   const itemsQ = useItems({ kind: ['assignment'], from: win.from, to: win.to, limit: 500 });
+  const manualQ = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 200 });
 
   if (coursesQ.isError) return <ErrorState error={coursesQ.error} onRetry={() => coursesQ.refetch()} />;
   const courses = (coursesQ.data ?? []).filter((c) => !c.archived);
@@ -39,7 +40,7 @@ export function ClassesWidget({ size }: WidgetProps) {
           {courses.map((c) => {
             const list = byCourse.get(c.id) ?? [];
             const next = list[0];
-            const meeting = nextMeeting(c.schedule);
+            const meeting = nextMeeting(c.schedule, meetingExceptions((manualQ.data ?? []).filter((it) => it.courseId === c.id)));
             return (
               <tr key={c.id} className="border-b last:border-0">
                 <td className="w-0 whitespace-nowrap py-1 pl-1.5 pr-2 align-top">
