@@ -113,6 +113,10 @@ Unique on (`source`, `external_id`). Soft-delete when a source stops returning a
 
 **applications** — unused placeholder from the v1 plan; the tracker lives on `job_state` (DECISIONS 027).
 
+**Manual items** — `items` rows with `source = manual`: exam, quiz, and final dates, cancelled or virtual sessions, notes on a day. `kind = event`, `raw` is `ManualEventRaw` (`eventKind`, `date`, `start`/`end` or all-day, `location`, `note`, `meetingKind` for session tags). No `sources` row and no ingester; `INGESTED_SOURCE_IDS` is the list with ingesters. Written through `POST/PUT/DELETE /api/items/manual`.
+
+**Grades** — two more `course_content` kinds from Canvas: `grade_group` (assignment group: `raw.weight`, `raw.rules` with drop_lowest etc.) and `grade_summary` (the enrollment's computed current/final score and whether Canvas applies weights). Assignments carry `raw.groupId`, `raw.omitFromFinal`, `raw.excused`. `courses.grading` (nullable JSON, `GradingConfig`) overrides the categories: `mode: manual` with `{ name, weight, groupIds, match (title regex), dropLowest }` per category. `lib/grades.ts` computes the current grade Canvas-style; nothing is stored.
+
 **widget_instances** — `id`, `type`, `config` (JSON), `hidden`.
 **layouts** — `breakpoint` (lg | md | sm), `layout` (JSON array of `{i, x, y, w, h}`).
 **settings** — key/value JSON.
@@ -188,7 +192,7 @@ type WidgetDef = {
 
 Adding a widget = adding a folder and a registry entry.
 
-**Side pane**: widgets stay small; detail lives in one app-wide right-hand sheet (`web/src/panes/`). `usePane().open({ kind, ... })` from anywhere. Kinds: `course` (schedule, links, every assignment split to-do/done or upcoming/past for TA courses, modules and files, announcements, syllabus), `job` (posting details plus the tracker fields, saved on blur), `job-new` (manual entry form). Courses open from the classes overview, the class widget header, and the course code in item popovers; jobs open from feed and tracker cards.
+**Side pane**: widgets stay small; detail lives in one app-wide right-hand sheet (`web/src/panes/`). `usePane().open({ kind, ... })` from anywhere. Kinds: `course` (overview; assignments split to-do/done or upcoming/past for TA courses; grades: categories, weights, drop rules, a weight editor; dates: month grid with class days shaded, exam/quiz/final entries, cancelled/virtual session tags; modules and files; announcements; syllabus), `job` (posting details plus the tracker fields, saved on blur), `job-new` (manual entry form). Courses open from the classes overview, the class widget header, and the course code in item popovers; jobs open from feed and tracker cards.
 
 **Canvas files**: file links never point at Canvas's download URL. `/api/canvas/files/:id/open` asks Canvas for the file's `public_url` (an InstFS link without `download=1`) and redirects; the CDN serves it inline, so PDFs render in the browser. `?download=1` forces a download. Module items of type File carry the file id in `raw.contentId` and use the same route.
 
@@ -200,10 +204,10 @@ Adding a widget = adding a folder and a registry entry.
 - **todo** (unified items of kind task/assignment, grouped by section = label): narrow = one section with tabs; wide = sections as columns. Homework section is fed by effective assignments plus Todoist tasks carrying the homework label. Check-off writes an override for source items and closes the task for Todoist items. Quick-add box uses Todoist's natural-language parser.
 - **sources**: xs = colored dots; md = table with status, last success, error, and per-source actions (sync now, reconnect).
 - **class** (multi-instance, config: course_id): header with code + color + next meeting; hotlinks row from `courses.links`; upcoming assignments; recent announcements; for TA role: grading queue and discussion time. sm = links + next due; lg = full.
-- **classes**: one row per course (code, next due, hotlinks, next meeting). Clicking a course opens the course pane.
+- **classes**: one row per course (code, current grade, next due, hotlinks, next meeting). Clicking a course opens the course pane.
 - **jobs**: short and wide = horizontal tape of matches; otherwise a card grid (1–3 columns by width). Star / hide / applied actions; starred-only and all-listings toggles; header shows new / match / active counts. Cards on screen for two seconds are marked seen, which drives the "new" count. Clicking a card opens the job pane; the external-link icon goes to the posting.
 - **tracker** ("Applications"): every job with a tracked state. Wide = a board with a column per open stage (saved, applied, screen, interviewing, offer) and an optional closed column; narrow = one list with stage pills. Cards open the job pane; a stage select on each card moves it without opening. "Add" opens the manual-entry form.
-- **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor, todoist sync options, job filter, layout reset, JSON export/import.
+- **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor (schedule drawn on a week grid, JSON one click away), todoist sync options, job filter, layout reset, JSON export/import.
 
 ## API
 
@@ -225,6 +229,8 @@ GET/PUT /api/layout   GET/PUT /api/widgets
 GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state   { state?, notes?, appliedAt?, nextAction?, nextActionAt?, resumePath? }
 GET  /api/jobs/tracked  GET /api/jobs/:id  POST /api/jobs (manual entry)  DELETE /api/jobs/:id (manual only)
 GET  /api/canvas/files/:id/open?download  (302 to a one-shot inline link)
+POST /api/items/manual  PUT/DELETE /api/items/manual/:externalId   (course dates and session tags)
+GET  /api/grades  (current grade per course)  GET /api/grades/:courseId  (categories, assignments, Canvas's own numbers)
 GET/PUT /api/settings
 GET  /api/export  POST /api/import     (courses, settings, layout, widgets)
 GET  /api/health

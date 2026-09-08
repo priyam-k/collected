@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-07. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025), and the first-use backlog (course pane, applications tracker, inline files, settings nav) is built locally but not shipped. Next: ship the image, connect the sources on prod, the backup cron, then two weeks of real use.
+Last updated: 2026-09-08. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Built locally since, not shipped: course pane, applications tracker, inline files, settings nav, grades, course dates, schedule editor (migrations 0002 and 0003 run on boot). Next: ship the image, connect the sources on prod, the backup cron, then two weeks of real use.
 
 ## Milestones
 
@@ -39,6 +39,12 @@ Done the same day, on the Mac, not yet shipped to the box (build on the Mac and 
 - [x] Course pane: click a course anywhere (overview, class widget, item popover) for schedule, links, every assignment, modules and files, announcements, syllabus.
 - [x] Job pane + Applications widget: stages, applied date, next action, notes, resume path; manual entries; board or list. The widget is on the dashboard already (added while testing; hide it from edit mode if unwanted).
 - [x] Canvas files open inline (PDFs render in the tab) via `/api/canvas/files/:id/open`; a download icon keeps the old behaviour.
+
+Second batch, 2026-09-08, also local only:
+
+- [x] Grades: Canvas assignment groups with weights and drop rules, a Canvas-style current grade per course, a Grades tab (categories expand to assignments, weight editor for custom categories and title regexes), current percent in the classes overview.
+- [x] Dates: exam/quiz/final entries and cancelled/virtual session tags per course, a Dates tab with a month grid (class days shaded), everything showing on the calendar automatically, next-meeting logic honouring cancellations.
+- [x] Schedule editor: drag on a week grid in the course dialog; JSON still available.
 
 Still open:
 

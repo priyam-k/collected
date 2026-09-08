@@ -135,3 +135,18 @@ Why: a feed listing and a hand-added lead need the same fields and the same widg
 
 `/api/canvas/files/:id/open` fetches the file's `public_url` with the stored session and redirects the browser to it.
 Why: every Canvas file URL ends at InstFS with `download=1`, so the browser saves instead of rendering. `public_url` is the same InstFS link without the flag, served inline by the CDN. The token is single-use, so the server must not follow it; redirecting keeps the box's egress at zero for files, which matters on a 1 GB/month allowance.
+
+## 029 — Hand-entered course dates are items with `source = manual` (2026-09-08)
+
+Exams, quizzes, finals, cancelled and virtual sessions are `items` rows (`kind = event`) rather than a new table.
+Why: the calendar, popovers, class widgets, and the course pane already consume items; a separate table would have meant a second query and a merge in every one of them. `manual` has no `sources` row and no ingester, so the sources widget and settings never see it. Session tags carry `meetingKind`, which is how `nextMeeting()` knows to skip a cancelled lecture or label an online one.
+
+## 030 — Grades are computed here from Canvas's groups, with a per-course override (2026-09-08)
+
+The ingester stores assignment groups and Canvas's computed scores; `lib/grades.ts` recomputes the current grade the way Canvas does (category percentages after drop rules, weighted over categories with graded work when the course applies weights). `courses.grading` can replace the categories with hand-made ones keyed by group id or a title regex.
+Why: Canvas's own number is one opaque float, and half the courses don't apply weights in Canvas even though the syllabus does. Recomputing gives per-category numbers and lets the syllabus weights be typed in; the regex path is what makes Gradescope-only courses work. Showing Canvas's number next to ours keeps any disagreement visible.
+
+## 031 — Visual editors sit on top of the JSON, never replace it (2026-09-08)
+
+The schedule is drawn on a week grid; dates are picked on a month calendar. Both write the same JSON/rows the API takes, and the raw JSON stays one click away in the course dialog.
+Why: the grid can't express every edge (odd minutes, one-off rooms), and the JSON is what export/import and the seed use. Keeping both means the easy path is easy and nothing is unreachable.
