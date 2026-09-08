@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { COURSE_ROLES, SUBMITS_VIA, type Course, type CourseInput, type CourseLink } from '@collected/shared';
+import { COURSE_ROLES, SUBMITS_VIA, courseScheduleSchema, type Course, type CourseInput, type CourseLink, type CourseSchedule } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCourseLinks, useCourses, useDeleteCourse, useLinkItems, useSaveCourse } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
+import { ScheduleEditor } from './ScheduleEditor';
 import { Field, PageTitle } from './ui';
 
 type Draft = Omit<CourseInput, 'links' | 'schedule'> & { id?: string; links: CourseLink[]; scheduleText: string };
@@ -202,9 +203,7 @@ export function CoursesPage() {
                 </div>
               </div>
               <div className="sm:col-span-2">
-                <Field label="Schedule (JSON)" hint={'{"discussion":[{"day":"fri","start":"11:00","end":"11:50"}],"office_hours":[]}'}>
-                  <Textarea rows={4} className="font-mono text-xs" value={draft.scheduleText} onChange={(e) => setDraft({ ...draft, scheduleText: e.target.value })} />
-                </Field>
+                <ScheduleField text={draft.scheduleText} onText={(t) => setDraft({ ...draft, scheduleText: t })} />
               </div>
               <div className="sm:col-span-2">
                 <Field label="Notes">
@@ -228,6 +227,38 @@ export function CoursesPage() {
   );
 }
 
+
+/** Visual week editor over the schedule JSON, with the raw JSON one click away for anything the grid can't express. */
+function ScheduleField({ text, onText }: { text: string; onText(t: string): void }) {
+  const [showJson, setShowJson] = useState(false);
+  let parsed: CourseSchedule | null = null;
+  let error: string | null = null;
+  try {
+    const r = courseScheduleSchema.safeParse(JSON.parse(text || '{}'));
+    if (r.success) parsed = r.data;
+    else error = r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+  } catch {
+    error = 'not valid JSON';
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-medium">Schedule</span>
+        <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setShowJson((v) => !v)}>
+          {showJson ? 'Hide JSON' : 'Edit as JSON'}
+        </button>
+      </div>
+      {parsed ? (
+        <ScheduleEditor value={parsed} onChange={(next) => onText(JSON.stringify(next, null, 2))} />
+      ) : (
+        <p className="text-xs text-destructive">Schedule JSON is invalid ({error}). Fix it below to use the grid.</p>
+      )}
+      {(showJson || !parsed) && (
+        <Textarea rows={5} className="font-mono text-xs" value={text} onChange={(e) => onText(e.target.value)} placeholder={'{"lecture":[{"day":"tue","start":"09:30","end":"10:45","location":"IRB 0324"}]}'} />
+      )}
+    </div>
+  );
+}
 
 /** Canvas ↔ Gradescope pairs for one course: auto links can be broken, unlinked rows can be paired by hand. */
 function LinkedAssignments({ courseId }: { courseId: string }) {
