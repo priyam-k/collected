@@ -46,6 +46,8 @@ Second batch, 2026-09-08, also local only:
 - [x] Dates: exam/quiz/final entries and cancelled/virtual session tags per course, a Dates tab with a month grid (class days shaded), everything showing on the calendar automatically, next-meeting logic honouring cancellations.
 - [x] Schedule editor: drag on a week grid in the course dialog; JSON still available.
 
+UI overhaul, 2026-09-09, on the `new-ui` branch (not merged): the "Collected Dashboard v2" design applied to tokens (light and dark), the dashboard header, every widget, the drawer, and settings. Merge with `git merge new-ui` on main when it has been lived with; Settings → Layout → Reset positions puts the widgets in the mock's arrangement.
+
 Still open:
 
 - **Widget stacking** (several widgets in one grid slot with tabs) and the broader **UI overhaul**. The pane removed most of the pressure; revisit after two weeks of use.

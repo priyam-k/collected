@@ -155,3 +155,8 @@ Why: the grid can't express every edge (odd minutes, one-off rooms), and the JSO
 
 `CourseSchedule` is `Record<string, Meeting[]>`; the schema accepts any lowercase snake_case key. Lecture, discussion, lab, and office hours are the built-in chips; the editor adds a chip for any key the schedule already carries or the user types.
 Why: the fixed three-key object silently stripped a typed-in `lab`, which read as a bug. Courses have seminars, studios, recitations; a closed enum would keep growing. Labels derive from the key, so nothing else needs a lookup table.
+
+## 033 — The redesign keeps the grid and aliases the tokens (2026-09-09, `new-ui` branch)
+
+The v2 design is implemented as a restyle over the same widget system: react-grid-layout, widget instances, saved layouts, the pane, all unchanged. Its palette became a small named token set that the shadcn variables alias to, so dialogs, popovers, inputs and settings pages follow without per-component edits. Widget-specific controls moved from widget bodies into the frame header through a portal.
+Why: the mock still has "Edit layout", so it describes a default arrangement, not a fixed one; re-implementing the grid as fixed columns would have thrown away the per-breakpoint layouts. Aliasing tokens rather than rewriting components kept the change to the pieces the design actually shows. The branch stays separate until the look has been used for a while.
