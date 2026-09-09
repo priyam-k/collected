@@ -35,7 +35,7 @@ function groupItems(items: EffectiveItem[]): Group[] {
 }
 
 /** Concentric rings, one per group, outermost first; the centre is the overall figure. */
-function Rings({ groups, done, total, size }: { groups: Group[]; done: number; total: number; size: number }) {
+function Rings({ groups, done, total }: { groups: Group[]; done: number; total: number }) {
   const shown = groups.slice(0, 5);
   const n = Math.max(1, shown.length);
   const thick = Math.min(8, 24 / n);
@@ -43,7 +43,7 @@ function Rings({ groups, done, total, size }: { groups: Group[]; done: number; t
   const pct = total ? Math.round((done / total) * 100) : 0;
   const big = n <= 2 ? 13 : 11;
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0" role="img" aria-label={`${pct}% done, ${done} of ${total}`}>
+    <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" className="h-full w-full" role="img" aria-label={`${pct}% done, ${done} of ${total}`}>
       {shown.map((g, i) => {
         const r = 47 - thick / 2 - i * (thick + gap);
         const c = 2 * Math.PI * r;
@@ -91,7 +91,6 @@ export function ProgressWidget({ size }: WidgetProps) {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const xs = size.tier === 'xs';
   const wide = size.aspect === 'wide' && size.width >= 380;
-  const ring = Math.max(72, Math.min(size.height - (wide ? 24 : xs ? 20 : 50), wide ? 220 : size.width - 24, 240));
 
   const legendItem = (g: Group) => (
     <li key={g.id}>
@@ -108,7 +107,7 @@ export function ProgressWidget({ size }: WidgetProps) {
       <WidgetHeader>
         <span className="seg !gap-0.5 !p-0.5">
           <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
-          <button className={cn('!h-[26px] !px-2.5 !py-0 !font-semibold', isNow ? '!text-ink' : '!text-sub')} title={isNow ? `This ${period}` : `Back to this ${period}`} onClick={() => setAnchor(new Date())}>
+          <button className={cn('!h-[26px] !min-w-[8.5rem] !px-2 !py-0 !text-center !font-semibold tabular-nums', isNow ? '!text-ink' : '!text-sub')} title={isNow ? `This ${period}` : `Back to this ${period}`} onClick={() => setAnchor(new Date())}>
             {label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}
           </button>
           <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
@@ -117,7 +116,7 @@ export function ProgressWidget({ size }: WidgetProps) {
       {q.isPending ? (
         <div className="m-3 h-24 animate-pulse rounded-xl bg-well" />
       ) : (
-        <div className={cn('relative flex min-h-0 flex-1 items-center', wide ? 'gap-4 px-3 py-2' : 'justify-center px-3 pb-2 pt-1')}>
+        <div className={cn('relative flex min-h-0 flex-1', wide ? 'flex-row items-stretch gap-4 px-3 py-2' : 'flex-col px-3 pb-2 pt-1')}>
           {!xs && (
             <span className="seg absolute right-2.5 top-2 z-10 !p-[2px]">
               {(['week', 'month'] as Period[]).map((p) => (
@@ -127,9 +126,15 @@ export function ProgressWidget({ size }: WidgetProps) {
               ))}
             </span>
           )}
-          {total ? <Rings groups={groups} done={done} total={total} size={ring} /> : <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>}
+          {total ? (
+            <div className={cn('min-h-0', wide ? 'aspect-square h-full shrink-0 self-center' : cn('w-full flex-1', !xs && 'pt-7'))}>
+              <Rings groups={groups} done={done} total={total} />
+            </div>
+          ) : (
+            <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>
+          )}
           {wide ? (
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch justify-center overflow-auto pt-6">
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 overflow-auto pt-7">
               <ul className="space-y-1">
                 {groups.map((g) => (
                   <li key={g.id}>
@@ -144,7 +149,7 @@ export function ProgressWidget({ size }: WidgetProps) {
               </ul>
             </div>
           ) : (
-            !xs && total > 0 && <ul className="absolute inset-x-3 bottom-2 flex flex-wrap justify-center gap-x-3 gap-y-0.5">{groups.map(legendItem)}</ul>
+            !xs && total > 0 && <ul className="flex shrink-0 flex-wrap justify-center gap-x-3 gap-y-0.5 pt-1.5">{groups.map(legendItem)}</ul>
           )}
         </div>
       )}
