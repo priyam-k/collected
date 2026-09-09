@@ -91,7 +91,7 @@ export function ProgressWidget({ size }: WidgetProps) {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const xs = size.tier === 'xs';
   const wide = size.aspect === 'wide' && size.width >= 380;
-  const ring = Math.max(72, Math.min(size.height - (wide ? 24 : xs ? 20 : 44), wide ? 220 : size.width - 24, 240));
+  const ring = Math.max(72, Math.min(size.height - (wide ? 24 : xs ? 20 : 50), wide ? 220 : size.width - 24, 240));
 
   const legendItem = (g: Group) => (
     <li key={g.id}>
@@ -107,26 +107,29 @@ export function ProgressWidget({ size }: WidgetProps) {
     <div className="flex h-full flex-col">
       <WidgetHeader>
         <span className="seg !gap-0.5 !p-0.5">
-          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Previous ${period}`} onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
-          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Next ${period}`} onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
+          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
+          <button className={cn('!h-[26px] !px-2.5 !py-0 !font-semibold', isNow ? '!text-ink' : '!text-sub')} title={isNow ? `This ${period}` : `Back to this ${period}`} onClick={() => setAnchor(new Date())}>
+            {label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}
+          </button>
+          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
         </span>
-        <button className="chip !h-7" title={`Showing the ${period}; click for the ${period === 'week' ? 'month' : 'week'}`} onClick={() => setPeriod((p) => (p === 'week' ? 'month' : 'week'))}>
-          {period === 'week' ? 'Week' : 'Month'}
-        </button>
       </WidgetHeader>
       {q.isPending ? (
         <div className="m-3 h-24 animate-pulse rounded-xl bg-well" />
       ) : (
         <div className={cn('relative flex min-h-0 flex-1 items-center', wide ? 'gap-4 px-3 py-2' : 'justify-center px-3 pb-2 pt-1')}>
-          {!xs && !wide && (
-            <button className={cn('absolute left-3 top-2 rounded-md text-[12.5px] font-semibold transition-colors hover:text-ink', isNow ? 'text-ink' : 'text-sub')} title={isNow ? undefined : `Back to this ${period}`} onMouseDown={(e) => e.stopPropagation()} onClick={() => setAnchor(new Date())}>
-              {label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}
-            </button>
+          {!xs && (
+            <span className="seg absolute right-2.5 top-2 z-10 !p-[2px]">
+              {(['week', 'month'] as Period[]).map((p) => (
+                <button key={p} className={cn('!px-2.5 !py-1 !text-[11.5px]', p === period && 'seg-on')} title={p === 'week' ? 'What was due this week' : 'What was due this month'} onMouseDown={(e) => e.stopPropagation()} onClick={() => setPeriod(p)}>
+                  {p === 'week' ? 'Week' : 'Month'}
+                </button>
+              ))}
+            </span>
           )}
           {total ? <Rings groups={groups} done={done} total={total} size={ring} /> : <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>}
           {wide ? (
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch justify-center overflow-auto">
-              <button className={cn('self-start text-[12.5px] font-semibold', isNow ? 'text-ink' : 'text-sub hover:text-ink')} onMouseDown={(e) => e.stopPropagation()} onClick={() => setAnchor(new Date())}>{label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}</button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch justify-center overflow-auto pt-6">
               <ul className="space-y-1">
                 {groups.map((g) => (
                   <li key={g.id}>
