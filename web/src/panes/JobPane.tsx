@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { EyeOff, ExternalLink, Trash2 } from 'lucide-react';
+import { EyeOff, ExternalLink, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CLOSED_STAGES, JOB_STATE_LABELS, OPEN_STAGES, type Job, type JobStateValue } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { SheetClose, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateJob, useDeleteJob, useJob, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
@@ -75,11 +75,15 @@ function NewJobForm() {
   };
   return (
     <form onSubmit={submit} className="flex h-full min-h-0 flex-col">
-      <SheetHeader className="border-b pb-3">
-        <SheetTitle className="text-base">Add a job</SheetTitle>
-        <SheetDescription>Something outside the feed: a referral, a career-fair lead, a company site.</SheetDescription>
+      <SheetHeader className="border-b border-line bg-well px-[22px] pb-4 pt-5">
+        <div className="flex items-center gap-2.5">
+          <SheetTitle className="text-xl font-bold tracking-[-0.02em]">Add a job</SheetTitle>
+          <span className="flex-1" />
+          <SheetClose className="orb size-8 border border-line" aria-label="Close"><X className="size-3.5" /></SheetClose>
+        </div>
+        <SheetDescription className="text-[14px] text-sub">Something outside the feed: a referral, a career-fair lead, a company site.</SheetDescription>
       </SheetHeader>
-      <div className="grid gap-3 overflow-auto px-4 py-4 sm:grid-cols-2">
+      <div className="grid gap-3 overflow-auto px-[18px] py-[18px] sm:grid-cols-2">
         <div className="space-y-1"><Label className="text-xs text-muted-foreground">Company</Label><Input autoFocus required value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} className="h-8 text-sm" /></div>
         <div className="space-y-1"><Label className="text-xs text-muted-foreground">Title</Label><Input required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className="h-8 text-sm" placeholder="Software Engineer Intern" /></div>
         <div className="space-y-1 sm:col-span-2"><Label className="text-xs text-muted-foreground">Posting URL</Label><Input type="url" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} className="h-8 text-sm" placeholder="https://…" /></div>
@@ -90,7 +94,7 @@ function NewJobForm() {
         </div>
         <div className="space-y-1 sm:col-span-2"><Label className="text-xs text-muted-foreground">Notes</Label><Textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} className="text-sm" placeholder="Who referred you, what they said, the deadline…" /></div>
       </div>
-      <div className="mt-auto flex justify-end gap-2 border-t p-4">
+      <div className="mt-auto flex justify-end gap-2 border-t border-line p-4">
         <Button type="submit" disabled={create.isPending || !f.company.trim() || !f.title.trim()}>Add to tracker</Button>
       </div>
     </form>
@@ -122,13 +126,14 @@ export function JobPane({ jobId }: { jobId: string | null }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <SheetHeader className="border-b pb-3">
-        <div className="flex items-start gap-2 pr-8">
+      <SheetHeader className="border-b border-line bg-well px-[22px] pb-4 pt-5">
+        <div className="flex items-start gap-2.5">
           <div className="min-w-0 flex-1">
-            <SheetTitle className="truncate text-base">{job.company}</SheetTitle>
-            <SheetDescription className="truncate">{job.title}</SheetDescription>
+            <SheetTitle className="truncate text-xl font-bold tracking-[-0.02em]">{job.company}</SheetTitle>
+            <SheetDescription className="truncate text-[15px] text-sub">{job.title}</SheetDescription>
           </div>
-          <Badge variant="outline" className="shrink-0 text-[10px]">{manual ? 'Manual' : 'Feed'}</Badge>
+          <Badge variant="outline" className="mt-1 shrink-0 text-[10px]">{manual ? 'Manual' : 'Feed'}</Badge>
+          <SheetClose className="orb size-8 border border-line" aria-label="Close"><X className="size-3.5" /></SheetClose>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {job.locations.length > 0 && <span>{job.locations.join(' · ')}</span>}
@@ -158,7 +163,7 @@ export function JobPane({ jobId }: { jobId: string | null }) {
         </div>
       </SheetHeader>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-auto px-[18px] py-[18px]">
         {!tracked && <p className="text-xs text-muted-foreground">Pick a stage above to start tracking this one. Notes are saved either way.</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           <SavedField label="Applied on" type="date" value={job.appliedAt} onSave={(v) => save({ appliedAt: v })} />

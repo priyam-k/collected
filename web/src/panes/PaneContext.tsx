@@ -42,7 +42,7 @@ export function PaneProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={api}>
       {children}
       <Sheet open={visible} onOpenChange={(o) => !o && close()}>
-        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl md:max-w-2xl" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <SheetContent side="right" showCloseButton={false} className="inset-y-3 right-3 h-auto w-[min(580px,92vw)] max-w-none gap-0 overflow-hidden rounded-[24px] border-0 bg-card p-0 shadow-[0_30px_80px_-30px_rgba(0,0,0,.8),0_1px_0_rgba(255,255,255,.06)_inset] sm:max-w-none" onOpenAutoFocus={(e) => e.preventDefault()}>
           {pane?.kind === 'course' && <CoursePane key={`${pane.courseId}:${pane.tab ?? ''}`} courseId={pane.courseId} initialTab={pane.tab} />}
           {pane?.kind === 'job' && <JobPane jobId={pane.jobId} />}
           {pane?.kind === 'job-new' && <JobPane jobId={null} />}
