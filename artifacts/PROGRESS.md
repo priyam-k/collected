@@ -48,6 +48,8 @@ Second batch, 2026-09-08, also local only:
 
 UI overhaul, 2026-09-09, on the `new-ui` branch (not merged): the "Collected Dashboard v2" design applied to tokens (light and dark), the dashboard header, every widget, the drawer, and settings. Merge with `git merge new-ui` on main when it has been lived with; Settings → Layout → Reset positions puts the widgets in the mock's arrangement.
 
+Widgets added 2026-09-09 on `new-ui`: Progress (BetterCanvas-style completion rings) and Clock. Job feed minimum height is 4 rows (compact cards under 165px); classes overview goes down to 2 columns.
+
 Still open:
 
 - **Widget stacking** (several widgets in one grid slot with tabs) and the broader **UI overhaul**. The pane removed most of the pressure; revisit after two weeks of use.

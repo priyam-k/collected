@@ -1,9 +1,11 @@
-import { Briefcase, CalendarDays, CheckSquare, ClipboardList, GraduationCap, LayoutList, Plug } from 'lucide-react';
+import { Briefcase, CalendarDays, CheckSquare, ClipboardList, Clock, GraduationCap, LayoutList, PieChart, Plug } from 'lucide-react';
 import type { WidgetInstance } from '@collected/shared';
 import type { TitleContext } from './types';
 import { CalendarWidget } from './calendar/CalendarWidget';
 import { ClassWidget } from './class/ClassWidget';
 import { ClassesWidget } from './classes/ClassesWidget';
+import { ClockWidget } from './clock/ClockWidget';
+import { ProgressWidget } from './progress/ProgressWidget';
 import { JobsWidget } from './jobs/JobsWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
 import { TodoWidget } from './todo/TodoWidget';
@@ -53,10 +55,11 @@ export const WIDGETS: WidgetDef[] = [
     icon: LayoutList,
     requires: [],
     presets: [
+      { label: 'Narrow', w: 3, h: 7 },
       { label: 'Compact', w: 6, h: 4 },
       { label: 'Wide', w: 12, h: 4 },
     ],
-    min: { w: 4, h: 3 },
+    min: { w: 2, h: 3 },
     Component: ClassesWidget,
   },
   {
@@ -92,7 +95,7 @@ export const WIDGETS: WidgetDef[] = [
       { label: 'Grid', w: 8, h: 9 },
       { label: 'List', w: 4, h: 9 },
     ],
-    min: { w: 3, h: 5 },
+    min: { w: 3, h: 4 },
     Component: JobsWidget,
   },
   {
@@ -108,6 +111,35 @@ export const WIDGETS: WidgetDef[] = [
     ],
     min: { w: 3, h: 3 },
     Component: TrackerWidget,
+  },
+  {
+    type: 'progress',
+    accent: 'teal',
+    name: 'Progress',
+    description: 'How much of what was due this week or month is done, one ring per course.',
+    icon: PieChart,
+    requires: [],
+    presets: [
+      { label: 'Ring', w: 3, h: 6 },
+      { label: 'Wide', w: 6, h: 5 },
+    ],
+    min: { w: 2, h: 3 },
+    Component: ProgressWidget,
+  },
+  {
+    type: 'clock',
+    accent: 'amber',
+    name: 'Clock',
+    description: 'The time, the date, and how long until your next class. Analog when square, digital when wide.',
+    icon: Clock,
+    requires: [],
+    presets: [
+      { label: 'Small', w: 2, h: 3 },
+      { label: 'Analog', w: 3, h: 6 },
+      { label: 'Wide', w: 4, h: 3 },
+    ],
+    min: { w: 2, h: 2 },
+    Component: ClockWidget as WidgetDef['Component'],
   },
   {
     type: 'sources',
