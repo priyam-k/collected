@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Link } from 'react-router';
 import { format } from 'date-fns';
 import { Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
@@ -24,6 +24,12 @@ const DAY_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu:
 
 /** "2 classes today · 10 overdue · synced 5 min ago" under the date. */
 function useSummary() {
+  // Relative times are computed at render, and polling returns identical data, so nothing re-renders on its own.
+  const [, tick] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const id = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const courses = useCourses();
   const sources = useSources();
   const win = useMemo(() => windowFromNow(1), []);

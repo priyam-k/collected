@@ -12,21 +12,33 @@ import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
 
-/** Conic ring with the current grade inside; TA courses show "TA", ungraded ones a dash. */
+/**
+ * Conic ring with the current grade inside; TA courses show "TA", ungraded ones a dash. The filled arc is the
+ * course colour on a well track, with a soft halo ring outside rather than a blur.
+ */
 export function GradeRing({ course, percent, size = 34 }: { course: Pick<Course, 'role' | 'color'>; percent: number | null | undefined; size?: number }) {
   const color = course.color ?? 'var(--indigo)';
-  const inner = size - 8;
+  const thickness = size >= 56 ? 5 : 3.5;
+  const inner = size - thickness * 2;
   const ta = course.role === 'ta';
-  const pct = ta ? 0 : Math.max(0, Math.min(100, percent ?? 0));
+  const pct = ta ? 100 : Math.max(0, Math.min(100, percent ?? 0));
   const lit = ta || percent != null;
+  const big = size >= 56;
   return (
     <div
-      className={cn('grid shrink-0 place-items-center rounded-full', lit && 'ring-glow')}
-      style={{ width: size, height: size, background: lit ? `conic-gradient(${color} 0 ${pct}%, var(--well2) ${pct}% 100%)` : 'var(--well2)', '--glow-color': `color-mix(in oklab, ${color} 45%, transparent)` } as CSSProperties}
+      className="grid shrink-0 place-items-center rounded-full"
+      style={{
+        width: size,
+        height: size,
+        background: lit ? `conic-gradient(${color} 0 ${pct}%, var(--well2) ${pct}% 100%)` : 'var(--well2)',
+        boxShadow: lit ? `0 0 0 ${big ? 4 : 3}px color-mix(in oklab, ${color} 14%, transparent)` : undefined,
+      } as CSSProperties}
     >
-      <div className="grid place-items-center rounded-full bg-card font-bold tabular-nums" style={{ width: inner, height: inner, color: lit ? color : 'var(--ter)', fontSize: size >= 56 ? 15 : ta ? 9 : 9.5 }}>
-        {ta ? 'TA' : percent == null ? '–' : Math.round(percent)}
-        {size >= 56 && percent != null && !ta && <span className="text-[10px] text-sub">%</span>}
+      <div className="grid place-items-center rounded-full bg-card" style={{ width: inner, height: inner }}>
+        <span className="flex items-baseline font-bold leading-none tabular-nums tracking-[-0.02em]" style={{ color: lit ? color : 'var(--ter)', fontSize: big ? 17 : ta ? 9 : 10 }}>
+          {ta ? 'TA' : percent == null ? '–' : Math.round(percent)}
+          {big && percent != null && !ta && <span className="ml-px text-[10px] font-semibold text-sub">%</span>}
+        </span>
       </div>
     </div>
   );
