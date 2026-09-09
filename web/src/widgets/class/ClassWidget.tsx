@@ -4,6 +4,7 @@ import { ClipboardCheck, Download, FileText, Maximize2, Megaphone } from 'lucide
 import { Button } from '@/components/ui/button';
 import { usePane } from '@/panes/PaneContext';
 import { canvasFileUrl } from '@/lib/canvas';
+import { FileLink } from '@/widgets/FileLink';
 import { meetingLabel } from '@collected/shared';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
@@ -130,9 +131,9 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
           <ul className="space-y-0.5">
             {files.map((f) => (
               <li key={f.id} className="group/file flex items-baseline gap-2">
-                <a href={canvasFileUrl(f.externalId)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title="Open in a new tab (PDFs render inline)">
+                <FileLink file={{ fileId: f.externalId, title: f.title, contentType: String(f.raw.contentType ?? ''), size: Number(f.raw.size) || null }} className="min-w-0 flex-1 truncate hover:underline">
                   {f.title}
-                </a>
+                </FileLink>
                 <a href={canvasFileUrl(f.externalId, { download: true })} className="shrink-0 text-muted-foreground opacity-0 group-hover/file:opacity-100" title="Download" aria-label={`Download ${f.title}`}>
                   <Download className="size-3" />
                 </a>

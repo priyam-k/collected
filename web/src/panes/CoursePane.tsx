@@ -12,6 +12,7 @@ import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { CourseDot, DueLabel, HotLinks, ItemRow, StatusBadge, manualRaw, meetingExceptions, nextMeeting } from '@/widgets/shared';
 import { ItemPopover } from '@/widgets/ItemPopover';
+import { FileLink } from '@/widgets/FileLink';
 import { CourseDates } from './CourseDates';
 import { CourseGrades } from './CourseGrades';
 
@@ -75,14 +76,20 @@ function Modules({ rows }: { rows: CourseContentRow[] }) {
                 {items.map((it) => {
                   const raw = it.raw as { type?: string; indent?: number; contentId?: string | number | null };
                   const isFile = raw.type === 'File' && raw.contentId != null;
-                  const href = isFile ? canvasFileUrl(String(raw.contentId)) : (it.url ?? '#');
+                  const href = it.url ?? '#';
                   const Icon = raw.type === 'ExternalUrl' || raw.type === 'ExternalTool' ? Link2 : raw.type === 'Assignment' || raw.type === 'Quiz' ? ClipboardCheck : FileText;
                   return (
                     <li key={it.id} className="group/row flex items-center gap-1.5 rounded px-1 py-0.5 text-sm hover:bg-accent/60" style={{ paddingLeft: 4 + (raw.indent ?? 0) * 14 }}>
                       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <a href={href} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title={isFile ? 'Open (PDFs render inline)' : 'Open in Canvas'}>
-                        {it.title}
-                      </a>
+                      {isFile ? (
+                        <FileLink file={{ fileId: String(raw.contentId), title: it.title }} className="min-w-0 flex-1 truncate hover:underline">
+                          {it.title}
+                        </FileLink>
+                      ) : (
+                        <a href={href} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title="Open in Canvas">
+                          {it.title}
+                        </a>
+                      )}
                       {isFile && (
                         <a href={canvasFileUrl(String(raw.contentId), { download: true })} className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100" title="Download" aria-label={`Download ${it.title}`}>
                           <Download className="size-3" />
@@ -108,9 +115,9 @@ function FileList({ rows, limit }: { rows: CourseContentRow[]; limit?: number })
       {rows.slice(0, limit ?? rows.length).map((f) => (
         <li key={f.id} className="group/row flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent/60">
           <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-          <a href={canvasFileUrl(f.externalId)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline" title="Open in a new tab (PDFs render inline)">
+          <FileLink file={{ fileId: f.externalId, title: f.title, contentType: String(f.raw.contentType ?? ''), size: Number(f.raw.size) || null }} className="min-w-0 flex-1 truncate hover:underline">
             {f.title}
-          </a>
+          </FileLink>
           <a href={canvasFileUrl(f.externalId, { download: true })} className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100" title="Download" aria-label={`Download ${f.title}`}>
             <Download className="size-3" />
           </a>

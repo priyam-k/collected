@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import type { PreviewFile } from '@/lib/canvas';
 import { CoursePane } from './CoursePane';
+import { FilePreview } from './FilePreview';
 import { JobPane } from './JobPane';
 
 /** Everything that can open in the app-wide side pane. Widgets stay small; the pane is where detail lives. */
@@ -10,9 +12,11 @@ interface PaneApi {
   pane: Pane | null;
   open(p: Pane): void;
   close(): void;
+  /** Inline PDF/image preview in a dialog; sits above the pane. */
+  openPreview(f: PreviewFile): void;
 }
 
-const Ctx = createContext<PaneApi>({ pane: null, open: () => {}, close: () => {} });
+const Ctx = createContext<PaneApi>({ pane: null, open: () => {}, close: () => {}, openPreview: () => {} });
 
 export const usePane = () => useContext(Ctx);
 
@@ -25,12 +29,14 @@ export function PaneProvider({ children }: { children: ReactNode }) {
     setVisible(true);
   }, []);
   const close = useCallback(() => setVisible(false), []);
+  const [preview, setPreview] = useState<PreviewFile | null>(null);
+  const openPreview = useCallback((f: PreviewFile) => setPreview(f), []);
   useEffect(() => {
     if (visible || !pane) return;
     const t = setTimeout(() => setPane(null), 350);
     return () => clearTimeout(t);
   }, [visible, pane]);
-  const api = useMemo(() => ({ pane: visible ? pane : null, open, close }), [pane, visible, open, close]);
+  const api = useMemo(() => ({ pane: visible ? pane : null, open, close, openPreview }), [pane, visible, open, close, openPreview]);
 
   return (
     <Ctx.Provider value={api}>
@@ -42,6 +48,7 @@ export function PaneProvider({ children }: { children: ReactNode }) {
           {pane?.kind === 'job-new' && <JobPane jobId={null} />}
         </SheetContent>
       </Sheet>
+      <FilePreview file={preview} onClose={() => setPreview(null)} />
     </Ctx.Provider>
   );
 }

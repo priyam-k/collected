@@ -25,3 +25,21 @@ export function canvasOrigin(urls: (string | null | undefined)[]): string {
   }
   return 'https://umd.instructure.com';
 }
+
+export type PreviewKind = 'pdf' | 'image' | null;
+
+/** What the preview dialog can show inline. Chrome renders PDFs in an iframe; images are plain <img>. */
+export function previewKind(title: string | null | undefined, contentType?: string | null): PreviewKind {
+  const ct = (contentType ?? '').toLowerCase();
+  const ext = (title ?? '').toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
+  if (ct === 'application/pdf' || ext === 'pdf') return 'pdf';
+  if (ct.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
+  return null;
+}
+
+export interface PreviewFile {
+  fileId: string;
+  title: string;
+  contentType?: string | null;
+  size?: number | null;
+}
