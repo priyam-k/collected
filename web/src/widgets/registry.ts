@@ -1,10 +1,12 @@
-import { Briefcase, CalendarDays, CheckSquare, ClipboardList, Clock, GraduationCap, LayoutList, PieChart, Plug } from 'lucide-react';
+import { AlarmClock, Briefcase, CalendarDays, CheckSquare, ClipboardList, Clock, GraduationCap, LayoutList, Megaphone, PieChart, Plug } from 'lucide-react';
 import type { WidgetInstance } from '@collected/shared';
 import type { TitleContext } from './types';
 import { CalendarWidget } from './calendar/CalendarWidget';
 import { ClassWidget } from './class/ClassWidget';
 import { ClassesWidget } from './classes/ClassesWidget';
+import { AnnouncementsWidget } from './announcements/AnnouncementsWidget';
 import { ClockWidget } from './clock/ClockWidget';
+import { ExamsWidget } from './exams/ExamsWidget';
 import { ProgressWidget } from './progress/ProgressWidget';
 import { JobsWidget } from './jobs/JobsWidget';
 import { SourcesWidget } from './sources/SourcesWidget';
@@ -125,6 +127,34 @@ export const WIDGETS: WidgetDef[] = [
     ],
     min: { w: 2, h: 3 },
     Component: ProgressWidget,
+  },
+  {
+    type: 'exams',
+    accent: 'coral',
+    name: 'Exams',
+    description: 'Countdown to every exam, quiz, and final across your courses.',
+    icon: AlarmClock,
+    requires: [],
+    presets: [
+      { label: 'List', w: 3, h: 6 },
+      { label: 'Next', w: 2, h: 2 },
+    ],
+    min: { w: 2, h: 2 },
+    Component: ExamsWidget,
+  },
+  {
+    type: 'announcements',
+    accent: 'indigo',
+    name: 'Announcements',
+    description: 'Announcements from every course, newest first, unread ones marked.',
+    icon: Megaphone,
+    requires: [],
+    presets: [
+      { label: 'List', w: 4, h: 6 },
+      { label: 'Wide', w: 6, h: 4 },
+    ],
+    min: { w: 3, h: 3 },
+    Component: AnnouncementsWidget,
   },
   {
     type: 'clock',

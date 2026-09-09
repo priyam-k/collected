@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
+import { addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, isSameWeek, startOfMonth, startOfWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { EffectiveItem } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
@@ -38,9 +38,10 @@ function groupItems(items: EffectiveItem[]): Group[] {
 function Rings({ groups, done, total, size }: { groups: Group[]; done: number; total: number; size: number }) {
   const shown = groups.slice(0, 5);
   const n = Math.max(1, shown.length);
-  const thick = Math.min(9, 26 / n);
+  const thick = Math.min(8, 24 / n);
   const gap = 1.6;
   const pct = total ? Math.round((done / total) * 100) : 0;
+  const big = n <= 2 ? 13 : 11;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0" role="img" aria-label={`${pct}% done, ${done} of ${total}`}>
       {shown.map((g, i) => {
@@ -58,14 +59,17 @@ function Rings({ groups, done, total, size }: { groups: Group[]; done: number; t
           </g>
         );
       })}
-      {!shown.length && <circle cx="50" cy="50" r="42" fill="none" stroke="var(--well2)" strokeWidth="9" />}
-      <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fill="var(--ink)" fontSize={n > 3 ? 13 : 16} fontWeight={700} letterSpacing="-0.5">{total ? `${pct}%` : '–'}</text>
-      <text x="50" y={n > 3 ? 61 : 63} textAnchor="middle" fill="var(--sub)" fontSize={n > 3 ? 6 : 7}>{total ? `${done}/${total}` : 'nothing due'}</text>
+      {!shown.length && <circle cx="50" cy="50" r="42" fill="none" stroke="var(--well2)" strokeWidth="8" />}
+      <text x="50" y="48" textAnchor="middle" dominantBaseline="central" fill="var(--ink)" fontSize={big} fontWeight={700} letterSpacing="-0.4">{total ? `${pct}%` : '–'}</text>
+      <text x="50" y="59" textAnchor="middle" fill="var(--sub)" fontSize="5.5">{total ? `${done} of ${total}` : 'nothing due'}</text>
     </svg>
   );
 }
 
-/** What's done of what was due this week or month, as nested rings per course, the way BetterCanvas draws it. */
+/**
+ * What's done of what was due this week or month, as nested rings per course, the way BetterCanvas draws it.
+ * The header holds only navigation and the period; the range label and the legend sit in the ring's corners.
+ */
 export function ProgressWidget({ size }: WidgetProps) {
   const [period, setPeriod] = useState<Period>('week');
   const [anchor, setAnchor] = useState(() => new Date());
@@ -81,40 +85,49 @@ export function ProgressWidget({ size }: WidgetProps) {
   const done = groups.reduce((s, g) => s + g.done, 0);
   const total = groups.reduce((s, g) => s + g.total, 0);
   const shift = (dir: 1 | -1) => setAnchor((a) => (period === 'week' ? addWeeks(a, dir) : addMonths(a, dir)));
+  const isNow = period === 'week' ? isSameWeek(anchor, new Date(), { weekStartsOn: 0 }) : isSameMonth(anchor, new Date());
   const label = period === 'month' ? format(anchor, 'MMMM') : `${format(range.from, 'MMM d')} – ${format(range.to, isSameMonth(range.from, range.to) ? 'd' : 'MMM d')}`;
 
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const xs = size.tier === 'xs';
   const wide = size.aspect === 'wide' && size.width >= 380;
-  const ring = Math.max(72, Math.min(wide ? size.height - 56 : size.height - (xs ? 20 : 74), wide ? 200 : size.width - 32, 220));
+  const ring = Math.max(72, Math.min(size.height - (wide ? 24 : xs ? 20 : 44), wide ? 220 : size.width - 24, 240));
+
+  const legendItem = (g: Group) => (
+    <li key={g.id}>
+      <button className="flex items-center gap-1.5 text-[12.5px] transition-colors hover:text-ink" title={`${g.label}: ${g.done} of ${g.total} done`} onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
+        <span className="size-2 rounded-full" style={{ background: g.color }} />
+        <span className="font-medium">{g.label}</span>
+        <span className="text-xs tabular-nums text-ter">{g.done}/{g.total}</span>
+      </button>
+    </li>
+  );
 
   return (
     <div className="flex h-full flex-col">
       <WidgetHeader>
-        {!xs && <span className="text-[13px] font-semibold whitespace-nowrap">{label}</span>}
         <span className="seg !gap-0.5 !p-0.5">
-          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label="Previous" onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
-          <button className="!h-[26px] !py-0 !text-ink" title="Back to now" onClick={() => setAnchor(new Date())}>Now</button>
-          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label="Next" onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
+          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Previous ${period}`} onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
+          <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Next ${period}`} onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
         </span>
-        {!xs && (
-          <span className="seg">
-            {(['week', 'month'] as Period[]).map((p) => (
-              <button key={p} className={cn(p === period && 'seg-on')} onClick={() => setPeriod(p)}>{p === 'week' ? 'Week' : 'Month'}</button>
-            ))}
-          </span>
-        )}
+        <button className="chip !h-7" title={`Showing the ${period}; click for the ${period === 'week' ? 'month' : 'week'}`} onClick={() => setPeriod((p) => (p === 'week' ? 'month' : 'week'))}>
+          {period === 'week' ? 'Week' : 'Month'}
+        </button>
       </WidgetHeader>
       {q.isPending ? (
         <div className="m-3 h-24 animate-pulse rounded-xl bg-well" />
-      ) : !total ? (
-        <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>
       ) : (
-        <div className={cn('flex min-h-0 flex-1 items-center gap-4 p-3', wide ? 'flex-row' : 'flex-col justify-center')}>
-          <Rings groups={groups} done={done} total={total} size={ring} />
-          {!xs && (
-            wide ? (
-              <ul className="min-w-0 flex-1 space-y-1.5 self-center overflow-auto">
+        <div className={cn('relative flex min-h-0 flex-1 items-center', wide ? 'gap-4 px-3 py-2' : 'justify-center px-3 pb-2 pt-1')}>
+          {!xs && !wide && (
+            <button className={cn('absolute left-3 top-2 rounded-md text-[12.5px] font-semibold transition-colors hover:text-ink', isNow ? 'text-ink' : 'text-sub')} title={isNow ? undefined : `Back to this ${period}`} onMouseDown={(e) => e.stopPropagation()} onClick={() => setAnchor(new Date())}>
+              {label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}
+            </button>
+          )}
+          {total ? <Rings groups={groups} done={done} total={total} size={ring} /> : <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>}
+          {wide ? (
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch justify-center overflow-auto">
+              <button className={cn('self-start text-[12.5px] font-semibold', isNow ? 'text-ink' : 'text-sub hover:text-ink')} onMouseDown={(e) => e.stopPropagation()} onClick={() => setAnchor(new Date())}>{label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}</button>
+              <ul className="space-y-1">
                 {groups.map((g) => (
                   <li key={g.id}>
                     <button className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-well" onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
@@ -126,19 +139,9 @@ export function ProgressWidget({ size }: WidgetProps) {
                   </li>
                 ))}
               </ul>
-            ) : (
-              <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-                {groups.map((g) => (
-                  <li key={g.id}>
-                    <button className="flex items-center gap-1.5 text-[12.5px] transition-colors hover:text-ink" title={`${g.label}: ${g.done} of ${g.total} done`} onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
-                      <span className="size-2 rounded-full" style={{ background: g.color }} />
-                      <span className="font-medium">{g.label}</span>
-                      <span className="text-xs tabular-nums text-ter">{g.done}/{g.total}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
+            </div>
+          ) : (
+            !xs && total > 0 && <ul className="absolute inset-x-3 bottom-2 flex flex-wrap justify-center gap-x-3 gap-y-0.5">{groups.map(legendItem)}</ul>
           )}
         </div>
       )}
