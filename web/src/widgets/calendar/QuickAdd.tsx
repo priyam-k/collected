@@ -47,9 +47,9 @@ export function QuickAdd({ defaultDate }: { defaultDate?: Date }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="icon-xs" variant="ghost" aria-label="Add event" title={connected ? 'Add event' : 'Connect Google Calendar to add events'} disabled={!connected}>
-          <Plus className="size-3.5" />
-        </Button>
+        <button className="orb size-[30px] border border-line text-base disabled:opacity-40" aria-label="Add event" title={connected ? 'Add event' : 'Connect Google Calendar to add events'} disabled={!connected}>
+          <Plus className="size-4" />
+        </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-2">
         <Input autoFocus placeholder="Event title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && submit()} />

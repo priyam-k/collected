@@ -1,40 +1,43 @@
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { addDays, differenceInMinutes, format, getHours, getMinutes, isSameMonth } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
-import { CourseDot } from '@/widgets/shared';
 import { dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, sortItems, timeLabel } from './utils';
 
+const tint = (color: string | null, pct: number) => `color-mix(in oklab, ${color ?? 'var(--ink)'} ${pct}%, var(--card))`;
+
+/** A one-line pill: dot, optional time, title. Done items dim and strike through. */
 function Chip({ item, dense }: { item: EffectiveItem; dense?: boolean }) {
   const color = itemColor(item);
+  const done = item.effectiveDone;
   const isDue = item.kind !== 'event';
-  const body = (
-    <span
-      className={cn('flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-xs leading-tight hover:bg-accent', item.effectiveDone && 'line-through opacity-60')}
-      title={`${item.title}${item.course ? ` · ${item.course.code}` : ''}`}
-    >
-      <span className={cn('inline-block size-1.5 shrink-0 rounded-full', isDue && 'rounded-sm')} style={{ background: color ?? 'var(--muted-foreground)' }} />
-      {!dense && !item.allDay && <span className="shrink-0 tabular-nums text-muted-foreground">{format(itemTime(item)!, 'h:mma').toLowerCase().replace(':00', '')}</span>}
-      <span className="truncate">{item.title}</span>
-    </span>
+  return (
+    <ItemPopover item={item}>
+      <span
+        className={cn('flex min-w-0 items-center gap-1.5 rounded-[7px] px-[7px] py-[3px] text-[11.5px] leading-tight transition-[filter] hover:brightness-110', done && 'text-ter line-through')}
+        style={{ background: done ? 'var(--well)' : color ? tint(color, 16) : 'var(--well2)' }}
+        title={`${item.title}${item.course ? ` · ${item.course.code}` : ''}`}
+      >
+        <span className={cn('inline-block size-[5px] shrink-0 rounded-full', isDue && 'rounded-[1px]')} style={{ background: done ? 'var(--ter)' : (color ?? 'var(--ink)') }} />
+        {!dense && !item.allDay && <span className="shrink-0 tabular-nums text-sub">{format(itemTime(item)!, 'h:mma').toLowerCase().replace(':00', '')}</span>}
+        <span className="truncate">{item.title}</span>
+      </span>
+    </ItemPopover>
   );
-  return <ItemPopover item={item}>{body}</ItemPopover>;
 }
 
 function Row({ item }: { item: EffectiveItem }) {
   const color = itemColor(item);
-  const inner = (
-    <>
-      <span className="w-[5.5rem] shrink-0 text-xs tabular-nums text-muted-foreground">{timeLabel(item)}</span>
-      <CourseDot color={color} />
-      <span className={cn('min-w-0 flex-1 truncate', item.effectiveDone && 'line-through opacity-60')}>{item.title}</span>
-      {item.course && <span className="shrink-0 text-xs text-muted-foreground">{item.course.code}</span>}
-      {item.kind === 'event' && (item.raw as { location?: string | null }).location && <span className="hidden shrink-0 truncate text-xs text-muted-foreground sm:inline">{(item.raw as { location?: string }).location}</span>}
-    </>
-  );
   return (
     <ItemPopover item={item}>
-      <span className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60">{inner}</span>
+      <span className="flex items-center gap-3 rounded-xl px-2.5 py-1.5 text-[13.5px] hover:bg-well">
+        <span className="w-[5.5rem] shrink-0 text-xs tabular-nums text-ter">{timeLabel(item)}</span>
+        <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: color ?? 'var(--ter)' }} />
+        <span className={cn('min-w-0 flex-1 truncate font-medium', item.effectiveDone && 'text-ter line-through')}>{item.title}</span>
+        {item.course && <span className="shrink-0 text-xs font-medium" style={{ color: color ?? 'var(--sub)' }}>{item.course.code}</span>}
+        {item.kind === 'event' && (item.raw as { location?: string | null }).location && <span className="hidden shrink-0 truncate text-xs text-ter sm:inline">{(item.raw as { location?: string }).location}</span>}
+      </span>
     </ItemPopover>
   );
 }
@@ -46,11 +49,11 @@ export function NextUp({ items, limit = 4 }: { items: EffectiveItem[]; limit?: n
     .filter((i) => {
       const t = itemTime(i);
       const e = itemEnd(i);
-      return t && ((e ? e.getTime() : t.getTime()) >= now);
+      return t && (e ? e.getTime() : t.getTime()) >= now;
     })
     .sort(sortItems)
     .slice(0, limit);
-  if (!upcoming.length) return <p className="p-3 text-sm text-muted-foreground">Nothing coming up.</p>;
+  if (!upcoming.length) return <p className="p-3 text-sm text-sub">Nothing coming up.</p>;
   return (
     <ul className="space-y-0.5 p-1.5">
       {upcoming.map((i) => {
@@ -58,9 +61,9 @@ export function NextUp({ items, limit = 4 }: { items: EffectiveItem[]; limit?: n
         return (
           <li key={i.id}>
             <ItemPopover item={i}>
-              <span className="flex items-baseline gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent/60">
-                <span className="w-16 shrink-0 text-xs text-muted-foreground">{isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a')}</span>
-                <CourseDot color={itemColor(i)} />
+              <span className="flex items-baseline gap-2 rounded-lg px-1.5 py-1 text-sm hover:bg-well">
+                <span className="w-16 shrink-0 text-xs text-ter">{isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a')}</span>
+                <span className="inline-block size-2 shrink-0 self-center rounded-full" style={{ background: itemColor(i) ?? 'var(--ter)' }} />
                 <span className="min-w-0 flex-1 truncate">{i.title}</span>
               </span>
             </ItemPopover>
@@ -76,18 +79,35 @@ export function Agenda({ items, from, days = 7 }: { items: EffectiveItem[]; from
   const dayList = daysBetween(from, addDays(from, days - 1));
   const grouped = groupByDay(items, dayList);
   return (
-    <div className="h-full overflow-auto px-1.5 py-1">
+    <div className="h-full overflow-auto px-2 py-1.5">
       {dayList.map((d) => {
         const list = grouped.get(dayKey(d)) ?? [];
+        const today = isToday(d);
         return (
           <section key={dayKey(d)} className="mb-2">
-            <h4 className={cn('sticky top-0 z-10 bg-card px-1.5 py-1 text-[11px] font-medium uppercase tracking-wide', isToday(d) ? 'text-primary' : 'text-muted-foreground')}>
-              {isToday(d) ? 'Today' : format(d, 'EEEE')} <span className="font-normal">{format(d, 'MMM d')}</span>
+            <h4 className="sticky top-0 z-10 flex items-center gap-2 bg-card/95 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide backdrop-blur">
+              {today ? <span className="grid h-5 min-w-5 place-items-center rounded-full bg-indigo px-1.5 text-[11px] text-white ring-glow" style={{ '--glow-color': 'var(--indigo)' } as CSSProperties}>{format(d, 'd')}</span> : <span className="text-sub">{format(d, 'd')}</span>}
+              <span className={today ? 'text-indigo' : 'text-ter'}>{today ? 'Today' : format(d, 'EEEE')}</span>
+              <span className="font-normal normal-case tracking-normal text-ter">{format(d, 'MMM')}</span>
             </h4>
-            {list.length ? list.map((i) => <Row key={i.id} item={i} />) : <p className="px-1.5 py-0.5 text-xs text-muted-foreground/70">—</p>}
+            {list.length ? list.map((i) => <Row key={i.id} item={i} />) : <p className="px-2.5 py-0.5 text-xs text-ter/70">—</p>}
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function DayHead({ d }: { d: Date }) {
+  const today = isToday(d);
+  return (
+    <div className="py-0.5 text-center">
+      <div className={cn('text-[11px] font-medium', today ? 'font-semibold text-indigo' : 'text-ter')}>{format(d, 'EEE')}</div>
+      {today ? (
+        <div className="mx-auto mt-0.5 grid size-[26px] place-items-center rounded-full bg-indigo text-sm font-bold text-white ring-glow" style={{ '--glow-color': 'var(--indigo)' } as CSSProperties}>{format(d, 'd')}</div>
+      ) : (
+        <div className="mt-0.5 text-sm font-semibold text-sub">{format(d, 'd')}</div>
+      )}
     </div>
   );
 }
@@ -97,13 +117,11 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
   return (
-    <div className="grid h-full grid-cols-7 divide-x overflow-hidden">
+    <div className="grid h-full grid-cols-7 gap-1 overflow-hidden px-2.5 pb-2 pt-1.5">
       {dayList.map((d) => (
-        <div key={dayKey(d)} className="flex min-w-0 flex-col overflow-hidden">
-          <div className={cn('shrink-0 border-b px-1.5 py-1 text-[11px]', isToday(d) ? 'font-semibold text-primary' : 'text-muted-foreground')}>
-            {format(d, 'EEE')} <span className="tabular-nums">{format(d, 'd')}</span>
-          </div>
-          <div className="min-h-0 flex-1 space-y-0.5 overflow-auto p-1">
+        <div key={dayKey(d)} className={cn('flex min-w-0 flex-col overflow-hidden rounded-xl', isToday(d) ? 'bg-[color-mix(in_oklab,var(--indigo)_9%,var(--well))]' : 'bg-well')}>
+          <DayHead d={d} />
+          <div className="min-h-0 flex-1 space-y-[3px] overflow-auto p-1">
             {(grouped.get(dayKey(d)) ?? []).map((i) => <Chip key={i.id} item={i} />)}
           </div>
         </div>
@@ -115,65 +133,85 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
 /* ---------- lg: week grid with hours ---------- */
 const HOUR_START = 7;
 const HOUR_END = 23;
-const PX_PER_HOUR = 44;
+const PX_PER_HOUR = 52;
 
 export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }) {
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
   const now = new Date();
-  const nowTop = ((getHours(now) + getMinutes(now) / 60 - HOUR_START) / (HOUR_END - HOUR_START + 1)) * 100;
+  const nowTop = (getHours(now) + getMinutes(now) / 60 - HOUR_START) * PX_PER_HOUR;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Start the day view a little above "now" (or at 8 AM outside today's week).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const hasToday = dayList.some(isToday);
+    el.scrollTop = Math.max(0, (hasToday ? nowTop : (8 - HOUR_START) * PX_PER_HOUR) - 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from.getTime()]);
+  const col = 'grid-cols-[44px_repeat(7,minmax(0,1fr))] gap-x-[3px]';
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="grid shrink-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] border-b">
+      <div className={cn('grid shrink-0 px-2.5 pt-1.5', col)}>
         <div />
+        {dayList.map((d) => <DayHead key={dayKey(d)} d={d} />)}
+      </div>
+      <div className={cn('grid shrink-0 px-2.5 pb-1 pt-0.5', col)}>
+        <div className="pr-2 pt-1.5 text-right text-[11px] font-medium text-ter">all day</div>
         {dayList.map((d) => {
           const allDay = (grouped.get(dayKey(d)) ?? []).filter((i) => i.allDay || i.kind !== 'event');
           return (
-            <div key={dayKey(d)} className="min-w-0 border-l px-1 py-1">
-              <div className={cn('text-[11px]', isToday(d) ? 'font-semibold text-primary' : 'text-muted-foreground')}>
-                {format(d, 'EEE')} <span className="tabular-nums">{format(d, 'd')}</span>
-              </div>
-              <div className="mt-0.5 max-h-16 space-y-0.5 overflow-auto">
-                {allDay.map((i) => <Chip key={i.id} item={i} dense />)}
-              </div>
+            <div key={dayKey(d)} className="flex max-h-[76px] min-h-[30px] min-w-0 flex-col gap-[3px] overflow-auto py-0.5">
+              {allDay.map((i) => <Chip key={i.id} item={i} dense />)}
             </div>
           );
         })}
       </div>
-      <div className="relative min-h-0 flex-1 overflow-auto">
-        <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))]" style={{ height: hours.length * PX_PER_HOUR }}>
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto px-2.5 pb-2">
+        <div className={cn('grid', col)} style={{ height: (hours.length - 1) * PX_PER_HOUR + 8 }}>
           <div className="relative">
             {hours.map((h) => (
-              <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground" style={{ top: (h - HOUR_START) * PX_PER_HOUR }}>
-                {h === 12 ? '12 pm' : h > 12 ? `${h - 12} pm` : `${h} am`}
-              </div>
+              <span key={h} className="absolute right-2 -translate-y-1/2 text-[11px] tabular-nums text-ter" style={{ top: (h - HOUR_START) * PX_PER_HOUR }}>
+                {h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`}
+              </span>
             ))}
           </div>
           {dayList.map((d) => {
+            const today = isToday(d);
             const timed = (grouped.get(dayKey(d)) ?? []).filter((i) => !i.allDay && i.kind === 'event');
+            const well = today ? 'color-mix(in oklab, var(--indigo) 9%, var(--well))' : 'var(--well)';
             return (
-              <div key={dayKey(d)} className={cn('relative border-l', isToday(d) && 'bg-primary/[0.03]')}>
-                {hours.map((h) => (
-                  <div key={h} className="absolute inset-x-0 border-t border-border/60" style={{ top: (h - HOUR_START) * PX_PER_HOUR }} />
-                ))}
-                {isToday(d) && nowTop >= 0 && nowTop <= 100 && <div className="absolute inset-x-0 z-10 border-t-2 border-red-500/70" style={{ top: `${nowTop}%` }} />}
+              <div
+                key={dayKey(d)}
+                className="relative rounded-xl"
+                style={{ background: `repeating-linear-gradient(to bottom, ${well} 0, ${well} ${PX_PER_HOUR - 1}px, var(--card) ${PX_PER_HOUR - 1}px, var(--card) ${PX_PER_HOUR}px)` }}
+              >
+                {today && nowTop >= 0 && nowTop <= (hours.length - 1) * PX_PER_HOUR && (
+                  <>
+                    <div className="absolute inset-x-0 z-10 h-[2px] rounded-full bg-coral ring-glow" style={{ top: nowTop, '--glow-color': 'var(--coral)' } as CSSProperties} />
+                    <div className="absolute -left-1 z-10 size-2.5 rounded-full bg-coral shadow-[0_0_0_2px_var(--card)]" style={{ top: nowTop - 4 }} />
+                  </>
+                )}
                 {timed.map((i) => {
                   const s = itemTime(i)!;
                   const e = itemEnd(i) ?? new Date(s.getTime() + 30 * 60_000);
-                  const top = ((getHours(s) + getMinutes(s) / 60 - HOUR_START) * PX_PER_HOUR);
-                  const height = Math.max(18, (differenceInMinutes(e, s) / 60) * PX_PER_HOUR - 2);
+                  const top = (getHours(s) + getMinutes(s) / 60 - HOUR_START) * PX_PER_HOUR;
+                  const height = Math.max(22, (differenceInMinutes(e, s) / 60) * PX_PER_HOUR - 3);
                   const color = itemColor(i);
+                  const loc = (i.raw as { location?: string | null }).location;
                   return (
-                    <div key={i.id} className="absolute inset-x-0.5" style={{ top, height }}>
+                    <div key={i.id} className="absolute inset-x-1" style={{ top: top + 1, height }}>
                       <ItemPopover item={i} side="right" className="h-full">
                         <div
-                          className="h-full overflow-hidden rounded border px-1 py-0.5 text-[11px] leading-tight hover:brightness-110"
-                          style={{ background: `color-mix(in oklch, ${color ?? 'var(--primary)'} 18%, var(--card))`, borderColor: `color-mix(in oklch, ${color ?? 'var(--primary)'} 40%, transparent)` }}
+                          className={cn('h-full overflow-hidden rounded-[9px] px-2 py-[7px] text-left leading-tight transition-[filter] hover:brightness-110', i.effectiveDone && 'opacity-60')}
+                          style={{ background: tint(color, 26), boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color ?? 'var(--ink)'} 35%, transparent)` }}
                           title={`${i.title} · ${timeLabel(i)}`}
                         >
-                          <div className="truncate font-medium">{i.title}</div>
-                          {height > 30 && <div className="truncate text-muted-foreground">{timeLabel(i)}</div>}
+                          <div className="truncate text-xs font-semibold">{i.course?.code ?? i.title}</div>
+                          {height > 34 && <div className="mt-0.5 truncate text-[11px] text-sub">{i.course ? `${format(s, 'h:mm')} – ${format(e, 'h:mm')}` : timeLabel(i)}</div>}
+                          {height > 62 && i.course && <div className="mt-1 truncate text-[11px] text-sub">{i.title.replace(new RegExp(`^${i.course.code}\\s*\\(\\d+\\)\\s*-\\s*`), '')}{loc ? ` · ${loc}` : ''}</div>}
+                          {height > 62 && !i.course && loc && <div className="mt-1 truncate text-[11px] text-sub">{loc}</div>}
                         </div>
                       </ItemPopover>
                     </div>
@@ -194,20 +232,21 @@ export function Month({ items, from, to, anchor }: { items: EffectiveItem[]; fro
   const grouped = groupByDay(items, dayList);
   const weeks = Math.ceil(dayList.length / 7);
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="grid shrink-0 grid-cols-7 border-b text-[11px] text-muted-foreground">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="px-1.5 py-1">{d}</div>)}
+    <div className="flex h-full flex-col overflow-hidden px-2.5 pb-2 pt-1">
+      <div className="grid shrink-0 grid-cols-7 text-center text-[11px] font-medium text-ter">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="py-1">{d}</div>)}
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}>
+      <div className="grid min-h-0 flex-1 grid-cols-7 gap-1" style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}>
         {dayList.map((d) => {
           const list = grouped.get(dayKey(d)) ?? [];
           const inMonth = isSameMonth(d, anchor);
+          const today = isToday(d);
           return (
-            <div key={dayKey(d)} className={cn('flex min-h-0 flex-col overflow-hidden border-b border-r p-0.5', !inMonth && 'bg-muted/30')}>
-              <div className={cn('px-1 text-[11px] tabular-nums', isToday(d) ? 'font-semibold text-primary' : inMonth ? 'text-foreground' : 'text-muted-foreground/60')}>{format(d, 'd')}</div>
+            <div key={dayKey(d)} className={cn('flex min-h-0 flex-col overflow-hidden rounded-[10px] p-1', today ? 'bg-[color-mix(in_oklab,var(--indigo)_9%,var(--well))]' : inMonth ? 'bg-well' : 'bg-well/40')}>
+              <div className={cn('px-1 text-[11px] tabular-nums', today ? 'font-bold text-indigo' : inMonth ? 'font-semibold text-sub' : 'text-ter/60')}>{format(d, 'd')}</div>
               <div className="min-h-0 flex-1 space-y-px overflow-hidden">
                 {list.slice(0, 4).map((i) => <Chip key={i.id} item={i} dense />)}
-                {list.length > 4 && <div className="px-1 text-[10px] text-muted-foreground">+{list.length - 4} more</div>}
+                {list.length > 4 && <div className="px-1 text-[10px] text-ter">+{list.length - 4} more</div>}
               </div>
             </div>
           );

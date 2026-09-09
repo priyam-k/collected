@@ -1,17 +1,15 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { CornerDownRight, Plus } from 'lucide-react';
+import { Check, CornerDownRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCloseTodoistTask, useItems, useQuickAddTask, useSetOverride, useSettings, useSources } from '@/lib/queries';
-import { isPast } from '@/lib/time';
+import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
-import { CourseDot, DueLabel, StatusBadge, windowFromNow } from '@/widgets/shared';
+import { windowFromNow } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 interface Row {
@@ -85,6 +83,8 @@ function buildSections(items: EffectiveItem[], order: string[], homeworkLabel: s
   return sections;
 }
 
+const sourceTag = (it: EffectiveItem) => (it.source === 'canvas_ical' ? 'Canvas' : SOURCE_LABELS[it.source]);
+
 export function TodoWidget({ size }: WidgetProps) {
   const settings = useSettings();
   const sources = useSources();
@@ -134,84 +134,91 @@ export function TodoWidget({ size }: WidgetProps) {
     quickAdd.mutate(text.trim(), { onSuccess: () => setText(''), onError: (err) => toast.error(err.message) });
   };
 
-  const list = (s: Section, showSectionHints = false) =>
+  const list = (s: Section) =>
     s.rows.length ? (
-      <ul className="space-y-0.5">
-        {s.rows.map(({ item: it, depth }) => (
-          <li key={it.id} className="group flex items-start gap-2 rounded px-1 py-1 text-sm hover:bg-accent/60" style={{ paddingLeft: 4 + depth * 18 }}>
-            {depth > 0 && <CornerDownRight className="mt-1 size-3 shrink-0 text-muted-foreground/60" />}
-            <Checkbox
-              className="mt-0.5"
-              aria-label={`Complete ${it.title}`}
-              title={it.source === 'todoist' ? 'Complete this task in Todoist' : 'Mark done here only. Canvas / Gradescope are never changed.'}
-              checked={false}
-              onCheckedChange={() => complete(it)}
-            />
-            <div className="min-w-0 flex-1">
-              <ItemPopover item={it}>
-                <span className="flex items-center gap-1.5">
-                  {it.course && <CourseDot color={it.course.color} title={it.course.code} />}
-                  <span className="truncate">{it.title}</span>
-                  <StatusBadge item={it} />
-                </span>
-              </ItemPopover>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <DueLabel item={it} />
-                {it.course && <span title="Course">{it.course.code}</span>}
-                {it.source === 'todoist' && (it.raw as { projectName?: string }).projectName && <span title="Todoist project">#{(it.raw as { projectName?: string }).projectName}</span>}
-                {showSectionHints && it.labels.length > 0 && <span title="Labels">{it.labels.map((l) => `@${l}`).join(' ')}</span>}
-                <span className="ml-auto rounded bg-secondary px-1 text-[10px] uppercase tracking-wide" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>
-                  {it.source === 'canvas_ical' ? 'ical' : it.source}
-                </span>
+      <ul className="flex flex-col">
+        {s.rows.map(({ item: it, depth }) => {
+          const late = !!it.dueAt && isPast(it.dueAt);
+          const raw = it.raw as { projectName?: string };
+          return (
+            <li key={it.id} className="group/row flex items-start gap-3 rounded-[14px] px-2.5 py-[9px] transition-colors hover:bg-well" style={{ paddingLeft: 10 + depth * 18 }}>
+              {depth > 0 && <CornerDownRight className="mt-1 size-3 shrink-0 text-ter/60" />}
+              <button
+                type="button"
+                aria-label={`Complete ${it.title}`}
+                title={it.source === 'todoist' ? 'Complete this task in Todoist' : 'Mark done here only. Canvas / Gradescope are never changed.'}
+                onClick={() => complete(it)}
+                onMouseDown={(e) => e.stopPropagation()}
+                className={cn('mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-bg transition-colors', late ? 'border-coral hover:bg-coral' : it.course ? 'hover:bg-[var(--c)]' : 'border-ter hover:bg-ink')}
+                style={it.course && !late ? ({ borderColor: it.course.color ?? 'var(--ter)', '--c': it.course.color ?? 'var(--ink)' } as React.CSSProperties) : undefined}
+              >
+                <Check className="size-3 opacity-0 transition-opacity group-hover/row:opacity-100" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <ItemPopover item={it}>
+                  <span className="block truncate text-[13.5px] font-medium leading-[1.35]">{it.title}</span>
+                </ItemPopover>
+                <div className="mt-1 flex items-center gap-2 text-[11.5px]">
+                  {it.dueAt ? <span className={cn('font-medium', late ? 'text-coral' : 'text-sub')}>{friendlyDate(it.dueAt, { withTime: true, allDay: it.allDay })}</span> : <span className="text-ter">no date</span>}
+                  {it.course && <span className="font-medium" style={{ color: it.course.color ?? 'var(--sub)' }}>{it.course.code}</span>}
+                  {it.source === 'todoist' && raw.projectName && <span className="text-ter">{raw.projectName}</span>}
+                  <span className="flex-1" />
+                  <span className="text-ter" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>{sourceTag(it)}</span>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     ) : (
-      <p className="px-1 py-1 text-xs text-muted-foreground/70">Nothing here.</p>
+      <p className="px-3 py-2 text-xs text-ter">Nothing here.</p>
     );
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b px-1.5 py-1">
+      <WidgetHeader>
+        {overdue > 0 && (
+          <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-coral" style={{ background: 'color-mix(in oklab, var(--coral) 18%, var(--card))' }}>
+            <span className="size-1.5 rounded-full bg-coral ring-glow" style={{ '--glow-color': 'var(--coral)' } as React.CSSProperties} />
+            {overdue} overdue
+          </span>
+        )}
+        <span className="grid h-7 place-items-center rounded-full border border-line bg-card px-[11px] text-[12.5px] font-medium text-sub">{merged.length} open</span>
+      </WidgetHeader>
+      <div className="flex shrink-0 flex-wrap gap-1.5 px-3 pb-1.5 pt-2.5">
         {(!columns ? tabs : [all]).map((s) => (
           <button
             key={s.key}
+            type="button"
             title={s.key === '__all' ? 'Everything, overdue first, then by due date' : `Tasks labelled @${s.key}`}
-            className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[11px]', (columns ? flat : active.key === s.key) ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}
+            className={cn('chip', (columns ? flat : active.key === s.key) && 'chip-on')}
             onClick={() => {
               if (columns || s.key === '__all') setFlat((v) => (columns ? true : s.key === '__all' ? v : false));
               setTab(s.key);
               if (s.key !== '__all') setFlat(false);
             }}
           >
-            {s.label} <span className="text-muted-foreground">{s.rows.length}</span>
-            {s.key === '__all' && overdue > 0 && <span className="ml-1 rounded bg-destructive/15 px-1 text-destructive">{overdue} overdue</span>}
+            {s.label}{s.key !== '__all' && s.rows.length > 0 ? ` · ${s.rows.length}` : ''}
           </button>
         ))}
         {(columns || flat) && size.tier !== 'sm' && size.tier !== 'xs' && (
-          <button
-            title={flat ? 'Back to sections' : 'One list, overdue first'}
-            className={cn('ml-auto whitespace-nowrap rounded px-1.5 py-0.5 text-[11px]', flat ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}
-            onClick={() => setFlat((v) => !v)}
-          >
+          <button type="button" title={flat ? 'Back to sections' : 'One list, overdue first'} className={cn('chip ml-auto', flat && 'chip-on')} onClick={() => setFlat((v) => !v)}>
             {flat ? 'Sections' : 'List'}
           </button>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-1.5">
+      <div className="min-h-0 flex-1 overflow-auto px-1.5">
         {dated.isPending ? (
-          <div className="h-16 animate-pulse rounded bg-muted/40" />
+          <div className="m-2 h-16 animate-pulse rounded-xl bg-well" />
         ) : !merged.length ? (
           <EmptyState>
             Nothing to do. {!todoistOn && <Link to="/settings/sources" className="underline">Connect Todoist</Link>}
           </EmptyState>
         ) : columns ? (
-          <div className="grid h-full gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(sections.length, size.tier === 'lg' ? 4 : 3)}, minmax(0, 1fr))` }}>
+          <div className="grid h-full gap-3 px-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(sections.length, size.tier === 'lg' ? 4 : 3)}, minmax(0, 1fr))` }}>
             {sections.map((s) => (
               <section key={s.key} className="min-w-0">
-                <h4 className="mb-1 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <h4 className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-ter">
                   {s.label} <span className="font-normal">{s.rows.length}</span>
                 </h4>
                 {list(s)}
@@ -219,15 +226,15 @@ export function TodoWidget({ size }: WidgetProps) {
             ))}
           </div>
         ) : (
-          list(active, active.key === '__all')
+          list(active)
         )}
       </div>
       {todoistOn && size.tier !== 'xs' && (
-        <form onSubmit={submitQuickAdd} className="flex shrink-0 items-center gap-1 border-t p-1.5">
-          <Input className="h-7 text-xs" placeholder="Add a task… (tomorrow 5pm @grocery #Home)" value={text} onChange={(e) => setText(e.target.value)} />
-          <Button size="icon-xs" type="submit" variant="secondary" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)">
-            <Plus className="size-3.5" />
-          </Button>
+        <form onSubmit={submitQuickAdd} className="mx-2.5 mb-2.5 mt-1.5 flex h-[38px] shrink-0 items-center gap-2.5 rounded-full border border-line bg-well pl-3.5 pr-1">
+          <input className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ter" placeholder="Add a task… tomorrow 5pm @grocery #Home" value={text} onChange={(e) => setText(e.target.value)} />
+          <button type="submit" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)" className="grid size-[30px] place-items-center rounded-full bg-ink text-bg transition-opacity disabled:opacity-40">
+            <Plus className="size-4" />
+          </button>
         </form>
       )}
     </div>

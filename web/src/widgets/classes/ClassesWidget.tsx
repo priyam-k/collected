@@ -1,16 +1,38 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
-import { meetingLabel } from '@collected/shared';
+import { format } from 'date-fns';
+import { meetingLabel, type Course } from '@collected/shared';
+import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCourses, useGradesSummary, useItems } from '@/lib/queries';
+import { friendlyDate, isPast } from '@/lib/time';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
-import { ItemPopover } from '@/widgets/ItemPopover';
-import { CourseDot, DueLabel, HotLinks, StatusBadge, meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
 
-/** One row per course: next due, hotlinks, upcoming count. */
+/** Conic ring with the current grade inside; TA courses show "TA", ungraded ones a dash. */
+export function GradeRing({ course, percent, size = 34 }: { course: Pick<Course, 'role' | 'color'>; percent: number | null | undefined; size?: number }) {
+  const color = course.color ?? 'var(--indigo)';
+  const inner = size - 8;
+  const ta = course.role === 'ta';
+  const pct = ta ? 0 : Math.max(0, Math.min(100, percent ?? 0));
+  const lit = ta || percent != null;
+  return (
+    <div
+      className={cn('grid shrink-0 place-items-center rounded-full', lit && 'ring-glow')}
+      style={{ width: size, height: size, background: lit ? `conic-gradient(${color} 0 ${pct}%, var(--well2) ${pct}% 100%)` : 'var(--well2)', '--glow-color': `color-mix(in oklab, ${color} 45%, transparent)` } as CSSProperties}
+    >
+      <div className="grid place-items-center rounded-full bg-card font-bold tabular-nums" style={{ width: inner, height: inner, color: lit ? color : 'var(--ter)', fontSize: size >= 56 ? 15 : ta ? 9 : 9.5 }}>
+        {ta ? 'TA' : percent == null ? '–' : Math.round(percent)}
+        {size >= 56 && percent != null && !ta && <span className="text-[10px] text-sub">%</span>}
+      </div>
+    </div>
+  );
+}
+
+/** One row per course: grade ring, code, what's next, hotlinks on wide tiers. Click opens the course pane. */
 export function ClassesWidget({ size }: WidgetProps) {
   const coursesQ = useCourses();
   const { open } = usePane();
@@ -33,64 +55,57 @@ export function ClassesWidget({ size }: WidgetProps) {
     if (!it.courseId) continue;
     byCourse.set(it.courseId, [...(byCourse.get(it.courseId) ?? []), it]);
   }
-  const compact = size.tier === 'xs' || size.tier === 'sm';
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const dueToday = (itemsQ.data ?? []).filter((it) => it.dueAt && format(new Date(it.dueAt), 'yyyy-MM-dd') === todayKey && !it.effectiveDone).length;
+  const wide = size.tier === 'lg' || (size.tier === 'md' && size.aspect === 'wide');
 
   return (
-    <div className="h-full overflow-auto">
-      <table className="w-full text-sm">
-        <tbody>
-          {courses.map((c) => {
-            const list = byCourse.get(c.id) ?? [];
-            const next = list[0];
-            const meeting = nextMeeting(c.schedule, meetingExceptions((manualQ.data ?? []).filter((it) => it.courseId === c.id)));
-            return (
-              <tr key={c.id} className="border-b last:border-0">
-                <td className="w-0 whitespace-nowrap py-1 pl-1.5 pr-2 align-top">
-                  <button
-                    className="group/course block w-full rounded px-1.5 py-0.5 text-left hover:bg-accent/60"
-                    title={`Open ${c.code}: assignments, files, announcements`}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={() => open({ kind: 'course', courseId: c.id })}
-                  >
-                    <div className="flex items-center gap-2">
-                      <CourseDot color={c.color} />
-                      <span className="font-medium">{c.code}</span>
-                      {c.role === 'ta' && <span className="rounded bg-secondary px-1 text-[10px] uppercase text-muted-foreground">TA</span>}
-                      {gradesQ.data?.[c.id]?.current != null && (
-                        <span className="rounded bg-secondary px-1 text-[10px] tabular-nums text-muted-foreground" title={`Current grade (${gradesQ.data[c.id]!.weighted ? 'weighted' : 'by points'}, ${gradesQ.data[c.id]!.graded} graded)`}>
-                          {gradesQ.data[c.id]!.current!.toFixed(1)}%
-                        </span>
-                      )}
-                      <ChevronRight className="size-3 text-muted-foreground opacity-0 group-hover/course:opacity-100" />
-                    </div>
-                    {!compact && c.name && <div className="max-w-[16rem] truncate pl-4 text-xs text-muted-foreground">{c.name}</div>}
-                  </button>
-                </td>
-                <td className="py-1.5 pr-2 align-top">
+    <div className="h-full overflow-auto p-1.5">
+      <WidgetHeader>
+        <span className="text-[12.5px] text-sub">{itemsQ.isPending ? '' : dueToday ? `${dueToday} due today` : 'nothing due today'}</span>
+      </WidgetHeader>
+      <ul className="flex flex-col">
+        {courses.map((c) => {
+          const list = byCourse.get(c.id) ?? [];
+          const next = list[0];
+          const isToday = !!next?.dueAt && format(new Date(next.dueAt), 'yyyy-MM-dd') === todayKey;
+          const meeting = nextMeeting(c.schedule, meetingExceptions((manualQ.data ?? []).filter((it) => it.courseId === c.id)));
+          const grade = gradesQ.data?.[c.id];
+          return (
+            <li key={c.id}>
+              <button
+                type="button"
+                className={cn('flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-well')}
+                style={isToday ? { background: 'color-mix(in oklab, var(--indigo) 8%, transparent)' } : undefined}
+                title={`Open ${c.code}: assignments, grades, dates, files`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={() => open({ kind: 'course', courseId: c.id })}
+              >
+                <GradeRing course={c} percent={grade?.current} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[13.5px] font-semibold">{c.code}</span>
+                    {wide && c.name && <span className="truncate text-xs text-ter">{c.name}</span>}
+                  </div>
                   {next ? (
-                    <ItemPopover item={next}>
-                      <span className="flex items-center gap-2 rounded hover:bg-accent/60">
-                        <span className="truncate">{next.title}</span>
-                        <StatusBadge item={next} />
-                        <DueLabel item={next} className="shrink-0 text-xs" />
-                      </span>
-                    </ItemPopover>
+                    <div className="mt-px truncate text-xs text-sub">
+                      {next.title} · <span className={cn('font-medium', (isToday || (next.dueAt && isPast(next.dueAt))) ? 'text-coral' : 'text-sub')}>{isToday ? `due ${next.dueAt ? format(new Date(next.dueAt), 'h:mm a') : 'today'}` : friendlyDate(next.dueAt, { withTime: false })}</span>
+                    </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground">nothing due in 3 weeks</span>
+                    <div className="mt-px text-xs text-ter">{itemsQ.isPending ? '…' : 'Nothing due in 3 weeks'}</div>
                   )}
-                  {list.length > 1 && <div className="text-xs text-muted-foreground">+{list.length - 1} more upcoming</div>}
-                </td>
-                {!compact && (
-                  <td className={cn('py-1.5 pr-3 align-top', size.tier === 'md' ? 'max-w-[14rem]' : 'max-w-[24rem]')}>
-                    <HotLinks links={c.links} compact />
-                    {meeting && <div className="mt-0.5 text-xs text-muted-foreground">{meetingLabel(meeting.kind)} {meeting.label}</div>}
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  {list.length > 1 ? (
+                    <div className="mt-px text-[11.5px] text-ter">+{list.length - 1} more upcoming</div>
+                  ) : meeting && wide ? (
+                    <div className="mt-px truncate text-[11.5px] text-ter">{meetingLabel(meeting.kind)} {meeting.label}</div>
+                  ) : null}
+                </div>
+                <ChevronRight className="size-3.5 shrink-0 text-ter" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

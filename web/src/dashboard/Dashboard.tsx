@@ -27,7 +27,8 @@ function useSummary() {
   const courses = useCourses();
   const sources = useSources();
   const win = useMemo(() => windowFromNow(1), []);
-  const due = useItems({ kind: ['assignment', 'task'], to: new Date().toISOString(), limit: 500 });
+  const nowIso = useMemo(() => new Date().toISOString(), []); // stable key; a fresh Date per render never settles
+  const due = useItems({ kind: ['assignment', 'task'], to: nowIso, limit: 500 });
   const manual = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 100 });
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayDow = new Date().getDay();
