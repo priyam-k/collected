@@ -20,7 +20,7 @@ export function HotLinks({ links, compact }: { links: CourseLink[]; compact?: bo
           href={l.url}
           target="_blank"
           rel="noreferrer"
-          className={cn('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground', compact && 'px-1')}
+          className={cn('inline-flex h-7 items-center gap-1 rounded-full border border-line bg-card px-3 text-[12px] font-medium text-ink transition-colors hover:bg-well2', compact && 'h-6 px-2.5 text-[11.5px]')}
         >
           {l.label}
           {!compact && <ExternalLink className="size-3" />}
@@ -120,7 +120,7 @@ export function ItemRow({ item, showCourse }: { item: EffectiveItem; showCourse?
   );
   return (
     <ItemPopover item={item}>
-      <span className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/60">{inner}</span>
+      <span className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-well">{inner}</span>
     </ItemPopover>
   );
 }

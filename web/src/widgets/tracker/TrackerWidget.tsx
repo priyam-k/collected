@@ -3,6 +3,7 @@ import { CalendarClock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { CLOSED_STAGES, JOB_STATE_LABELS, OPEN_STAGES, type Job, type JobStateValue } from '@collected/shared';
 import { Button } from '@/components/ui/button';
+import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useTrackedJobs, usePatchJobState } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -42,7 +43,7 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => open({ kind: 'job', jobId: job.id })}
       onKeyDown={(e) => e.key === 'Enter' && open({ kind: 'job', jobId: job.id })}
-      className="group/card flex min-w-0 cursor-pointer flex-col gap-0.5 rounded-md border bg-card p-2 text-sm hover:bg-accent/40"
+      className="group/card flex min-w-0 cursor-pointer flex-col gap-1 rounded-[14px] bg-well p-3 text-sm shadow-[inset_0_1px_0_var(--line)] transition-colors hover:bg-well2"
     >
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">
@@ -84,42 +85,40 @@ export function TrackerWidget({ size }: WidgetProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b px-1.5 py-1 text-[11px]">
+      <WidgetHeader>
         {summary.length ? (
-          <span className="truncate text-muted-foreground">
+          <span className="truncate text-[12.5px] text-sub">
             {summary.map(([s, n], i) => (
-              <span key={s}>{i > 0 && ' · '}<span className={cn('font-medium', STAGE_TONE[s])}>{n}</span> {JOB_STATE_LABELS[s].toLowerCase()}</span>
+              <span key={s}>{i > 0 && ' · '}<span className={cn('font-semibold', STAGE_TONE[s])}>{n}</span> {JOB_STATE_LABELS[s].toLowerCase()}</span>
             ))}
           </span>
         ) : (
-          <span className="text-muted-foreground">nothing open</span>
+          <span className="text-[12.5px] text-ter">nothing open</span>
         )}
-        <span className="ml-auto flex items-center gap-0.5">
-          {closedJobs.length > 0 && (
-            <button title="Rejected, ghosted, withdrawn" className={cn('rounded px-1.5 py-0.5', showClosed ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')} onClick={() => setShowClosed((v) => !v)}>
-              Closed {closedJobs.length}
-            </button>
-          )}
-          <Button size="xs" variant="secondary" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'job-new' })} title="Add a job that isn't in the feed">
-            <Plus className="size-3" /> Add
-          </Button>
-        </span>
-      </div>
+        {closedJobs.length > 0 && (
+          <button title="Rejected, ghosted, withdrawn" className={cn('chip !h-7', showClosed && 'chip-on')} onClick={() => setShowClosed((v) => !v)}>
+            Closed · {closedJobs.length}
+          </button>
+        )}
+        <Button size="xs" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'job-new' })} title="Add a job that isn't in the feed">
+          <Plus className="size-3" /> Add
+        </Button>
+      </WidgetHeader>
       <div className={cn('min-h-0 flex-1', board ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto')}>
         {q.isPending ? (
-          <div className="m-2 h-16 animate-pulse rounded bg-muted/40" />
+          <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
         ) : !openJobs.length && !(showClosed && closedJobs.length) ? (
           <EmptyState>
             Nothing tracked yet. Star or apply from the job feed, or{' '}
             <button className="underline" onClick={() => open({ kind: 'job-new' })}>add one by hand</button>.
           </EmptyState>
         ) : board ? (
-          <div className="flex h-full min-w-max gap-2 p-2">
+          <div className="flex h-full min-w-max gap-2.5 p-2.5">
             {[...OPEN_STAGES.filter((s) => (byStage.get(s)?.length ?? 0) > 0 || s === 'applied' || s === 'starred'), ...(showClosed ? (['closed'] as const) : [])].map((stage) => {
               const list = stage === 'closed' ? closedJobs : (byStage.get(stage) ?? []);
               return (
                 <section key={stage} className="flex w-52 shrink-0 flex-col">
-                  <h4 className={cn('mb-1 flex items-baseline gap-1 px-1 text-[11px] font-medium uppercase tracking-wide', stage === 'closed' ? 'text-muted-foreground' : STAGE_TONE[stage])}>
+                  <h4 className={cn('mb-1.5 flex items-baseline gap-1 px-1 text-[11px] font-semibold uppercase tracking-wide', stage === 'closed' ? 'text-ter' : STAGE_TONE[stage])}>
                     {stage === 'closed' ? 'Closed' : JOB_STATE_LABELS[stage]} <span className="font-normal text-muted-foreground">{list.length}</span>
                   </h4>
                   <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
@@ -131,7 +130,7 @@ export function TrackerWidget({ size }: WidgetProps) {
             })}
           </div>
         ) : (
-          <div className="space-y-1.5 p-2">
+          <div className="space-y-2 p-2.5">
             {[...openJobs, ...(showClosed ? closedJobs : [])].map((j) => <Card key={j.id} job={j} onStage={(s) => onStage(j, s)} showStage />)}
           </div>
         )}

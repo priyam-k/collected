@@ -88,11 +88,11 @@ export const WIDGETS: WidgetDef[] = [
     icon: Briefcase,
     requires: ['jobs'],
     presets: [
-      { label: 'Tape', w: 8, h: 4 },
-      { label: 'Grid', w: 8, h: 7 },
-      { label: 'List', w: 4, h: 8 },
+      { label: 'Tape', w: 6, h: 6 },
+      { label: 'Grid', w: 8, h: 9 },
+      { label: 'List', w: 4, h: 9 },
     ],
-    min: { w: 3, h: 3 },
+    min: { w: 3, h: 5 },
     Component: JobsWidget,
   },
   {

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { ClipboardCheck, Download, FileText, Maximize2, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { usePane } from '@/panes/PaneContext';
 import { canvasFileUrl } from '@/lib/canvas';
 import { FileLink } from '@/widgets/FileLink';
@@ -47,38 +48,40 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
   const showContent = size.tier === 'lg' || size.tier === 'md' || size.aspect === 'tall';
 
   return (
-    <div className="flex h-full flex-col gap-2 overflow-auto p-2.5 text-sm">
-      <div className="flex items-baseline gap-x-2 gap-y-0.5">
-        <button className="min-w-0 flex-1 truncate text-left text-muted-foreground hover:text-foreground hover:underline" title="Open the course: every assignment, module, file, and announcement" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>
-          {course.name && size.tier !== 'xs' ? course.name : course.code}
-        </button>
+    <div className="flex h-full flex-col gap-3 overflow-auto p-3 text-sm">
+      <WidgetHeader>
         {meeting && size.tier !== 'xs' && (
-          <span className="shrink-0 truncate text-xs text-muted-foreground">
+          <span className="truncate text-[12.5px] text-sub">
             {isTa && meeting.kind === 'discussion' ? 'Your discussion' : meeting.kind === 'lecture' ? 'Next' : meetingLabel(meeting.kind)} · {meeting.label}
           </span>
         )}
         <Button size="icon-xs" variant="ghost" className="shrink-0" aria-label="Open course" title="Open the course pane" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>
-          <Maximize2 className="size-3" />
+          <Maximize2 className="size-3.5" />
         </Button>
-      </div>
+      </WidgetHeader>
+      {course.name && size.tier !== 'xs' && (
+        <button className="truncate text-left text-[13px] text-sub hover:text-ink" title="Open the course: every assignment, module, file, and announcement" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'course', courseId: course.id })}>
+          {course.name}
+        </button>
+      )}
       {(course.links.length > 0 || syllabus) && (
         <HotLinks links={[...(syllabus?.url ? [{ label: 'Syllabus', url: syllabus.url }] : []), ...course.links]} compact={size.tier === 'xs'} />
       )}
 
       <section>
-        <h4 className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{isTa ? 'Course assignments' : 'Up next'}</h4>
+        <h4 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ter">{isTa ? 'Course assignments' : 'Up next'}</h4>
         {upcoming.isPending ? (
-          <div className="h-8 animate-pulse rounded bg-muted/40" />
+          <div className="h-8 animate-pulse rounded-xl bg-well" />
         ) : upcoming.data?.length ? (
           <div className="-mx-1">{upcoming.data.slice(0, size.tier === 'xs' ? 3 : 8).map((it) => <ItemRow key={it.id} item={it} />)}</div>
         ) : (
-          <p className="text-xs text-muted-foreground">Nothing due in the next two weeks.</p>
+          <p className="px-1 text-xs text-ter">Nothing due in the next two weeks.</p>
         )}
       </section>
 
       {isTa && grading.length > 0 && (
         <section>
-          <h4 className="mb-0.5 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <h4 className="mb-1 flex items-center gap-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ter">
             <ClipboardCheck className="size-3" /> Grading
           </h4>
           <ul className="space-y-1">
@@ -101,7 +104,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
 
       {showAnnouncements && announcements.data && announcements.data.length > 0 && (
         <section>
-          <h4 className="mb-0.5 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <h4 className="mb-1 flex items-center gap-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ter">
             <Megaphone className="size-3" /> Announcements
           </h4>
           <ul className="space-y-0.5">
@@ -125,7 +128,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
 
       {showContent && files.length > 0 && (
         <section>
-          <h4 className="mb-0.5 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <h4 className="mb-1 flex items-center gap-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ter">
             <FileText className="size-3" /> Recent files
           </h4>
           <ul className="space-y-0.5">
