@@ -25,13 +25,16 @@ const DAY_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu:
 /** "2 classes today · 10 overdue · synced 5 min ago" under the date. */
 function useSummary() {
   // Relative times are computed at render, and polling returns identical data, so nothing re-renders on its own.
+  // Under a minute the label reads "N seconds ago", so tick every second there; every 30 s after that.
   const [, tick] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    const id = window.setInterval(tick, 30_000);
-    return () => window.clearInterval(id);
-  }, []);
   const courses = useCourses();
   const sources = useSources();
+  const last = (sources.data ?? []).map((s) => s.lastSuccessAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
+  const fast = !!last && Date.now() - new Date(last).getTime() < 60_000;
+  useEffect(() => {
+    const id = window.setInterval(tick, fast ? 1_000 : 30_000);
+    return () => window.clearInterval(id);
+  }, [fast]);
   const win = useMemo(() => windowFromNow(1), []);
   const nowIso = useMemo(() => new Date().toISOString(), []); // stable key; a fresh Date per render never settles
   const due = useItems({ kind: ['assignment', 'task'], to: nowIso, limit: 500 });
@@ -51,7 +54,6 @@ function useSummary() {
   }
   const now = Date.now();
   const overdue = (due.data ?? []).filter((i) => i.dueAt && new Date(i.dueAt).getTime() < now && !i.effectiveDone).length;
-  const last = (sources.data ?? []).map((s) => s.lastSuccessAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
   const broken = (sources.data ?? []).filter((s) => s.enabled && (s.status === 'error' || s.status === 'needs_auth')).length;
   return { classes, overdue, last, broken, ready: courses.isSuccess && due.isSuccess };
 }
