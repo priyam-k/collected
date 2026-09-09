@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-08. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Built locally since, not shipped: course pane, applications tracker, inline files, settings nav, grades, course dates, schedule editor (migrations 0002 and 0003 run on boot). Next: ship the image, connect the sources on prod, the backup cron, then two weeks of real use.
+Last updated: 2026-09-09. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Shipped to the box 2026-09-09 (image built on the Mac, main at 1df90e7): course pane, applications tracker, inline files, grades, course dates, schedule editor, the new UI, and the Progress / Clock / Exams / Announcements widgets; migrations 0002 and 0003 applied on boot. Next: connect the sources on prod, the backup cron, then two weeks of real use.
 
 ## Milestones
 
@@ -46,7 +46,7 @@ Second batch, 2026-09-08, also local only:
 - [x] Dates: exam/quiz/final entries and cancelled/virtual session tags per course, a Dates tab with a month grid (class days shaded), everything showing on the calendar automatically, next-meeting logic honouring cancellations.
 - [x] Schedule editor: drag on a week grid in the course dialog; JSON still available.
 
-UI overhaul, 2026-09-09, on the `new-ui` branch (not merged): the "Collected Dashboard v2" design applied to tokens (light and dark), the dashboard header, every widget, the drawer, and settings. Merge with `git merge new-ui` on main when it has been lived with; Settings → Layout → Reset positions puts the widgets in the mock's arrangement.
+UI overhaul, 2026-09-09, built on the `new-ui` branch, merged to main and deployed the same day: the "Collected Dashboard v2" design applied to tokens (light and dark), the dashboard header, every widget, the drawer, and settings. Merge with `git merge new-ui` on main when it has been lived with; Settings → Layout → Reset positions puts the widgets in the mock's arrangement.
 
 Widgets added 2026-09-09 on `new-ui`: Progress (BetterCanvas-style completion rings), Clock, Exams (countdown), Announcements (feed with per-browser read state). Job feed minimum height is 4 rows (compact cards under 165px); classes overview goes down to 2 columns.
 
