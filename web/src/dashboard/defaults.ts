@@ -8,11 +8,11 @@ export const MARGIN: [number, number] = [8, 8];
 
 /** Where the core widgets go on a fresh install (lg, 12 columns). */
 const DEFAULT_LG: Record<string, Omit<LayoutItem, 'i'>> = {
-  calendar: { x: 0, y: 0, w: 8, h: 7 },
-  todo: { x: 8, y: 0, w: 4, h: 7 },
-  classes: { x: 0, y: 7, w: 12, h: 4 },
-  sources: { x: 0, y: 11, w: 4, h: 3 },
-  jobs: { x: 4, y: 11, w: 8, h: 3 },
+  calendar: { x: 0, y: 0, w: 8, h: 14 },
+  todo: { x: 8, y: 0, w: 4, h: 14 },
+  sources: { x: 0, y: 14, w: 3, h: 7 },
+  jobs: { x: 3, y: 14, w: 6, h: 7 },
+  classes: { x: 9, y: 14, w: 3, h: 7 },
 };
 
 export function withConstraints(item: LayoutItem, type: string): LayoutItem {

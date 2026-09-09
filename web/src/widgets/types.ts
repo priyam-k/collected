@@ -19,11 +19,15 @@ export interface WidgetProps<C = Record<string, unknown>> {
   editMode: boolean;
 }
 
+/** Tint of the widget surface. `course` uses the configured course's color. */
+export type WidgetAccent = 'indigo' | 'coral' | 'teal' | 'lime' | 'amber' | 'course';
+
 export interface WidgetDef<C = Record<string, unknown>> {
   type: string;
   name: string;
   description: string;
   icon: LucideIcon;
+  accent?: WidgetAccent;
   /** Sources that must be connected for the widget to be useful. Otherwise a placeholder renders. */
   requires: SourceId[];
   presets: WidgetPreset[];

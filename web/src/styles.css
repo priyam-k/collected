@@ -3,76 +3,95 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Palette from the "Collected Dashboard v2" design: a small set of named tokens (bg / card / well / well2 for
+ * surfaces, ink / sub / ter for text, five accents) that the shadcn names below alias to, so every existing
+ * component picks the look up without edits. Light values on :root, dark values on .dark.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.875rem;
+  --bg: #eef0f5;
+  --card: #ffffff;
+  --well: #f3f4f8;
+  --well2: #e7e9f0;
+  --line: rgba(20, 24, 40, 0.06);
+  --line2: rgba(20, 24, 40, 0.1);
+  --ink: #17181d;
+  --sub: #5f6370;
+  --ter: #7d818e;
+  --indigo: #5b5ce6;
+  --teal: #178f78;
+  --amber: #b86f0a;
+  --lime: #5f8a05;
+  --coral: #d6453a;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 12px 30px -16px rgba(30, 40, 80, 0.22);
+  --glow: 0 0 18px -6px;
+
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: var(--card);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--bg);
+  --secondary: var(--well);
+  --secondary-foreground: var(--ink);
+  --muted: var(--well);
+  --muted-foreground: var(--sub);
+  --accent: var(--well2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--coral);
+  --border: var(--line2);
+  --input: var(--line2);
+  --ring: var(--indigo);
+  --chart-1: var(--indigo);
+  --chart-2: var(--teal);
+  --chart-3: var(--amber);
+  --chart-4: var(--lime);
+  --chart-5: var(--coral);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--indigo);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--well);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line2);
+  --sidebar-ring: var(--indigo);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --bg: #1a1b20;
+  --card: #23252c;
+  --well: #2a2c34;
+  --well2: #31343d;
+  --line: rgba(255, 255, 255, 0.06);
+  --line2: rgba(255, 255, 255, 0.1);
+  --ink: #f3f3f6;
+  --sub: #a0a3ad;
+  --ter: #6c6f7a;
+  --indigo: #8b8cf8;
+  --teal: #45c9ad;
+  --amber: #f5a742;
+  --lime: #bde85a;
+  --coral: #ff7a6e;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 14px 34px -18px rgba(0, 0, 0, 0.7);
+  --glow: 0 0 22px -6px;
 }
 
 @theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
+  --color-ink: var(--ink);
+  --color-sub: var(--sub);
+  --color-ter: var(--ter);
+  --color-well: var(--well);
+  --color-well2: var(--well2);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-indigo: var(--indigo);
+  --color-teal: var(--teal);
+  --color-amber: var(--amber);
+  --color-lime: var(--lime);
+  --color-coral: var(--coral);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -119,14 +138,90 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    letter-spacing: -0.01em;
   }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(150, 152, 165, 0.25); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  /* A widget card or drawer: 18px corners, soft shadow, tinted from --accent at the top-left. */
+  .surface {
+    border-radius: 18px;
+    background: radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--accent, var(--card)) 7%, var(--card)), var(--card) 60%);
+    box-shadow: var(--shadow);
+  }
+  /* Header bar inside a surface. */
+  .surface-head {
+    background: var(--well);
+    border-bottom: 1px solid var(--line);
+  }
+  /* Segmented pill control container; children use .seg-on / plain. */
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--card);
+    border: 1px solid var(--line);
+  }
+  .seg > * {
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sub);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .seg > *:hover { color: var(--ink); }
+  .seg > .seg-on {
+    color: var(--ink);
+    font-weight: 600;
+    background: var(--well2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+  /* Filter chips (To do sections, drawer tabs). */
+  .chip {
+    display: inline-grid;
+    place-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: var(--well);
+    color: var(--sub);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .chip:hover { color: var(--ink); background: var(--well2); }
+  .chip.chip-on { background: var(--ink); color: var(--bg); font-weight: 600; }
+  /* Round icon button, 28px, sits on a well. */
+  .orb {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--sub);
+    cursor: pointer;
+    border: 0;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .orb:hover { color: var(--ink); }
+  .ring-glow { box-shadow: var(--glow) var(--glow-color, var(--indigo)); }
 }
 
 /* react-grid-layout: theme the drag placeholder and resize handle instead of the library's red box. */
 .react-grid-item.react-grid-placeholder {
-  background: color-mix(in oklch, var(--primary) 18%, transparent) !important;
+  background: color-mix(in oklab, var(--indigo) 16%, transparent) !important;
   opacity: 1 !important;
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   transition-duration: 100ms;
 }
 .react-grid-item > .react-resizable-handle {

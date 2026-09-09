@@ -17,6 +17,7 @@ import type { WidgetDef } from './types';
 export const WIDGETS: WidgetDef[] = [
   {
     type: 'calendar',
+    accent: 'indigo',
     name: 'Calendar',
     description: 'Events, deadlines, and todos on one timeline.',
     icon: CalendarDays,
@@ -32,6 +33,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'todo',
+    accent: 'coral',
     name: 'To do',
     description: 'Todoist tasks by section, with homework from Canvas and Gradescope on top.',
     icon: CheckSquare,
@@ -45,6 +47,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'classes',
+    accent: 'lime',
     name: 'Classes overview',
     description: 'One row per course: next due, hotlinks.',
     icon: LayoutList,
@@ -58,6 +61,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'class',
+    accent: 'course',
     name: 'Class',
     description: 'A single course: assignments, announcements, hotlinks, TA duties.',
     icon: GraduationCap,
@@ -78,6 +82,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'jobs',
+    accent: 'indigo',
     name: 'Job feed',
     description: 'New internship postings that match your filter.',
     icon: Briefcase,
@@ -92,6 +97,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'tracker',
+    accent: 'amber',
     name: 'Applications',
     description: 'Everything you saved or applied to, by stage. Add jobs that are not in the feed.',
     icon: ClipboardList,
@@ -105,6 +111,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     type: 'sources',
+    accent: 'teal',
     name: 'Sources',
     description: 'Health of every integration: status, last sync, errors.',
     icon: Plug,
