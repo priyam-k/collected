@@ -1,6 +1,6 @@
 <!-- Generated from the published reference artifact (https://claude.ai/code/artifact/d0a7ad88-df03-4dc0-bb34-14009cecb7b1). Edit either, keep them in step. -->
 
-_Reference · written 2026-09-09 · main at 1df90e7_
+_Reference · written 2026-09-09, updated 2026-09-12_
 
 # collected Internals
 
@@ -405,7 +405,7 @@ Returns `{ok: true, version, now, authDisabled}`. Docker's container health chec
 
 #### GET `/api/sources`
 
-Every ingested source as `Source[]`: id, enabled, status, lastRunAt, lastSuccessAt, lastError, hasConfig (never the config itself), meta, updatedAt. Ordered canvas, canvas_ical, gradescope, gcal, todoist, jobs.
+Every ingested source as `Source[]`: id, enabled, status, lastRunAt, lastSuccessAt, lastError, hasConfig (never the config itself), running (a sync is in flight in this process right now), meta, updatedAt. Ordered canvas, canvas_ical, gradescope, gcal, todoist, jobs.
 
 #### GET `/api/sources/:id`
 
@@ -434,6 +434,10 @@ Clears the credential, status disconnected. Returns Source.
 #### GET `/api/sources/:id/summary`
 
 The settings "data pulled" panel: `{id, status, lastError, lastRun, byCourse: [{courseId, code, role, linkedId, kinds: {kind: count}, content: {kind: count}}], unassigned: {kind: count}, recent: [30 most recently updated items, trimmed], jobs: {total, matched} | null, total}`.
+
+#### POST `/api/sources/sync`
+
+The header's sync button. Starts every enabled source that isn't already running and answers 202 immediately with `{started: [ids], skipped: [{id, reason: 'running'|'disabled'}]}`; the runs continue in the background. The web app then polls `GET /api/sources` every two seconds until none of the started ids report `running`, refetches everything, and toasts a summary. Unconfigured sources start and end as disconnected a moment later.
 
 #### POST `/api/sources/:id/sync`
 
@@ -672,7 +676,7 @@ Vite builds it; React 19 renders it; Tailwind v4 and shadcn components (over Rad
 
 ### The dashboard
 
-- **Dashboard.tsx** renders the header (date, a summary line computed from courses, overdue items, and source sync times, then Edit layout, refresh, theme, avatar menu) and the grid.
+- **Dashboard.tsx** renders the header (date, a summary line computed from courses, overdue items, and source sync times, then Edit layout, a sync-all button, theme, avatar menu) and the grid. The sync button posts to `/sources/sync`, spins while any started source still reports running, then invalidates every query.
 - **useLayout.ts** loads widget instances and saved layouts, reconciles them with `defaults.ts` so every visible widget has a slot at every breakpoint, and debounces saves by half a second. Persisting only happens on user-driven changes.
 - **Grid.tsx** wraps react-grid-layout: 12/8/4 columns at 1100/700/0 px, 40 px rows, 8 px gaps, dragging only from the title bar and only in edit mode.
 - **WidgetFrame.tsx** is the card around every widget: a tinted surface, a header with the title and a slot, an edit-mode grip and hide button, and a body measured by a ResizeObserver. `useWidgetSize` turns the body's width and height into a tier (xs under 300 px, sm under 520, md under 820, lg) and an aspect (tall, square, wide); widgets switch layouts on those rather than media queries. `WidgetHeader` lets a widget render controls into the frame's header through a portal.

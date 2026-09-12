@@ -207,6 +207,8 @@ export interface Source {
   lastSuccessAt: string | null;
   lastError: string | null;
   hasConfig: boolean;
+  /** A sync is in flight right now. */
+  running: boolean;
   meta: Record<string, unknown>;
   updatedAt: string;
 }

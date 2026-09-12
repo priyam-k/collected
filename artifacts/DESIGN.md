@@ -224,6 +224,7 @@ POST /api/items/link  /api/items/unlink
 
 GET  /api/sources
 PUT  /api/sources/:id/config           (secrets encrypted at rest)
+POST /api/sources/sync                 (start every enabled source; 202, runs continue in background)
 POST /api/sources/:id/sync             (run now)
 POST /api/sources/canvas/cookie        (from local helper)
 

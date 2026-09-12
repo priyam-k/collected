@@ -6,6 +6,11 @@ import { NeedsAuthError, NotConfiguredError, type Ingester, type RunResult } fro
 
 const running = new Set<SourceId>();
 
+/** Whether a run for this source is in flight right now (in this process). */
+export function isRunning(id: SourceId): boolean {
+  return running.has(id);
+}
+
 /** Post-sync work that depends on more than one source (dedup, push sync). Failures are logged, never propagated. */
 async function runAfterHooks(ctx: AppContext, id: SourceId): Promise<void> {
   if (id === 'canvas' || id === 'gradescope') {

@@ -4,11 +4,12 @@ import { format } from 'date-fns';
 import { Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Layouts } from '@collected/shared';
+import { SOURCE_LABELS, type Layouts, type Source } from '@collected/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useCourses, useItems, useSettings, useSources, useUpsertWidget } from '@/lib/queries';
+import { api } from '@/lib/api';
+import { qk, useCourses, useItems, useSettings, useSources, useSyncAll, useUpsertWidget } from '@/lib/queries';
 import { useTheme } from '@/lib/theme';
 import { relative } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -173,22 +174,55 @@ export function Dashboard() {
   );
 }
 
+/** Sync every enabled source, spin until the last one finishes, then refetch everything. Give up waiting after 5 minutes. */
+const SYNC_POLL_MS = 2_000;
+const SYNC_WAIT_MAX_MS = 5 * 60_000;
+
 function RefreshAll() {
   const qc = useQueryClient();
+  const syncAll = useSyncAll();
   const [spinning, setSpinning] = useState(false);
   const refresh = async () => {
+    if (spinning) return;
     setSpinning(true);
-    await qc.invalidateQueries();
-    setTimeout(() => setSpinning(false), 600);
+    try {
+      const { started, skipped } = await syncAll.mutateAsync();
+      if (!started.length) {
+        toast.info(skipped.some((s) => s.reason === 'running') ? 'A sync is already running' : 'No sources enabled');
+        await qc.invalidateQueries();
+        return;
+      }
+      const deadline = Date.now() + SYNC_WAIT_MAX_MS;
+      let latest: Source[] = [];
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, SYNC_POLL_MS));
+        latest = await api<Source[]>('/sources');
+        qc.setQueryData(qk.sources, latest);
+        if (!latest.some((s) => started.includes(s.id) && s.running)) break;
+      }
+      await qc.invalidateQueries();
+      const failed = latest.filter((s) => started.includes(s.id) && (s.status === 'error' || s.status === 'needs_auth'));
+      const stillRunning = latest.filter((s) => started.includes(s.id) && s.running);
+      if (stillRunning.length) toast.info(`Still syncing: ${stillRunning.map((s) => SOURCE_LABELS[s.id]).join(', ')}`);
+      else if (failed.length) toast.error(failed.map((s) => `${SOURCE_LABELS[s.id]}: ${s.status === 'needs_auth' ? 'needs reconnecting' : s.lastError ?? 'failed'}`).join('\n'));
+      else {
+        const n = latest.filter((s) => started.includes(s.id) && s.status === 'connected').length;
+        toast.success(n ? `Synced ${n} source${n === 1 ? '' : 's'}` : 'Nothing to sync yet. Connect a source in Settings.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Sync failed');
+    } finally {
+      setSpinning(false);
+    }
   };
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" variant="outline" aria-label="Refresh" onClick={refresh}>
+        <Button size="icon" variant="outline" aria-label="Sync all sources" onClick={refresh} disabled={spinning}>
           <RefreshCw className={cn('size-4', spinning && 'animate-spin')} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Refresh all widgets</TooltipContent>
+      <TooltipContent>{spinning ? 'Syncing…' : 'Sync all sources'}</TooltipContent>
     </Tooltip>
   );
 }

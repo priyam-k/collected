@@ -4,8 +4,9 @@ import { INGESTED_SOURCE_IDS, sourceConfigSchemas, sourceIdSchema, type Ingested
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { sources } from '../db/schema.js';
-import { getIngester } from '../ingest/registry.js';
-import { runIngester } from '../ingest/runner.js';
+import { ingesters as registryIngesters } from '../ingest/registry.js';
+import { isRunning, runIngester as runReal, type RunOutcome } from '../ingest/runner.js';
+import type { Ingester } from '../ingest/types.js';
 import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
 import { bad, parseBody } from './util.js';
 import { eq } from 'drizzle-orm';
@@ -19,13 +20,51 @@ function toPublic(row: typeof sources.$inferSelect): Source {
     lastSuccessAt: row.lastSuccessAt,
     lastError: row.lastError,
     hasConfig: !!row.configEnc,
+    running: isRunning(row.id as IngestedSourceId),
     meta: row.meta,
     updatedAt: row.updatedAt,
   };
 }
 
-export function sourcesRoutes(ctx: AppContext) {
+export interface SyncAllResult {
+  started: IngestedSourceId[];
+  skipped: { id: IngestedSourceId; reason: 'running' | 'disabled' }[];
+}
+
+interface SourcesDeps {
+  ingesters: Ingester[];
+  run: (ctx: AppContext, ing: Ingester, opts?: { force?: boolean }) => Promise<RunOutcome>;
+}
+
+export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: registryIngesters, run: runReal }) {
   const r = new Hono();
+  const getIngester = (id: string) => deps.ingesters.find((i) => i.id === id);
+  const runIngester = deps.run;
+
+  /**
+   * Start every enabled source now and return immediately; runs continue in the background. The UI polls
+   * GET /sources and watches `running` to know when they're done. Disabled and already-running sources are
+   * reported as skipped. Unconfigured ones start and end as `disconnected` a moment later, which is harmless.
+   */
+  r.post('/sync', async (c) => {
+    const result: SyncAllResult = { started: [], skipped: [] };
+    for (const ing of deps.ingesters) {
+      const id = ing.id as IngestedSourceId;
+      if (isRunning(id)) {
+        result.skipped.push({ id, reason: 'running' });
+        continue;
+      }
+      const row = await getSourceRow(ctx, id);
+      if (!row.enabled) {
+        result.skipped.push({ id, reason: 'disabled' });
+        continue;
+      }
+      result.started.push(id);
+      void runIngester(ctx, ing).catch((err) => ctx.log.error({ err, source: id }, 'sync-all run threw'));
+    }
+    ctx.log.info({ started: result.started, skipped: result.skipped.length }, 'sync all requested');
+    return c.json(result, 202);
+  });
 
   r.get('/', async (c) => {
     const rows = await ctx.db.select().from(sources);

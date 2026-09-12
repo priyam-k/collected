@@ -219,6 +219,20 @@ export function useInvalidate() {
   return (...keys: readonly (readonly unknown[])[]) => Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: k })));
 }
 
+export interface SyncAllResult {
+  started: SourceId[];
+  skipped: { id: SourceId; reason: 'running' | 'disabled' }[];
+}
+
+/** Kicks off every enabled source; the server answers before they finish. Poll `useSources` and watch `running`. */
+export function useSyncAll() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: () => api<SyncAllResult>('/sources/sync', { method: 'POST' }),
+    onSettled: () => inv(qk.sources),
+  });
+}
+
 export function useSyncSource() {
   const inv = useInvalidate();
   return useMutation({

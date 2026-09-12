@@ -89,7 +89,7 @@ export function SourcesWidget({ size }: WidgetProps) {
       <ul className="flex flex-col">
         {list.map((s) => {
           const standby = s.id === 'canvas_ical' && s.status !== 'error';
-          const busy = sync.isPending && sync.variables === s.id;
+          const busy = s.running || (sync.isPending && sync.variables === s.id);
           return (
             <li key={s.id} className="group/row flex items-center gap-2.5 rounded-[10px] px-2.5 py-[7px] transition-colors hover:bg-well">
               <Dot s={s} />
