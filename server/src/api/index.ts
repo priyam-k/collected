@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { compress } from 'hono/compress';
+import { etag } from 'hono/etag';
 import { accessAuth, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { calendarRoutes } from './calendar.js';
@@ -33,6 +35,12 @@ export function createApi(ctx: AppContext) {
     }
     return guard(c, next);
   });
+
+  // Egress is the one thing the box is billed for (DECISIONS 036), and the widgets poll every minute. compress gzips JSON
+  // ~8×; etag answers a poll whose body hasn't changed with an empty 304. Registered in this order so that on the way
+  // out etag hashes the uncompressed body first and compress wraps whatever is left.
+  api.use('*', compress());
+  api.use('*', etag());
 
   api.route('/health', healthRoutes(ctx));
   api.route('/sources', sourcesRoutes(ctx));

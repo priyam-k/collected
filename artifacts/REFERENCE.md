@@ -389,7 +389,7 @@ Nothing about grades is stored beyond what the ingester copies. `lib/grades.ts` 
 
 ## API reference
 
-All routes live under `/api`, take and return JSON, and require a valid Cloudflare Access JWT unless `AUTH_DISABLED` is on. The JWT arrives as the `cf-access-jwt-assertion` header or the `CF_Authorization` cookie and is verified against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` with the configured audience. Two routes are exempt, marked (open). Query parameters that take lists are comma-separated. Boolean query flags accept `1` or `true`.
+All routes live under `/api`, take and return JSON, and require a valid Cloudflare Access JWT unless `AUTH_DISABLED` is on. Responses over 1 KB are gzipped when the client accepts it, and every successful GET carries an `ETag`; a repeat GET with a matching `If-None-Match` gets an empty 304, which is what makes the widgets' one-minute polling nearly free in egress (DECISIONS 036). The JWT arrives as the `cf-access-jwt-assertion` header or the `CF_Authorization` cookie and is verified against `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` with the configured audience. Two routes are exempt, marked (open). Query parameters that take lists are comma-separated. Boolean query flags accept `1` or `true`.
 
 Shapes named below (Source, Course, EffectiveItem, Job, CourseGrades, WidgetInstance, Layouts) are the TypeScript interfaces in `shared/src/types.ts`; request bodies are validated by the zod schemas in `shared/src/schemas.ts`, and 422 responses list the failing fields.
 

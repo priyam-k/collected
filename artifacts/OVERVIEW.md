@@ -119,4 +119,5 @@ Credentials are AES-256-GCM encrypted into `sources.config_enc`. The key is `dat
 - `queryEffectiveItems` does a full mirror scan (`select … where source='todoist' and status='done'`) on every call. Fine now; would want an index or a precomputed flag if items grew 10×.
 - `GET /api/grades` runs a handful of queries per course per call, no cache.
 - Everything is single-process in-memory state (the running-mutex `Set`, the JWKS cache). A second replica or a separate worker process would need those moved to the DB.
+- The only thing the box is billed for is egress past 1 GB/month, and egress is API polling through the tunnel. Responses are gzipped and ETagged (DECISIONS 036); if the bill shows egress again, the next levers are trimming `raw` from item payloads and the poll interval.
 - SQLite with `synchronous=NORMAL` can lose the last few commits on power loss (never corrupt). Acceptable because source rows are re-fetchable, but overrides and job_state are *not*, and the nightly backup cron is still not set up on the box.
