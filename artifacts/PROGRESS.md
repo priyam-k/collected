@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-09-09. Status: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Shipped to the box 2026-09-09 (image built on the Mac, main at 1df90e7): course pane, applications tracker, inline files, grades, course dates, schedule editor, the new UI, and the Progress / Clock / Exams / Announcements widgets; migrations 0002 and 0003 applied on boot. Next: connect the sources on prod, the backup cron, then two weeks of real use.
+Last updated: 2026-09-24. Deploys now run from GitHub Actions on push to `main` (DECISIONS 035); the deploy key and repo secrets still have to be set by hand once (SETUP.md Phase 2 step 9). The unused `applications` table is dropped (migration 0004). Status as of 2026-09-09: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Shipped to the box 2026-09-09 (image built on the Mac, main at 1df90e7): course pane, applications tracker, inline files, grades, course dates, schedule editor, the new UI, and the Progress / Clock / Exams / Announcements widgets; migrations 0002 and 0003 applied on boot. Next: connect the sources on prod, the backup cron, then two weeks of real use.
 
 ## Milestones
 
@@ -16,6 +16,7 @@ Last updated: 2026-09-09. Status: M1–M8 done, M9 in progress: the e2-micro is 
 - [ ] **M9 — Deploy.** VPS, tunnel, Access, backups. Prod connect of all sources.
   - [x] Google Cloud e2-micro (`collected-instance-2`, `us-east1-c`), Docker, repo cloned with a deploy key, Cloudflare Tunnel + Access, `collected.priyamkabra.com` resolves (2026-09-07).
   - [x] First-deploy fixes (2026-09-07): jobs sync batched and diffed, health probe unauthenticated, Node heap capped, web/server build stages split, image built on the Mac and shipped as a tarball. Container healthy, cloudflared quiet, public URL answering in ~100 ms.
+  - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
   - [ ] Disable the Ops Agent on the box (command in SETUP.md step 3). Not done yet.
   - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
   - [ ] Backup cron (SETUP.md VPS step 5).

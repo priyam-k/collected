@@ -3,6 +3,7 @@
 Personal student dashboard: Canvas, Gradescope, Google Calendar, Todoist, and a job feed in one grid of rearrangeable widgets. Single user.
 
 ## Read first
+- `artifacts/OVERVIEW.md` — the backend landscape in ten minutes: what runs, the data model by purpose, write path, read path, what is load-bearing. Start here.
 - `artifacts/DESIGN.md` — architecture, data model, ingesters, sync rules, widget system. The spec.
 - `artifacts/DECISIONS.md` — why things are the way they are. Append a new numbered entry when a decision changes; don't rewrite old ones.
 - `artifacts/PROGRESS.md` — milestone checklist and open questions. Update it when a milestone lands or a question gets answered.

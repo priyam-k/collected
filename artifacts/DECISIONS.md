@@ -160,3 +160,14 @@ Why: the fixed three-key object silently stripped a typed-in `lab`, which read a
 
 The v2 design is implemented as a restyle over the same widget system: react-grid-layout, widget instances, saved layouts, the pane, all unchanged. Its palette became a small named token set that the shadcn variables alias to, so dialogs, popovers, inputs and settings pages follow without per-component edits. Widget-specific controls moved from widget bodies into the frame header through a portal.
 Why: the mock still has "Edit layout", so it describes a default arrangement, not a fixed one; re-implementing the grid as fixed columns would have thrown away the per-breakpoint layouts. Aliasing tokens rather than rewriting components kept the change to the pieces the design actually shows. The branch stays separate until the look has been used for a while.
+
+## 034 — Drop the `applications` table (2026-09-24)
+
+Migration 0004 drops it. 027 kept it "rather than a migration that drops it for nothing"; two weeks on, the tracker on `job_state` has been used and nothing will move back, so the table was only a thing to explain.
+Why: an unused table in the schema is a question every reader has to ask. A one-line migration answers it once.
+
+## 035 — Deploys run in GitHub Actions on push to `main`; the image travels as a tarball over SSH (2026-09-24)
+
+`.github/workflows/deploy.yml`: typecheck and tests gate the run, a GitHub-hosted runner builds the image natively for amd64, `docker save | gzip`, `scp` to the box, `docker load`, `compose up`, wait for `/api/health`. The runner has its own SSH key (public half in the instance's `ssh-keys` metadata, private half a repo secret). The outgoing image is kept as `collected:prev` for a one-command rollback.
+Why: the box cannot build (024's neighbour: 1 GB RAM), so a build had to happen elsewhere, and the Mac's Docker Desktop hangs on pulls. A registry (GHCR) was the conventional alternative but a private package on a personal GitHub plan gets 500 MB storage and 1 GB/month transfer to the box; at ~110 MB per image that is about nine deploys a month. The tarball path has no quota and is the flow that was already proven by hand. One deploy at a time (`concurrency`), never cancelling a run mid-restart.
+Rules out: GHCR or Docker Hub as the transport; a pull-based updater on the box (watchtower, a cron `compose pull`), which would have needed a registry credential on the box and given no feedback in the Actions run.

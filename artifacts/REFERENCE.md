@@ -43,7 +43,7 @@ Three parts, one process. The **web app** runs in your browser. The **server** i
 ```
 [Canvas: JSON API, session cookie]  [Gradescope: HTML pages, email + password]  [Google Calendar: REST API, OAuth]  [Todoist: REST API, token]  [Simplify jobs: public JSON on GitHub]
 ↓ ingesters read on timers (15 min, 60, 30, 5, 5, 60) ↓
-[server · Node + Hono: /api routes · static files · scheduler · encryption]  [data/collected.db: SQLite, 13 tables, WAL mode · data/.secret_key]
+[server · Node + Hono: /api routes · static files · scheduler · encryption]  [data/collected.db: SQLite, 12 tables, WAL mode · data/.secret_key]
 ↑ browser calls /api/… as JSON; polls every 60 s while visible ↑
 [web app · React: widget grid · side drawer · settings]  [Cloudflare Access + Tunnel: login wall, TLS, no open ports]
 ```
@@ -105,7 +105,7 @@ Every error response is `{"error": "message"}`. 400 for a bad request, 404 not f
 
 ## Every table, every column
 
-Thirteen tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1), `real`. "json" means text containing JSON. Timestamps are ISO text. Unless noted, `updated_at` is set on every write and `created_at` on insert.
+Twelve tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1), `real`. "json" means text containing JSON. Timestamps are ISO text. Unless noted, `updated_at` is set on every write and `created_at` on insert.
 
 **sources — one row per integration**
 
@@ -260,9 +260,7 @@ What *is* automatic is the link to the source. When the Canvas or Gradescope ing
 | settings.key | text, pk | See chapter 11. |
 | settings.value | json | Any JSON. |
 
-One more table, `applications`, exists in the schema and is empty. It was the v1 plan for the tracker before the tracker moved onto `job_state`. A rewrite can drop it.
-
-Migrations so far: 0000 created everything, 0001 added the Todoist map and course content details, 0002 added applied_at, next_action, next_action_at to job_state, 0003 added grading to courses. Drizzle records applied ones in `__drizzle_migrations`.
+Migrations so far: 0000 created everything, 0001 added the Todoist map and course content details, 0002 added applied_at, next_action, next_action_at to job_state, 0003 added grading to courses, 0004 dropped the unused `applications` table (the v1 plan for the tracker before it moved onto `job_state`). Drizzle records applied ones in `__drizzle_migrations`.
 
 ## Effective items: the one read path
 
@@ -754,6 +752,10 @@ A Google Cloud e2-micro in us-east1, the Always Free tier: a quarter of a shared
 Nothing on the box listens on a public port. A `cloudflared` systemd service, installed with a tunnel token from the Cloudflare dashboard, keeps outbound QUIC connections open to Cloudflare's edge. The tunnel's public hostname rule maps `collected.priyamkabra.com` to `http://localhost:3000`, and Cloudflare created the DNS record. In front of that, an Access application for the hostname with a policy allowing one email; login is a one-time PIN or Google. A request flows browser → Cloudflare (TLS terminates, Access checks the session, attaches the JWT) → tunnel → cloudflared → localhost:3000 → the server, which verifies the JWT. The connector proves the box is yours with the token; Access proves the visitor is you.
 
 ### Deploying a change
+
+Pushing to `main` deploys. `.github/workflows/deploy.yml` runs on a GitHub-hosted runner: `pnpm -r typecheck` and `pnpm -r test` as the gate, then the Docker build (native amd64, layer cache in GitHub's cache store), `docker save | gzip`, `scp` to the box, and over SSH: `git pull --ff-only`, retag the running image as `collected:prev`, `docker load`, `docker compose up -d`, then poll `/api/health` from inside the box for up to three minutes. One deploy runs at a time; a second push queues. The runner authenticates with a dedicated SSH key (repo secret `DEPLOY_SSH_KEY`; public half in the instance's `ssh-keys` metadata) against `DEPLOY_HOST` / `DEPLOY_USER` repo variables, with the box's host key pinned in the workflow. Rollback on the box: `docker tag collected:prev collected:latest && docker compose up -d`. The box's IP is ephemeral; if the instance is ever stopped and started, update `DEPLOY_HOST`.
+
+The same steps by hand, if Actions is unavailable:
 
 ```
 # on the Mac, main checked out, Docker Desktop running

@@ -131,7 +131,20 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
    ```
    Upload takes under a minute. `docker-compose.yml` names the image `collected:latest`, so `up -d` (no `--build`) uses the loaded one. If Docker Desktop's registry hang bites, the base image `node:24-bookworm-slim` is already cached locally for amd64 after the first successful build.
 8. `docker compose logs -f app` should show `seeded from seed-config.json` and `listening`, and `docker compose ps` should say `healthy` within about a minute (the health probe is the one API route that doesn't need an Access JWT). Five seconds after boot every ingester runs once; the jobs feed is ~16k rows and its first run writes them all, later runs write only what changed. Then do the Cloudflare section.
-9. Updating later: `git pull` on the box (for the compose file and seed config), then repeat step 7 from the Mac. Never `--build` on the box.
+9. Updating later: push to `main`. `.github/workflows/deploy.yml` does step 7 on a GitHub runner (typecheck and tests first, then build, tarball, scp, `git pull` on the box, `docker load`, `compose up`, wait for `/api/health`). One-time setup, from the Mac:
+   ```sh
+   # a keypair only Actions uses
+   ssh-keygen -t ed25519 -C github-actions-deploy -f ~/.ssh/gha_deploy -N ""
+   # public half into the instance's ssh-keys metadata; the guest agent installs it. Don't edit authorized_keys by hand on GCP: the agent rewrites it.
+   cur=$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(metadata.items.filter(key:ssh-keys).extract(value).flatten())')
+   printf '%s\n%s\n' "$cur" "priyamkabra:$(cat ~/.ssh/gha_deploy.pub)" > /tmp/ssh-keys.txt
+   gcloud compute instances add-metadata collected-instance-2 --zone us-east1-c --metadata-from-file ssh-keys=/tmp/ssh-keys.txt
+   # what the workflow reads
+   gh secret set DEPLOY_SSH_KEY < ~/.ssh/gha_deploy
+   gh variable set DEPLOY_HOST --body "$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(networkInterfaces[0].accessConfigs[0].natIP)')"
+   gh variable set DEPLOY_USER --body priyamkabra
+   ```
+   The box's host key is pinned in the workflow; if the box is ever rebuilt, replace it with the output of `ssh-keyscan -t ed25519 <ip>`. The external IP is ephemeral (no reserved address): stopping and starting the instance changes it, so update `DEPLOY_HOST` then, or reserve the current one with `gcloud compute addresses create collected-ip --addresses <ip> --region us-east1` (check GCP's current static-IPv4 pricing first; it is no longer free). Rollback on the box: `docker tag collected:prev collected:latest && docker compose up -d`. Step 7 by hand still works as a fallback. Never `--build` on the box.
 
 ### How the tunnel works
 
