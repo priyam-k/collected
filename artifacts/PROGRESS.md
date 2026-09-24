@@ -64,6 +64,13 @@ Still open:
 
 ## Later
 
+Parked 2026-09-24 while the multi-user question is worked out (see the discussion notes when they land in DESIGN/DECISIONS):
+
+- **Multi-user hosting**: sign-in (Google OAuth for identity first), `user_id` on every user-owned table, shared job feed with per-user state, security audit, capacity (the e2-micro will not carry several users' ingesters). Possibly a local/self-host mode for people who won't hand credentials to a box they don't run.
+- **More sources**: Google Tasks; Apple Reminders if there is any sane API.
+- **Per-source write toggles**: sources are read-only by default; writes (Todoist close/push, Google event create, later Canvas submissions or planner overrides) become explicit opt-ins in source settings.
+- **Multiple pages/screens**: several dashboards (overview, jobs, classes, one per class) each with their own grid, plus other surfaces such as a side panel of small widgets. Layouts are already per breakpoint; they would become per (page, breakpoint).
+
 - Haiku job scorer over new matches with a short profile blurb.
 - Resume pipeline: launchd job on the Mac calls the API for starred jobs, runs the resume skill, posts back a path.
 - Pinloop as a second job source if it beats the repo on freshness.
