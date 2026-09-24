@@ -17,7 +17,7 @@ Last updated: 2026-09-24. Deploys now run from GitHub Actions on push to `main` 
   - [x] Google Cloud e2-micro (`collected-instance-2`, `us-east1-c`), Docker, repo cloned with a deploy key, Cloudflare Tunnel + Access, `collected.priyamkabra.com` resolves (2026-09-07).
   - [x] First-deploy fixes (2026-09-07): jobs sync batched and diffed, health probe unauthenticated, Node heap capped, web/server build stages split, image built on the Mac and shipped as a tarball. Container healthy, cloudflared quiet, public URL answering in ~100 ms.
   - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
-  - [ ] Disable the Ops Agent on the box (command in SETUP.md step 3). Not done yet.
+  - [x] Ops Agent on the box is inactive and disabled (checked 2026-09-24).
   - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
   - [ ] Backup cron (SETUP.md VPS step 5).
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.

@@ -769,7 +769,7 @@ gcloud compute ssh collected-instance-2 --zone us-east1-c --command \
 gcloud compute ssh collected-instance-2 --zone us-east1-c --command 'cd /srv/collected && docker compose ps && docker compose logs --tail 20 app'
 ```
 
-The git pull only matters when the compose file, env example, or seed config changed; the code runs from the image. Migrations apply when the container starts. Right after a restart the box is busy for about two minutes (image load, six boot-time syncs, often a scheduled Canvas sync) and the container can show unhealthy because the 5-second probe times out; it recovers on its own and Docker doesn't restart on unhealthy. Rollback is checking out the previous commit and repeating from the build.
+The git pull only matters when the compose file, env example, or seed config changed; the code runs from the image. Migrations apply when the container starts; boot logs `migrations applied` with the tags it ran, or nothing when the schema is current. Right after a restart the box is busy for about two minutes (image load, six boot-time syncs, often a scheduled Canvas sync) and the container can show unhealthy because the 5-second probe times out; it recovers on its own and Docker doesn't restart on unhealthy. Rollback is checking out the previous commit and repeating from the build.
 
 > **Not yet done on the box:** a nightly backup (`sqlite3 data/collected.db ".backup /srv/backups/collected-$(date +%F).db"` in cron), and connecting the sources on the live site, which is a Settings step there, not a deploy step.
 
