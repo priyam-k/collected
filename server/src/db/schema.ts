@@ -155,21 +155,6 @@ export const jobState = sqliteTable('job_state', {
   updatedAt: text('updated_at').notNull().$defaultFn(nowIso).$onUpdateFn(nowIso),
 });
 
-export const applications = sqliteTable('applications', {
-  id: text('id').primaryKey(),
-  jobId: text('job_id'),
-  company: text('company').notNull(),
-  title: text('title').notNull(),
-  url: text('url'),
-  appliedAt: text('applied_at'),
-  status: text('status').notNull().default('applied'),
-  contact: text('contact'),
-  nextAction: text('next_action'),
-  nextActionAt: text('next_action_at'),
-  notes: text('notes'),
-  ...timestamps,
-});
-
 export const courseContent = sqliteTable(
   'course_content',
   {

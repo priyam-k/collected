@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { courseContent, courses, items } from '../../db/schema.js';
 import { testContext } from '../../test-util.js';
 import { NeedsAuthError } from '../types.js';
@@ -16,6 +16,13 @@ async function seedCourses(ctx: Awaited<ReturnType<typeof testContext>>) {
 }
 
 describe('syncGradescope', () => {
+  // The fixtures were captured on 2026-09-06; statuses like "missing" depend on the due date being past *now*.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-06T12:00:00-04:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('matches courses, ingests student rows and TA grading queue', async () => {
     const ctx = await testContext();
     await seedCourses(ctx);

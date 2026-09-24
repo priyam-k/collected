@@ -29,6 +29,13 @@
       "when": 1788898721017,
       "tag": "0003_ordinary_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790280823055,
+      "tag": "0004_drop_applications",
+      "breakpoints": true
     }
   ]
 }
