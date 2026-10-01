@@ -140,7 +140,7 @@ Thirteen tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1
 | notes | text, nullable | Free text shown in the drawer overview. |
 | archived | integer bool | Archived courses are skipped by ingesters and hidden from widgets. |
 | grading | json, nullable | Grade category override (chapter 9). `{mode: 'auto'\|'manual', categories: [{id, name, weight, groupIds[], match, dropLowest}]}`. Null means use Canvas groups. |
-| file_sync | json, nullable | File sync config (chapter 7b): `{enabled, targets: [{name, description}], rules: [{target, folder, module, name}], fallback: model\|unsorted\|skip, threshold, skipHint}`. Null means never set up. |
+| file_sync | json, nullable | File sync config: `{enabled, targets: [{name, description}], rules: [{target, folder, module, name, largerThanMb, flatten}], fallback: model\|unsorted\|skip, threshold, skipHint}`. Null means never set up. |
 | created_at, updated_at | text |  |
 
 #### How courses get into the system
@@ -397,7 +397,7 @@ Course files land in folders on the laptop (DESIGN "File sync to a laptop", DECI
 
 **Decision** (`shared/src/file-sync.ts`, used by both sides): manual override → first rule whose regexes all match (folder path, module name, filename) → the model's answer if its confidence meets the course threshold, else `unsorted` → the course fallback (`model` = wait, `unsorted`, `skip`). `skip` and `unsorted` are reserved target names.
 
-**Agent run**: `GET /api/file-sync/manifest` (enabled courses, files, config, effective decisions) → classify pending files with Jev (`POST https://api.typesafe.ai/v1/systemone`, or any server with the same shape via `model.baseUrl`) → download new or changed files via `/api/canvas/files/:id/open`, following the 302 by hand so auth headers never reach the CDN → hard-link from `~/.collected/cache/<course>/<fileId>-<version>/<name>` into the target folder → `_collected.md` per folder → optional `onPlace` hook → `POST /api/file-sync/report`. State in `~/.collected/state.json` records each placement's sha256; a file whose bytes changed is never overwritten or removed (new versions become `name (v2).ext`; moves leave the modified copy and warn). Paths are only in `~/.collected/agent.json`; the server stores target names.
+**Agent run**: `GET /api/file-sync/manifest` (enabled courses, files, config, effective decisions) → classify pending files with Jev (`POST https://api.typesafe.ai/v1/systemone`, or any server with the same shape via `model.baseUrl`) → reconcile each file → `canvas.md` index and the facts files (`assignments.md`, `announcements.md`, `syllabus.md`, from `GET /api/items?kind=…&course=…` and `GET /api/courses/:id/content`) → `onPlace` hook → `POST /api/file-sync/report`. A file's home is `<target>/<Canvas subfolders>/<display name>`; a rule with `flatten` drops the top-level Canvas folder. Downloads go through `/api/canvas/files/:id/open` (302 followed by hand so auth headers never reach the CDN) into `~/.collected/cache/<course>/<fileId>-<version>/<name>`, then a hard link or copy written as temp file + rename with mtime = Canvas `updated_at`. State in `~/.collected/state.json` records each placement's sha256, desired path, and whether it was adopted (a byte-identical file the user already had, found by hashing same-size files under the course root; never moved or removed) or pulled by hand. Untouched copies follow renames, re-sorts and new versions; edited copies are never touched (`name (v2).ext` beside them); user deletions stick; files Canvas drops stay on disk. `collected-agent pull <fileId> --to <dir>` fetches a skipped file on demand. Paths are only in `~/.collected/agent.json`; the server stores target names. DESIGN.md has the full reconcile rules.
 
 **Auth for scripts** (DECISIONS 038): a Cloudflare Access service token. Access exchanges `CF-Access-Client-Id/Secret` for the usual JWT with the identity in `common_name`; the verifier returns `service:<name>`. `LOCAL_HELPER_KEY` in `x-collected-key` is accepted by the API middleware as well, for local use.
 
@@ -657,7 +657,7 @@ Body `{text}`, up to 500 characters, sent to Todoist's natural-language quick ad
 
 #### GET `/api/file-sync/manifest`
 
-`{generatedAt, courses: [{course: {id, code, color}, config, files: FileSyncFileView[]}]}` for every non-archived course with `file_sync.enabled`. Each file: the Canvas metadata (`fileId, title, filename, folderPath, moduleName, contentType, size, updatedAt`), `decision` (`{target, decidedBy, confidence, reason}` or null while waiting for the model), `model`, `manualTarget`, `placed`.
+`{generatedAt, courses: [{course: {id, code, color}, config, files: FileSyncFileView[]}]}` for every non-archived course with `file_sync.enabled`. Each file: the Canvas metadata (`fileId, title, filename` (the display name), `folderPath, moduleName, modulePosition, contentType, size, updatedAt`), `decision` (`{target, decidedBy, confidence, reason, flatten?}` or null while waiting for the model), `model`, `manualTarget`, `placed`.
 
 #### POST `/api/file-sync/report`
 

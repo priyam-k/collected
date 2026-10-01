@@ -67,7 +67,9 @@ Still open:
 - [x] Server: `courses.file_sync`, `file_sync_state` (migration 0005), folder paths + module names on Canvas file rows (all files, not 30), decision logic in `shared`, `/api/file-sync/*`, service-token and helper-key identities.
 - [x] Agent workspace: `collected-agent init | auth | courses | link | sync | status | install-launchd`, staging cache, hard links, `_collected.md` or a per-course index, Jev classification over HTTP (DECISIONS 039), report. Unit tests cover placement and the model request/response; a live Jev call is untested until the first real run.
 - [x] Web: Sync panel in the course Files tab (folders, rules, fallback, per-file decision and override, make-rule, device paths); folder path and module under files.
-- [ ] You: create the Cloudflare Access service token (SETUP.md), run `collected-agent init`, link one course, `sync --dry-run`.
+- [x] Live on the Mac (2026-10-01): Access service token, five courses linked into the Obsidian vault, launchd every 30 min, Jev key set.
+- [x] Policy and mechanics pass with the vault's ingest session (DECISIONS 040): display names, mirrored folders with `flatten`, adoption by content hash, atomic writes with Canvas mtimes, skip rules, handouts, `pull`, course facts files.
+- [ ] Open: whether to skip STAT410-style blank notes (no reliable way to pair them with their filled versions); whether to add a read-only Canvas browsing command (needs a Canvas GET proxy route).
 
 ## Later
 

@@ -16,7 +16,7 @@ One Node process. Inside it, three things share one SQLite file:
 - **Scheduler** (croner): one cron entry per ingester, each on its own interval (Canvas 15 min, Gradescope 30, Google/Todoist 5, iCal/jobs 60), staggered so they don't fire together. Five seconds after boot it runs everything once so a fresh deploy isn't empty.
 - **SQLite** via `@libsql/client` + Drizzle, WAL mode, `synchronous=NORMAL`. No queue, no worker, no cache layer.
 
-One thing runs *off* the box: `collected-agent` (the `agent` workspace) on the laptop under launchd. It pulls a manifest of course files and decisions, downloads from the Canvas CDN into local folders, and reports back. The server never touches file bytes.
+One thing runs *off* the box: `collected-agent` (the `agent` workspace) on the laptop under launchd. It pulls a manifest of course files and decisions, downloads from the Canvas CDN into local folders, writes a per-course index plus assignments/announcements/syllabus files from the API, and reports back. The server never touches file bytes.
 
 Why one process (DECISIONS 001, 003): the hard part of this app is scrapers on a timer, which want a boring long-lived runtime you can debug locally with `pnpm sync canvas`. Serverless and edge runtimes fight that. Postgres buys nothing for one user. Hono was picked over Next/SvelteKit because a scheduler wants a plain server process, not request-scoped handlers.
 
