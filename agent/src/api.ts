@@ -63,6 +63,16 @@ export class Api implements SyncApi {
     return JSON.parse(text) as T;
   }
 
+  /** Any GET on collected's API. */
+  get<T>(p: string): Promise<T> {
+    return this.json<T>(p);
+  }
+
+  /** Any write on collected's API with a JSON body. */
+  send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', p: string, body?: unknown): Promise<T> {
+    return this.json<T>(p, { method, ...(body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) });
+  }
+
   getManifest(): Promise<FileSyncManifest> {
     return this.json<FileSyncManifest>('/api/file-sync/manifest');
   }

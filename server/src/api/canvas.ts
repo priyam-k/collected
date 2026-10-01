@@ -43,5 +43,44 @@ export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (
     }
   });
 
+  /**
+   * A read-only window onto Canvas for local tools (the `collected canvas …` commands): pages, full assignment
+   * bodies, rubrics, module trees. One GET with the stored session, the JSON passed through.
+   *
+   * Read-only by construction: CanvasClient only issues GETs, and the path must be a Canvas API path on the
+   * configured host. A 401/403/404 for the resource is reported as "not available" and never marks the source as
+   * needing auth: students get 401 for a tab an instructor disabled.
+   * `?all=1` follows pagination (up to 10 pages of 100).
+   */
+  r.get('/raw', async (c) => {
+    const path = c.req.query('path') ?? '';
+    if (!/^\/api\/v1\/[^\s]*$/.test(path) || path.includes('..') || path.includes('//')) return c.json({ error: 'path must be a Canvas API path starting with /api/v1/' }, 400);
+    const config = await getSourceConfig<CanvasConfig>(ctx, 'canvas');
+    if (!config) return c.json({ error: 'Canvas is not connected' }, 404);
+    const client = await clientFor(sourceConfigSchemas.canvas.parse(config));
+    c.header('Cache-Control', 'no-store');
+    try {
+      const first = await client.getRaw(path, c.req.query('all') === '1' ? { per_page: 100 } : {}, undefined, { deniedIsNull: true });
+      if (first.data === null) return c.json({ error: 'Canvas has no such resource, or it is not available to you' }, 404);
+      if (c.req.query('all') !== '1' || !Array.isArray(first.data)) return c.json(first.data as object);
+      const out = [...(first.data as unknown[])];
+      let next = first.link.next;
+      for (let page = 1; next && page < 10; page++) {
+        const more = await client.getRaw(next, {}, undefined, { deniedIsNull: true });
+        if (!Array.isArray(more.data)) break;
+        out.push(...(more.data as unknown[]));
+        next = more.link.next;
+      }
+      return c.json(out);
+    } catch (err) {
+      if (err instanceof NeedsAuthError) {
+        await setSourceStatus(ctx, 'canvas', 'needs_auth', { lastError: err.message });
+        return c.json({ error: 'Canvas session expired; reconnect it in Settings → Sources' }, 502);
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: message }, 502);
+    }
+  });
+
   return r;
 }

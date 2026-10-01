@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import { Api } from './api.js';
+import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { configPath, defaultConfig, loadConfig, saveConfig, targetDir } from './config.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
 import { pullFile } from './pull.js';
@@ -9,28 +10,35 @@ import { runSync } from './sync.js';
 const [cmd, ...rest] = process.argv.slice(2);
 
 function usage(): never {
-  console.log(`collected-agent: course files from collected into folders on this machine
+  console.log(`${HELP}
 
-  init <server-url>                     write ${configPath()} (device name, cache dir, model on)
-  auth service-token <id> <secret>      Cloudflare Access service token (prod)
-  auth helper-key <key>                 LOCAL_HELPER_KEY (local dev)
-  auth model <api-key>                  TypeSafe API key for Jev (or set TYPESAFE_API_KEY)
-  courses                               what the server wants synced and where it would go here
-  link <course> <path>                  root folder for a course; targets become <path>/<target>
-  link <course> <target> <path>         one target's folder, overriding the root
-  unlink <course> [target]              forget a mapping
-  sync [--dry-run] [--course X] [--no-model]
-  pull <canvas-file-id> --to <folder>   fetch one file the rules skip (ids are in each course's canvas.md); prints JSON
-  status                                last run and what has been placed
-  install-launchd [--interval 30]       run sync every N minutes (needs: pnpm --filter agent build)
-  uninstall-launchd`);
+  File sync (course files → folders on this machine)
+
+    init <server-url>                         write ${configPath()} (device name, cache dir, model on)
+    auth service-token <id> <secret> | auth helper-key <key> | auth model <typesafe-api-key>
+    files courses                             what the server wants synced and where it lands here
+    files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
+    sync [--dry-run] [--course X] [--no-model]    run the file sync now
+    status                                    last file sync and what has been placed
+    install-launchd [--interval 30] | uninstall-launchd`);
   process.exit(cmd ? 1 : 0);
 }
 
 const say = (s: string) => console.log(s);
 
 try {
-  switch (cmd) {
+  // `files <sub>` is the file sync's own namespace; `link <course-id> <path>` (the old spelling) still means a folder.
+  let command = cmd;
+  let argv = rest;
+  if (cmd === 'files') {
+    command = rest[0] === 'courses' ? 'files-courses' : rest[0] === 'link' ? 'files-link' : rest[0] === 'unlink' ? 'unlink' : rest[0];
+    argv = rest.slice(1);
+  } else if (cmd === 'link' && rest[0] !== 'add' && rest[0] !== 'rm') command = 'files-link';
+  if (command === cmd && isCollectedCommand(cmd)) {
+    say(await runCollected(new Api(loadConfig()), cmd, rest));
+    process.exit(0);
+  }
+  switch (command) {
     case undefined:
     case 'help':
     case '--help':
@@ -53,7 +61,7 @@ try {
       const cfg = defaultConfig(server);
       if (values.device) cfg.device = values.device;
       saveConfig(cfg);
-      say(`wrote ${configPath()}\nnext: collected-agent auth service-token <id> <secret>   (or auth helper-key <key> for a local server)\n      collected-agent auth model <typesafe-api-key>         (for the Jev classifier; skip to use rules only)\n      collected-agent courses`);
+      say(`wrote ${configPath()}\nnext: collected auth service-token <id> <secret>   (or auth helper-key <key> for a local server)\n      collected auth model <typesafe-api-key>         (for the Jev classifier; skip to use rules only)\n      collected courses`);
       break;
     }
     case 'auth': {
@@ -66,7 +74,7 @@ try {
       say('saved');
       break;
     }
-    case 'courses': {
+    case 'files-courses': {
       const cfg = loadConfig();
       const m = await new Api(cfg).getManifest();
       if (!m.courses.length) say('no course has file sync enabled yet (turn it on in the course drawer → Files → Sync to laptop)');
@@ -80,9 +88,9 @@ try {
       }
       break;
     }
-    case 'link': {
+    case 'files-link': {
       const cfg = loadConfig();
-      const [course, a, b] = rest;
+      const [course, a, b] = argv;
       if (!course || !a) usage();
       cfg.courses[course] ??= {};
       if (b) {
@@ -98,7 +106,7 @@ try {
     }
     case 'unlink': {
       const cfg = loadConfig();
-      const [course, target] = rest;
+      const [course, target] = argv;
       if (!course) usage();
       if (target) delete cfg.courses[course]?.targets?.[target];
       else delete cfg.courses[course];
@@ -107,7 +115,7 @@ try {
       break;
     }
     case 'sync': {
-      const { values } = parseArgs({ args: rest, options: { 'dry-run': { type: 'boolean' }, course: { type: 'string' }, 'no-model': { type: 'boolean' } } });
+      const { values } = parseArgs({ args: argv, options: { 'dry-run': { type: 'boolean' }, course: { type: 'string' }, 'no-model': { type: 'boolean' } } });
       const cfg = loadConfig();
       const t0 = Date.now();
       const s = await runSync(cfg, { dryRun: values['dry-run'], course: values.course, noModel: values['no-model'], log: say });
@@ -119,7 +127,7 @@ try {
     }
     // eslint-disable-next-line no-fallthrough
     case 'pull': {
-      const { values, positionals } = parseArgs({ args: rest, options: { to: { type: 'string' }, course: { type: 'string' } }, allowPositionals: true });
+      const { values, positionals } = parseArgs({ args: argv, options: { to: { type: 'string' }, course: { type: 'string' } }, allowPositionals: true });
       const fileId = positionals[0];
       if (!fileId || !values.to) usage();
       const r = await pullFile(loadConfig(), fileId, values.to, { course: values.course });
@@ -137,7 +145,7 @@ try {
       break;
     }
     case 'install-launchd': {
-      const { values } = parseArgs({ args: rest, options: { interval: { type: 'string', default: '30' } } });
+      const { values } = parseArgs({ args: argv, options: { interval: { type: 'string', default: '30' } } });
       const file = installLaunchd(Number(values.interval) || 30);
       say(`installed ${file}; log: ~/.collected/agent.log`);
       break;
