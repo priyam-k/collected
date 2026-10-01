@@ -71,7 +71,8 @@ Still open:
 - [x] Policy and mechanics pass with the vault's ingest session (DECISIONS 040): display names, mirrored folders with `flatten`, adoption by content hash, atomic writes with Canvas mtimes, skip rules, handouts, `pull`, course facts files.
 - [x] Files reachable only through links (syllabus PDFs, assignment specs in hidden folders) are ingested and routed (2026-10-01): 10 found across LING260, ENME480, CMSC422.
 - [x] 2026-10-01 incident: config-only course updates reset schedule and links on five courses (DECISIONS 041). Route fixed and tested; four schedules and one hotlink restored from residual bytes in the database file; **CMSC422's class time needs re-entering**.
-- [ ] Open: whether to skip STAT410-style blank notes (no reliable way to pair them with their filled versions); whether to add a read-only Canvas browsing command (needs a Canvas GET proxy route).
+- [x] Blank notes: keep syncing them; the vault's agent deletes a blank once its filled version has synced (2026-10-01).
+- [x] `collected` CLI (DECISIONS 042): dashboard reads with `--json`, edits (tasks, hotlinks, schedule, notes, dates, tracker), read-only Canvas browsing through `/api/canvas/raw`.
 
 ## Later
 

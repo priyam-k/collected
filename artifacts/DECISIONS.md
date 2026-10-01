@@ -208,3 +208,9 @@ Why: a partial update must mean "change these fields". The bug had been reachabl
 What it cost: four schedules and one hotlink were restored by reading the old row bytes that SQLite had not yet overwritten in the database file; one course's schedule was not recoverable. There was no backup to restore from. The nightly backup listed under M9 since the first deploy would have made this a non-event.
 Rules out: spreading or `.set()`-ing the output of a partial zod parse anywhere. Bulk writes to production from a script snapshot the affected rows first and diff them after.
 
+## 042 — A `collected` CLI over the existing API, with a read-only Canvas proxy (2026-10-01)
+
+`collected <command>` in the `agent` workspace reads and edits what the dashboard does (courses, assignments, agenda, grades, dates, hotlinks, schedule, notes, tasks, tracker) and browses Canvas (modules, pages, full assignment text and rubrics) through one new route, `GET /api/canvas/raw`.
+Why: agents working elsewhere on the laptop (the class-notes vault's) need assignment status, deadlines and course material without a browser, and need to write small facts back (an exam date read from a syllabus, a hotlink). Everything except Canvas browsing was already an API route, so the CLI is a thin client and nothing it does is unavailable to the web UI. Canvas browsing goes through the server so the Canvas session stays where it already is; the route is GET-only by construction and limited to Canvas API paths.
+Rules out: a Canvas token or cookie on the laptop; any command that writes to Canvas or Gradescope (CLAUDE.md's Todoist rule extends naturally: the only external writes are a Todoist task and a Todoist close, both already in the API).
+

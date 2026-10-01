@@ -677,6 +677,12 @@ One course's manifest entry (the web panel). 404 when sync was never set up for 
 
 Body `{target}`: a target name, `skip`, `unsorted`, or null to clear the override. Returns the updated file view.
 
+#### GET `/api/canvas/raw`
+
+- **Query:** `path` (required): a Canvas API path with its own query string, e.g. `/api/v1/courses/1408755/pages/week-3`; must start with `/api/v1/`, no `..` or `//`. `all=1` follows pagination (up to 10 pages of 100) when the result is a list.
+- **Effect:** One or more GETs to Canvas with the stored session. Nothing is stored.
+- **Returns:** Canvas's JSON as is. 400 for a path that is not a Canvas API path, 404 when Canvas denies or lacks the resource (a tab disabled for students answers 401; that does not mark the source `needs_auth`), 502 with a reconnect hint when the session itself is dead.
+
 ### Export, import, demo
 
 #### GET `/api/export`
@@ -702,7 +708,11 @@ Removes rows the fixture loaders created (tagged `raw.demo`, known fixture ids, 
 | profile.initials | string (stored as given, not validated) | The header avatar. |
 | fileSync.devices | `{device: {device, lastRunAt, model, targets, errors}}` | Written by the agent's report; read by the course pane. |
 
-### The CLI
+### The laptop CLI
+
+`collected <command>` (the `agent` workspace; DESIGN.md "The `collected` CLI") is a client of this API for people and agents: reads with `--json`, small edits (hotlinks, schedule, notes, dates, tasks, tracker state), read-only Canvas browsing through `/api/canvas/raw`, and the file sync.
+
+### The server CLI
 
 `pnpm cli <command>` runs the same bootstrap as the server against the same database, then exits. Everything an ingester does, you can trigger and watch by hand, which is how each one was built.
 

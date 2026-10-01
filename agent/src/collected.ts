@@ -124,17 +124,20 @@ async function agenda(api: Api, args: string[]): Promise<Out> {
   const from = startOfToday();
   const items = await api.get<EffectiveItem[]>(`/api/items?${q({ kind: 'event,assignment,task', from: from.toISOString(), to: addDays(from, Number(values.days) || 7).toISOString() })}`);
   const byDay = new Map<string, EffectiveItem[]>();
+  // An event happens when it starts; an assignment or task belongs to the day it is due (its start is an unlock date).
+  const at = (i: EffectiveItem): string | null => (i.kind === 'event' ? (i.startsAt ?? i.dueAt) : (i.dueAt ?? i.startsAt));
+  const today = localDate(from.toISOString());
   for (const i of items) {
-    const t = i.startsAt ?? i.dueAt;
-    if (!t) continue;
+    const t = at(i);
+    if (!t || localDate(t) < today) continue;
     const k = localDate(t);
     byDay.set(k, [...(byDay.get(k) ?? []), i]);
   }
   const lines: string[] = [];
   for (const [k, list] of [...byDay].sort((a, b) => a[0].localeCompare(b[0]))) {
     lines.push(dayOf(`${k}T12:00:00`));
-    for (const i of list.sort((a, b) => (a.startsAt ?? a.dueAt ?? '').localeCompare(b.startsAt ?? b.dueAt ?? ''))) {
-      const t = i.allDay ? 'all day ' : new Date(i.startsAt ?? i.dueAt!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).padStart(8);
+    for (const i of list.sort((a, b) => (at(a) ?? '').localeCompare(at(b) ?? ''))) {
+      const t = i.allDay ? 'all day ' : new Date(at(i)!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).padStart(8);
       lines.push(`  ${t}  ${i.kind === 'event' ? '' : i.kind === 'task' ? '[task] ' : '[due] '}${i.course ? `${i.course.code} ` : ''}${i.title}`);
     }
   }

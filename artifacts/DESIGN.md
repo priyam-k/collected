@@ -201,6 +201,17 @@ Course files land in folders on the laptop automatically, so local tools (Claude
 
 **Auth.** The agent authenticates through Cloudflare Access with a **service token** (`CF-Access-Client-Id/Secret` headers; Access mints a JWT whose identity is `common_name`, which the app accepts like an email). `LOCAL_HELPER_KEY` in `x-collected-key` is accepted by the API middleware as a second credential for local use.
 
+## The `collected` CLI
+
+The dashboard from a terminal, for a person or for an agent working in another folder (the class-notes vault). It lives in the `agent` workspace because that already holds the laptop's credentials for the API; one binary, `collected` (`collected-agent` is the same file). Every read prints a plain table, or JSON with `--json`. `collected help` lists everything.
+
+- **Look**: `courses`, `course <c>`, `assignments [--course --days --all]`, `agenda [--days]`, `todo`, `grades [c]`, `announcements`, `dates`, `sources`, `jobs`.
+- **Change**: `task add "<text>"` (Todoist quick add) and `task done`, `done <item> [--undo]` (a dashboard-only override), `link add|rm`, `schedule set|rm` (`"mon,wed 14:00-14:50 @ CHE 2110"`), `notes set|clear`, `date add|rm` (exams, quizzes, finals, cancelled or virtual sessions), `jobs set <id> <state>`, `resync [source|all]`.
+- **Canvas, read-only**: `canvas ls <c> [modules|files|pages|assignments|announcements]`, `canvas show <c> syllabus | page <slug> | assignment <id> | announcement <id>` (the full body as text, the rubric, and the ids of files it links), `canvas get "<api path>" [--all]`, and `pull <file-id> --to <folder>`.
+- **File sync**: `sync`, `status`, `files courses|link|unlink`, `install-launchd`.
+
+A `<course>` is its code, the digits, or the id. A course edit reads the course, changes one field, sends only that field (DECISIONS 041), and prints what it was and what it is now. The Canvas commands go through `GET /api/canvas/raw?path=/api/v1/…[&all=1]`: one GET with the stored session, JSON passed through, path restricted to the Canvas API on the configured host, a denied resource reported as missing without touching the source's status. No Canvas credential exists on the laptop, and nothing in the CLI can write to Canvas or Gradescope.
+
 ## Widget system
 
 **Grid**: react-grid-layout, `ResponsiveGridLayout`. Columns 12 (lg) / 8 (md) / 4 (sm, phone: effectively a stack). Row height 40px. Layouts saved per breakpoint to `layouts`, debounced.
@@ -270,6 +281,7 @@ GET/PUT /api/layout   GET/PUT /api/widgets
 GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state   { state?, notes?, appliedAt?, nextAction?, nextActionAt?, resumePath? }
 GET  /api/jobs/tracked  GET /api/jobs/:id  POST /api/jobs (manual entry)  DELETE /api/jobs/:id (manual only)
 GET  /api/canvas/files/:id/open?download  (302 to a one-shot inline link)
+GET  /api/canvas/raw?path=/api/v1/…&all   (read-only Canvas API passthrough for the CLI)
 POST /api/items/manual  PUT/DELETE /api/items/manual/:externalId   (course dates and session tags)
 GET  /api/file-sync/manifest   (agent: enabled courses, files, effective decisions)
 POST /api/file-sync/report     (agent: model decisions, placements, device target map)
