@@ -2,7 +2,8 @@ import { createWriteStream, mkdirSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { FileSyncManifest, FileSyncReport } from '@collected/shared';
+import type { EffectiveItem, FileSyncManifest, FileSyncReport } from '@collected/shared';
+import type { CourseContentRow } from './facts.js';
 import type { AgentConfig } from './config.js';
 
 export class ApiError extends Error {
@@ -20,6 +21,9 @@ export interface SyncApi {
   getManifest(): Promise<FileSyncManifest>;
   postReport(report: FileSyncReport): Promise<unknown>;
   download(fileId: string, dest: string): Promise<void>;
+  /** Every assignment or announcement of a course, done and informational included. */
+  getItems(courseId: string, kind: 'assignment' | 'announcement'): Promise<EffectiveItem[]>;
+  getCourseContent(courseId: string): Promise<CourseContentRow[]>;
 }
 
 /** Talks to collected. Auth is an Access service token (prod) or the helper key (local); see DECISIONS 038. */
@@ -61,6 +65,15 @@ export class Api implements SyncApi {
 
   getManifest(): Promise<FileSyncManifest> {
     return this.json<FileSyncManifest>('/api/file-sync/manifest');
+  }
+
+  getItems(courseId: string, kind: 'assignment' | 'announcement'): Promise<EffectiveItem[]> {
+    const q = new URLSearchParams({ kind, course: courseId, includeDone: '1', includeInformational: '1', includeHidden: '1', limit: '1000' });
+    return this.json<EffectiveItem[]>(`/api/items?${q}`);
+  }
+
+  getCourseContent(courseId: string): Promise<CourseContentRow[]> {
+    return this.json<CourseContentRow[]>(`/api/courses/${encodeURIComponent(courseId)}/content`);
   }
 
   postReport(report: FileSyncReport): Promise<{ ok: true }> {

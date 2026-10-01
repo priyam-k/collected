@@ -25,8 +25,11 @@ export interface AgentConfig {
   /**
    * courseId → root folder and per-target overrides. An unmapped target is <root>/<target>. `index` is a file to
    * write one course-wide manifest to (e.g. <root>/_data/canvas.md) instead of a `_collected.md` in each target.
+   * `facts` is a folder for assignments.md, announcements.md and syllabus.md (e.g. _data).
    */
-  courses: Record<string, { root?: string; targets?: Record<string, string>; index?: string }>;
+  courses: Record<string, { root?: string; targets?: Record<string, string>; index?: string; facts?: string }>;
+  /** Never download a file larger than this (a lecture video in a synced folder). Default 100. */
+  maxFileMb?: number;
   /** Shell command run once after a sync that placed files. Env: COLLECTED_PLACED (newline-separated paths), COLLECTED_COURSES. */
   onPlace?: string;
   model: ModelConfig;
@@ -64,6 +67,19 @@ export function saveConfig(cfg: AgentConfig): void {
 }
 
 export const expandHome = (p: string): string => (p.startsWith('~/') ? path.join(homedir(), p.slice(2)) : p);
+
+/** The course's root folder on this machine, when one is configured. */
+export function courseRoot(cfg: AgentConfig, courseId: string): string | null {
+  const r = cfg.courses[courseId]?.root;
+  return r ? path.resolve(expandHome(r)) : null;
+}
+
+/** Absolute folder for the course facts files, when configured. */
+export function courseFactsDir(cfg: AgentConfig, courseId: string): string | null {
+  const c = cfg.courses[courseId];
+  if (!c?.facts) return null;
+  return path.resolve(c.root ? expandHome(c.root) : process.cwd(), expandHome(c.facts));
+}
 
 /** Absolute path of the course-wide index file, when configured. */
 export function courseIndexPath(cfg: AgentConfig, courseId: string): string | null {

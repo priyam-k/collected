@@ -27,6 +27,7 @@ const file = (over: Partial<FileSyncFile>): FileSyncFile => ({
   filename: 'x.pdf',
   folderPath: null,
   moduleName: null,
+  modulePosition: null,
   contentType: 'application/pdf',
   size: 10,
   updatedAt: '2026-09-01T00:00:00Z',
@@ -52,6 +53,14 @@ describe('decideFile', () => {
     expect(decideFile(unsorted, file({ filename: 'q.pdf' }), { manualTarget: null, model: null })).toMatchObject({ target: 'unsorted', decidedBy: 'fallback' });
     const skip = { ...cfg, fallback: 'skip' as const };
     expect(decideFile(skip, file({ filename: 'q.pdf' }), { manualTarget: null, model: null })).toMatchObject({ target: 'skip', decidedBy: 'fallback' });
+  });
+
+  it('size conditions: skip big data files, keep small ones', () => {
+    const sized = fileSyncConfigSchema.parse({ targets: [{ name: 'slides' }], rules: [{ target: 'skip', name: '\\.(csv|json)$', largerThanMb: 1 }, { target: 'skip', largerThanMb: 30 }, { target: 'slides', name: '.' }], fallback: 'unsorted' });
+    expect(decideFile(sized, file({ filename: 'data.csv', size: 5 * 1024 * 1024 }), { manualTarget: null, model: null })).toMatchObject({ target: 'skip' });
+    expect(decideFile(sized, file({ filename: 'tiny.csv', size: 2000 }), { manualTarget: null, model: null })).toMatchObject({ target: 'slides' });
+    expect(decideFile(sized, file({ filename: 'huge.pdf', size: 40 * 1024 * 1024 }), { manualTarget: null, model: null })).toMatchObject({ target: 'skip', reason: 'larger than 30 MB' });
+    expect(fileSyncConfigSchema.safeParse({ targets: [{ name: 'a' }], rules: [{ target: 'skip', largerThanMb: 5 }] }).success).toBe(true);
   });
 });
 

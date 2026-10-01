@@ -145,12 +145,21 @@ export interface FileSyncTarget {
   description: string;
 }
 
-/** Every given regex must match (case-insensitive). folder = Canvas folder path, module = module name, name = filename. */
+/**
+ * Every given condition must match. folder = Canvas folder path, module = module name, name = display filename
+ * (case-insensitive regexes); largerThanMb = file size above this many megabytes.
+ */
 export interface FileSyncRule {
   target: string;
   folder: string | null;
   module: string | null;
   name: string | null;
+  largerThanMb: number | null;
+  /**
+   * Layout under the target. false (default): mirror the Canvas folder path ("/p1/x.md" → Assignments/p1/x.md).
+   * true: the top-level Canvas folder *is* the category, drop it ("/Lecture Notes/x.pdf" → Slides/x.pdf).
+   */
+  flatten: boolean;
 }
 
 export interface FileSyncConfig {
@@ -174,6 +183,8 @@ export interface FileSyncDecision {
   confidence: number | null;
   /** Human-readable: the rule that matched, or "model 0.82", or "fallback". */
   reason: string;
+  /** From the matching rule: drop the top-level Canvas folder when placing. Absent for model, manual and fallback decisions. */
+  flatten?: boolean;
 }
 
 /** A Canvas file as the sync sees it. */
@@ -184,6 +195,8 @@ export interface FileSyncFile {
   filename: string;
   folderPath: string | null;
   moduleName: string | null;
+  /** Order within the course's modules (module position × 1000 + item position), when the file sits in one. */
+  modulePosition: number | null;
   contentType: string | null;
   size: number | null;
   updatedAt: string | null;

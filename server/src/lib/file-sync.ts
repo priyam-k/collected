@@ -32,14 +32,17 @@ export async function listSyncFiles(ctx: AppContext, courseId: string): Promise<
     .where(and(eq(courseContent.courseId, courseId), eq(courseContent.kind, 'file')))
     .orderBy(asc(courseContent.position));
   return rows.map((r) => {
-    const raw = r.raw as { size?: number | null; contentType?: string | null; updatedAt?: string | null; filename?: string | null; folderPath?: string | null };
+    const raw = r.raw as { size?: number | null; contentType?: string | null; updatedAt?: string | null; folderPath?: string | null; modulePosition?: number | null };
     return {
       courseId,
       fileId: r.externalId,
       title: r.title,
-      filename: raw.filename || r.title,
+      // Canvas's display name: what the course page shows. The upload name (raw.filename) is URL-encoded and often a
+      // leftover from the instructor's disk ("Chapter4+2.pdf" for "Lecture9_Sept29.pdf").
+      filename: r.title,
       folderPath: raw.folderPath ?? null,
       moduleName: r.moduleName,
+      modulePosition: raw.modulePosition ?? null,
       contentType: raw.contentType ?? null,
       size: raw.size ?? null,
       updatedAt: raw.updatedAt ?? null,

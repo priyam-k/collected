@@ -3,7 +3,7 @@ import { fileSyncConfigSchema, type FileSyncFile } from '@collected/shared';
 import { classify, modelUnavailable } from './classify.js';
 
 const cfg = fileSyncConfigSchema.parse({ targets: [{ name: 'slides', description: 'lecture slides' }, { name: 'hw', description: 'homework' }], skipHint: 'junk' });
-const file: FileSyncFile = { courseId: 'c', fileId: '1', title: 'L03.pdf', filename: 'L03.pdf', folderPath: '/Lectures', moduleName: null, contentType: 'application/pdf', size: 1, updatedAt: null };
+const file: FileSyncFile = { courseId: 'c', fileId: '1', title: 'L03.pdf', filename: 'L03.pdf', folderPath: '/Lectures', moduleName: null, modulePosition: null, contentType: 'application/pdf', size: 1, updatedAt: null };
 
 describe('classify over the systemone API', () => {
   it('sends the Jev request shape with a bearer key and reads choice, probabilities, confidence', async () => {

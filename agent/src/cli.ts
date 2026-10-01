@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util';
 import { Api } from './api.js';
 import { configPath, defaultConfig, loadConfig, saveConfig, targetDir } from './config.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
+import { pullFile } from './pull.js';
 import { loadState } from './state.js';
 import { runSync } from './sync.js';
 
@@ -19,6 +20,7 @@ function usage(): never {
   link <course> <target> <path>         one target's folder, overriding the root
   unlink <course> [target]              forget a mapping
   sync [--dry-run] [--course X] [--no-model]
+  pull <canvas-file-id> --to <folder>   fetch one file the rules skip (ids are in each course's canvas.md); prints JSON
   status                                last run and what has been placed
   install-launchd [--interval 30]       run sync every N minutes (needs: pnpm --filter agent build)
   uninstall-launchd`);
@@ -109,13 +111,21 @@ try {
       const cfg = loadConfig();
       const t0 = Date.now();
       const s = await runSync(cfg, { dryRun: values['dry-run'], course: values.course, noModel: values['no-model'], log: say });
-      const parts = [`${s.placed} new`, `${s.updated} updated`, `${s.moved} moved`, `${s.removed} removed`, `${s.unchanged} unchanged`, `${s.skipped} skipped`];
+      const parts = [`${s.placed} new`, `${s.updated} updated`, `${s.moved} moved`, `${s.adopted} adopted`, `${s.removed} removed`, `${s.unchanged} unchanged`, `${s.skipped} skipped`];
       if (s.pending) parts.push(`${s.pending} waiting for the model`);
       if (s.classified) parts.push(`${s.classified} classified`);
       say(`${values['dry-run'] ? 'dry run: ' : ''}${s.courses} course${s.courses === 1 ? '' : 's'}: ${parts.join(', ')}${s.errors.length ? `, ${s.errors.length} error${s.errors.length === 1 ? '' : 's'}` : ''} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
       process.exit(s.errors.length ? 1 : 0);
     }
     // eslint-disable-next-line no-fallthrough
+    case 'pull': {
+      const { values, positionals } = parseArgs({ args: rest, options: { to: { type: 'string' }, course: { type: 'string' } }, allowPositionals: true });
+      const fileId = positionals[0];
+      if (!fileId || !values.to) usage();
+      const r = await pullFile(loadConfig(), fileId, values.to, { course: values.course });
+      say(JSON.stringify(r, null, 2));
+      break;
+    }
     case 'status': {
       const cfg = loadConfig();
       const st = loadState();

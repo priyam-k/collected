@@ -12,8 +12,9 @@ const test = (pattern: string | null, value: string | null | undefined): boolean
   }
 };
 
-export function ruleMatches(rule: FileSyncRule, file: Pick<FileSyncFile, 'folderPath' | 'moduleName' | 'filename' | 'title'>): boolean {
-  if (!rule.folder && !rule.module && !rule.name) return false;
+export function ruleMatches(rule: FileSyncRule, file: Pick<FileSyncFile, 'folderPath' | 'moduleName' | 'filename' | 'title' | 'size'>): boolean {
+  if (!rule.folder && !rule.module && !rule.name && rule.largerThanMb == null) return false;
+  if (rule.largerThanMb != null && !((file.size ?? 0) > rule.largerThanMb * 1024 * 1024)) return false;
   return test(rule.folder, file.folderPath) && test(rule.module, file.moduleName) && test(rule.name, file.filename || file.title);
 }
 
@@ -22,6 +23,7 @@ export function describeRule(rule: FileSyncRule): string {
   if (rule.folder) parts.push(`folder ~ /${rule.folder}/`);
   if (rule.module) parts.push(`module ~ /${rule.module}/`);
   if (rule.name) parts.push(`name ~ /${rule.name}/`);
+  if (rule.largerThanMb != null) parts.push(`larger than ${rule.largerThanMb} MB`);
   return parts.join(' and ');
 }
 
@@ -37,7 +39,7 @@ export interface FileSyncStateInput {
 export function decideFile(config: FileSyncConfig, file: FileSyncFile, state: FileSyncStateInput): FileSyncDecision | null {
   if (state.manualTarget) return { target: state.manualTarget, decidedBy: 'manual', confidence: null, reason: 'set by hand' };
   for (const rule of config.rules) {
-    if (ruleMatches(rule, file)) return { target: rule.target, decidedBy: 'rule', confidence: null, reason: describeRule(rule) };
+    if (ruleMatches(rule, file)) return { target: rule.target, decidedBy: 'rule', confidence: null, reason: describeRule(rule), flatten: rule.flatten || undefined };
   }
   if (state.model) {
     const conf = state.model.confidence;

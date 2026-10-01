@@ -1,12 +1,36 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type FileSyncFileView, type FileSyncManifestCourse, type FileSyncReport } from '@collected/shared';
 import { Api, type SyncApi } from './api.js';
 import { classify, modelUnavailable } from './classify.js';
-import { courseIndexPath, knownTargets, targetDir, type AgentConfig } from './config.js';
-import { adoptableTwin, cachePathFor, chooseLinkName, isSuffixedName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
-import { loadState, saveState, stateKey, type Placement } from './state.js';
+import { courseFactsDir, courseIndexPath, courseRoot, knownTargets, targetDir, type AgentConfig } from './config.js';
+import { writeFacts } from './facts.js';
+import {
+  cachePathFor,
+  findIdentical,
+  fixMtime,
+  handoutFor,
+  isMarkdown,
+  moveFile,
+  mtimeMatches,
+  placeFile,
+  placementUnmodified,
+  pruneEmptyDirs,
+  removePlacement,
+  renderIndex,
+  resolveName,
+  safeName,
+  sha256File,
+  sha256Text,
+  subdirFor,
+  versionName,
+  writeIfChanged,
+  writeTextAtomic,
+  type IndexEntry,
+  type SkippedEntry,
+} from './place.js';
+import { loadState, saveState, stateKey, type AgentState, type Placement } from './state.js';
 
 export interface SyncOptions {
   dryRun?: boolean;
@@ -24,6 +48,7 @@ export interface SyncSummary {
   placed: number;
   updated: number;
   moved: number;
+  adopted: number;
   removed: number;
   skipped: number;
   unchanged: number;
@@ -33,9 +58,15 @@ export interface SyncSummary {
 }
 
 const nowIso = () => new Date().toISOString();
+const rel = (p: string): string => (process.env.HOME ? p.replace(process.env.HOME, '~') : p);
+const metaOf = (f: FileSyncFileView): NonNullable<Placement['meta']> => ({ title: f.title, folderPath: f.folderPath, moduleName: f.moduleName, modulePosition: f.modulePosition, size: f.size });
 
 /**
- * One pass: manifest → decide → download into the cache → hard-link into targets → indexes → report.
+ * One pass: manifest → decide → reconcile each file with what is on disk → indexes and course facts → report.
+ *
+ * Reconcile, per file: already here under any name with the same bytes → adopt it (it stays the user's). Placed
+ * by us and untouched → follow the layout (rename, move) and Canvas (replace on a new version). Edited by the user
+ * → never touched; a new version lands beside it. Deleted by the user → stays deleted until Canvas changes it.
  * Dry run changes nothing on disk and reports only model decisions, so the web UI can preview the plan.
  */
 export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise<SyncSummary> {
@@ -44,99 +75,169 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   const state = loadState();
   const manifest = await api.getManifest();
   const report: FileSyncReport = { device: cfg.device, model: false, targets: {}, decisions: [], placed: [], removed: [], errors: [] };
-  const sum: SyncSummary = { courses: 0, placed: 0, updated: 0, moved: 0, removed: 0, skipped: 0, unchanged: 0, pending: 0, classified: 0, errors: report.errors };
+  const sum: SyncSummary = { courses: 0, placed: 0, updated: 0, moved: 0, adopted: 0, removed: 0, skipped: 0, unchanged: 0, pending: 0, classified: 0, errors: report.errors };
   const err = (message: string, courseId?: string, fileId?: string) => {
     report.errors.push({ courseId, fileId, message });
     log(`  ! ${message}`);
   };
-  const placedPaths: string[] = [];
-  const placedCourses = new Set<string>();
-  const indexDirs = new Map<string, { courseId: string; courseCode: string; target: string }>();
+  const mode = cfg.linkMode ?? 'hardlink';
+  const maxBytes = (cfg.maxFileMb ?? 100) * 1024 * 1024;
+  const touchedPaths: string[] = [];
+  const touchedCourses = new Map<string, string>(); // code → root
+  const synced: FileSyncManifestCourse[] = [];
+  const finalDecisions = new Map<string, Map<string, FileSyncDecision | null>>();
 
   for (const mc of manifest.courses) {
     if (opts.course && mc.course.id !== opts.course && mc.course.code.toLowerCase() !== opts.course.toLowerCase()) continue;
     sum.courses++;
     const { config } = mc;
-    report.targets[mc.course.id] = knownTargets(cfg, mc.course.id, allowedTargets(config));
-    if (!cfg.courses[mc.course.id]) {
-      log(`${mc.course.code}: no folder on this machine (collected-agent link ${mc.course.id} <path>); ${mc.files.length} files waiting`);
+    const courseId = mc.course.id;
+    report.targets[courseId] = knownTargets(cfg, courseId, allowedTargets(config));
+    if (!cfg.courses[courseId]) {
+      log(`${mc.course.code}: no folder on this machine (collected-agent link ${courseId} <path>); ${mc.files.length} files waiting`);
       continue;
     }
+    synced.push(mc);
+    const root = courseRoot(cfg, courseId);
     log(`${mc.course.code}: ${mc.files.length} files`);
+    const touch = (p: string) => {
+      touchedPaths.push(p);
+      if (root) touchedCourses.set(mc.course.code, root);
+    };
 
-    // Model pass for files nothing else decided.
+    // ---- model pass for files nothing else decided
     const decisions = new Map<string, FileSyncDecision | null>(mc.files.map((f) => [f.fileId, f.decision]));
     const pending = mc.files.filter((f) => !f.decision);
     if (pending.length && config.fallback === 'model' && !opts.noModel) {
       const why = modelUnavailable(cfg.model);
       if (why) {
-        if (cfg.model.enabled) err(`${pending.length} file${pending.length === 1 ? '' : 's'} waiting for the model, but ${why}`, mc.course.id);
+        if (cfg.model.enabled) err(`${pending.length} file${pending.length === 1 ? '' : 's'} waiting for the model, but ${why}`, courseId);
         else log(`  ${pending.length} file${pending.length === 1 ? '' : 's'} waiting for the model (${why})`);
       } else {
         report.model = true;
         for (const f of pending) {
           try {
             const ans = await classify(cfg.model, config, f);
-            report.decisions.push({ courseId: mc.course.id, fileId: f.fileId, target: ans.target, confidence: ans.confidence, probabilities: ans.probabilities });
+            report.decisions.push({ courseId, fileId: f.fileId, target: ans.target, confidence: ans.confidence, probabilities: ans.probabilities });
             decisions.set(f.fileId, decideFile(config, f, { manualTarget: f.manualTarget, model: ans }));
             sum.classified++;
             log(`  model: ${f.filename} → ${ans.target}${ans.confidence != null ? ` (${ans.confidence.toFixed(2)})` : ''}`);
           } catch (e) {
-            err(`model failed on ${f.filename}: ${(e as Error).message}`, mc.course.id, f.fileId);
+            err(`model failed on ${f.filename}: ${(e as Error).message}`, courseId, f.fileId);
             if (/check the API key/.test((e as Error).message)) break; // every call would fail the same way
           }
         }
       }
     }
 
+    finalDecisions.set(courseId, decisions);
+
+    // ---- fold: a copy we placed that turns out to duplicate a file the user already had goes away; theirs is adopted.
+    const ours = () => new Set(Object.values(state.placements).map((p) => p.localPath));
+    if (root) {
+      for (const p of Object.values(state.placements)) {
+        if (p.courseId !== courseId || p.adopted || p.handout || !existsSync(p.localPath) || !placementUnmodified(p)) continue;
+        const twin = findIdentical(root, p.localPath, ours());
+        if (!twin) continue;
+        if (opts.dryRun) {
+          log(`  would fold ${rel(p.localPath)} onto your identical ${path.basename(twin)}`);
+          continue;
+        }
+        unlinkSync(p.localPath);
+        pruneEmptyDirs(path.dirname(p.localPath), root);
+        log(`  folded ${path.basename(p.localPath)} onto your identical ${rel(twin)}`);
+        state.placements[stateKey(courseId, p.fileId)] = { ...p, localPath: twin, desired: twin, adopted: true, placedAt: nowIso() };
+        report.placed.push({ courseId, fileId: p.fileId, target: p.target, localPath: twin });
+        sum.adopted++;
+      }
+    }
+
+    // ---- reconcile each file
     const missingTargetWarned = new Set<string>();
     for (const f of mc.files) {
       const decision = decisions.get(f.fileId) ?? null;
-      const key = stateKey(mc.course.id, f.fileId);
+      const key = stateKey(courseId, f.fileId);
       const prev = state.placements[key] ?? null;
       if (!decision) {
         sum.pending++;
         continue;
       }
-      if (decision.target === FILE_SYNC_SKIP) {
+      const tooBig = f.size != null && f.size > maxBytes;
+      if (decision.target === FILE_SYNC_SKIP || tooBig) {
         sum.skipped++;
-        if (prev) {
-          if (opts.dryRun) log(`  would remove ${rel(prev.localPath)} (now skipped)`);
-          else if (removePlacement(prev)) {
-            delete state.placements[key];
-            report.removed.push({ courseId: mc.course.id, fileId: f.fileId });
-            sum.removed++;
-            log(`  removed ${rel(prev.localPath)} (skipped)`);
-          } else err(`${rel(prev.localPath)} was changed locally; left in place although it is now skipped`, mc.course.id, f.fileId);
+        if (tooBig && decision.target !== FILE_SYNC_SKIP && !prev) log(`  skipped ${f.filename}: ${(f.size! / 1024 / 1024).toFixed(0)} MB is over this machine's ${cfg.maxFileMb ?? 100} MB cap`);
+        if (!prev || prev.pulled) continue; // pulled by hand: kept although the rules skip it
+        if (prev.adopted) {
+          if (!opts.dryRun) delete state.placements[key]; // theirs: stays on disk, just no longer tracked
+          continue;
         }
+        if (opts.dryRun) log(`  would remove ${rel(prev.localPath)} (now skipped: ${decision.reason})`);
+        else if (removePlacement(prev)) {
+          delete state.placements[key];
+          report.removed.push({ courseId, fileId: f.fileId });
+          sum.removed++;
+          if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
+          log(`  removed ${rel(prev.localPath)} (skipped: ${decision.reason})`);
+        } else err(`${rel(prev.localPath)} was changed locally; left in place although it is now skipped`, courseId, f.fileId);
         continue;
       }
-      const dir = targetDir(cfg, mc.course.id, decision.target);
+      const dir = targetDir(cfg, courseId, decision.target);
       if (!dir) {
         if (!missingTargetWarned.has(decision.target)) {
           missingTargetWarned.add(decision.target);
-          err(`no folder for target "${decision.target}" (collected-agent link ${mc.course.id} ${decision.target} <path>)`, mc.course.id);
+          err(`no folder for target "${decision.target}" (collected-agent link ${courseId} ${decision.target} <path>)`, courseId);
         }
         continue;
       }
-      indexDirs.set(dir, { courseId: mc.course.id, courseCode: mc.course.code, target: decision.target });
+      const wantDir = path.join(dir, subdirFor(f.folderPath, !!decision.flatten));
+      const md = isMarkdown(f.filename);
+      const sameVersion = !!prev && prev.updatedAt === f.updatedAt;
+      const legacyHandout = md && !!prev && !prev.handout && !prev.adopted; // placed before handouts were transformed
 
-      const upToDate = prev && prev.updatedAt === f.updatedAt && path.dirname(prev.localPath) === dir && existsSync(prev.localPath);
-      if (upToDate) {
-        // Holding a "(2)" name beside an identical plain-named file (a hand download): fold onto the original.
-        if (isSuffixedName(prev.localPath) && existsSync(prev.cachePath)) {
-          const twin = adoptableTwin(dir, f.filename, prev.cachePath);
-          if (twin && twin !== prev.localPath && !opts.dryRun && removePlacement(prev)) {
-            state.placements[key] = { ...prev, localPath: twin, placedAt: nowIso() };
-            report.placed.push({ courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: twin });
-            log(`  adopted ${rel(twin)}, removed duplicate ${path.basename(prev.localPath)}`);
-          }
+      if (prev && sameVersion && !legacyHandout) {
+        if (prev.adopted || !existsSync(prev.localPath)) {
+          // Adopted files are the user's and stay wherever they are; a file the user deleted stays deleted.
+          if (prev.target !== decision.target && !opts.dryRun) state.placements[key] = { ...prev, target: decision.target, meta: metaOf(f) };
+          sum.unchanged++;
+          continue;
         }
-        sum.unchanged++;
-        continue;
+        const wantName = prev.handout ? path.basename(prev.desired ?? prev.localPath) : safeName(f.filename);
+        const wantPath = path.join(wantDir, wantName);
+        if (prev.desired === wantPath || (!prev.desired && prev.localPath === wantPath)) {
+          if (!opts.dryRun) {
+            if (!mtimeMatches(prev.localPath, f.updatedAt) && placementUnmodified(prev)) fixMtime(prev.localPath, f.updatedAt);
+            state.placements[key] = { ...prev, desired: wantPath, target: decision.target, meta: metaOf(f) };
+          }
+          sum.unchanged++;
+          continue;
+        }
+        // Same bytes, new home: the display name, the target, or the folder layout changed.
+        log(`  move: ${rel(prev.localPath)} → ${rel(wantPath)}`);
+        if (opts.dryRun) {
+          sum.moved++;
+          continue;
+        }
+        if (placementUnmodified(prev)) {
+          const dest = path.join(wantDir, resolveName(wantDir, wantName, f.updatedAt));
+          try {
+            moveFile(prev.localPath, dest);
+            fixMtime(dest, f.updatedAt);
+            if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
+            state.placements[key] = { ...prev, target: decision.target, localPath: dest, desired: wantPath, placedAt: nowIso(), meta: metaOf(f) };
+            report.placed.push({ courseId, fileId: f.fileId, target: decision.target, localPath: dest });
+            touch(dest);
+            sum.moved++;
+          } catch (e) {
+            err(`could not move ${rel(prev.localPath)}: ${(e as Error).message}`, courseId, f.fileId);
+          }
+          continue;
+        }
+        err(`${rel(prev.localPath)} was changed locally; left there, a fresh copy goes to ${rel(wantPath)}`, courseId, f.fileId);
+        // fall through: place a fresh copy at the new home
       }
-      const action = !prev ? 'new' : path.dirname(prev.localPath) !== dir ? 'move' : 'update';
-      log(`  ${action}: ${f.filename} → ${decision.target}/ (${decision.reason})`);
+
+      const action = !prev ? 'new' : sameVersion ? (legacyHandout ? 'rewrite' : 'move') : 'update';
+      if (action !== 'move') log(`  ${action}: ${f.filename} → ${rel(wantDir)} (${decision.reason})`);
       if (opts.dryRun) {
         if (action === 'new') sum.placed++;
         else if (action === 'move') sum.moved++;
@@ -146,52 +247,72 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
       try {
         const cachePath = cachePathFor(cfg.cacheDir, f);
         if (!existsSync(cachePath)) await api.download(f.fileId, cachePath);
-        if (prev) {
-          if (action === 'update' && placementUnmodified(prev)) unlinkSync(prev.localPath);
-          else if (action === 'move' && !removePlacement(prev)) err(`${rel(prev.localPath)} was changed locally; left there, new copy goes to ${decision.target}/`, mc.course.id, f.fileId);
-          // update + modified: keep theirs; chooseLinkName picks a (v2) name
+
+        // Already here under some name (a hand download)? Adopt it instead of writing a second copy.
+        if (!prev && !md && root) {
+          const twin = findIdentical(root, cachePath, ours());
+          if (twin) {
+            state.placements[key] = { courseId, fileId: f.fileId, target: decision.target, localPath: twin, desired: twin, adopted: true, sha256: sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso(), meta: metaOf(f) };
+            report.placed.push({ courseId, fileId: f.fileId, target: decision.target, localPath: twin });
+            log(`  adopted your ${rel(twin)} (identical to Canvas's ${f.filename})`);
+            sum.adopted++;
+            continue;
+          }
         }
-        const twin = adoptableTwin(dir, f.filename, cachePath);
-        const dest = twin ?? path.join(dir, chooseLinkName(dir, f.filename, cachePath, prev));
-        if (twin) log(`  adopted existing ${path.basename(twin)} (identical to Canvas)`);
-        if (!existsSync(dest)) linkOrCopy(cachePath, dest, cfg.linkMode ?? 'hardlink');
-        const placement: Placement = { courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: dest, sha256: sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso() };
-        state.placements[key] = placement;
-        report.placed.push({ courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: dest });
-        placedPaths.push(dest);
-        placedCourses.add(mc.course.code);
+
+        let name = safeName(f.filename);
+        let text: string | null = null;
+        if (md) {
+          const h = handoutFor(mc.course.code, f, readFileSync(cachePath, 'utf8'));
+          name = h.name;
+          text = h.content;
+        }
+        const wantPath = path.join(wantDir, name);
+        let dest: string;
+        const prevOurs = prev && !prev.adopted && existsSync(prev.localPath);
+        if (prevOurs && placementUnmodified(prev)) {
+          // Untouched copy of the old version (or the pre-transform handout): replace it.
+          unlinkSync(prev.localPath);
+          if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
+          dest = path.join(wantDir, resolveName(wantDir, name, f.updatedAt));
+        } else if (prevOurs && path.dirname(prev.localPath) === wantDir) {
+          dest = path.join(wantDir, versionName(wantDir, name)); // the user edited the old one: keep theirs, add (v2)
+        } else {
+          dest = path.join(wantDir, resolveName(wantDir, name, f.updatedAt));
+        }
+        if (text != null) writeTextAtomic(dest, text, f.updatedAt);
+        else placeFile(cachePath, dest, mode, f.updatedAt);
+        state.placements[key] = { courseId, fileId: f.fileId, target: decision.target, localPath: dest, desired: wantPath, sha256: text != null ? sha256Text(text) : sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso(), handout: md || undefined, meta: metaOf(f) };
+        report.placed.push({ courseId, fileId: f.fileId, target: decision.target, localPath: dest });
+        touch(dest);
         if (action === 'new') sum.placed++;
         else if (action === 'move') sum.moved++;
         else sum.updated++;
       } catch (e) {
-        err(`${f.filename}: ${(e as Error).message}`, mc.course.id, f.fileId);
+        err(`${f.filename}: ${(e as Error).message}`, courseId, f.fileId);
       }
     }
   }
 
   if (!opts.dryRun) {
-    // Indexes: one per course when the course has an `index` path, else a `_collected.md` in each target folder.
-    const perCourse = new Set<string>();
-    for (const [dir, info] of indexDirs) {
-      const indexFile = courseIndexPath(cfg, info.courseId);
-      if (indexFile) {
-        if (perCourse.has(info.courseId)) continue;
-        perCourse.add(info.courseId);
-        const entries = indexEntries(cfg, state, manifest.courses, info.courseId, null, path.dirname(indexFile));
-        if (entries.length || existsSync(indexFile)) writeIndex(indexFile, renderIndex(`${info.courseCode} · Canvas files`, entries));
-        continue;
+    for (const mc of synced) writeIndexes(cfg, state, mc, finalDecisions.get(mc.course.id) ?? new Map());
+    for (const mc of synced) {
+      const dir = courseFactsDir(cfg, mc.course.id);
+      if (!dir) continue;
+      try {
+        const [assignments, announcements, content] = await Promise.all([api.getItems(mc.course.id, 'assignment'), api.getItems(mc.course.id, 'announcement'), api.getCourseContent(mc.course.id)]);
+        const changed = writeFacts(dir, mc.course.code, assignments, announcements, content);
+        if (changed.length) log(`${mc.course.code}: wrote ${changed.join(', ')}`);
+      } catch (e) {
+        err(`${mc.course.code}: course facts failed: ${(e as Error).message}`, mc.course.id);
       }
-      const file = path.join(dir, '_collected.md');
-      const entries = indexEntries(cfg, state, manifest.courses, info.courseId, dir, dir);
-      // No index (and no folder) for a target nothing has landed in yet; an existing index is kept current, even at zero.
-      if (entries.length || existsSync(file)) writeIndex(file, renderIndex(`${info.courseCode} · ${info.target}`, entries));
     }
     state.lastRunAt = nowIso();
     saveState(state);
-    if (placedPaths.length && cfg.onPlace) {
-      log(`running onPlace hook for ${placedPaths.length} file${placedPaths.length === 1 ? '' : 's'}`);
-      const r = spawnSync('/bin/sh', ['-c', cfg.onPlace], { stdio: 'inherit', env: { ...process.env, COLLECTED_PLACED: placedPaths.join('\n'), COLLECTED_COURSES: [...placedCourses].join(',') } });
-      if (r.status !== 0) err(`onPlace hook exited ${r.status}`);
+    if (touchedPaths.length && cfg.onPlace) {
+      log(`running onPlace hook for ${touchedPaths.length} file${touchedPaths.length === 1 ? '' : 's'}`);
+      const status = runOnPlace(cfg, touchedPaths, touchedCourses);
+      if (status !== 0) err(`onPlace hook exited ${status}`);
     }
   }
   try {
@@ -202,17 +323,57 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   return sum;
 }
 
-/** Placements of a course (in one folder, or all when `dir` is null) as index rows with links relative to `linkBase`. */
-function indexEntries(cfg: AgentConfig, state: ReturnType<typeof loadState>, courses: FileSyncManifestCourse[], courseId: string, dir: string | null, linkBase: string): IndexEntry[] {
-  const files = new Map<string, FileSyncFileView>(courses.find((c) => c.course.id === courseId)?.files.map((f) => [f.fileId, f]) ?? []);
-  const out: IndexEntry[] = [];
-  for (const p of Object.values(state.placements)) {
-    if (p.courseId !== courseId || (dir && path.dirname(p.localPath) !== dir) || !existsSync(p.localPath)) continue;
-    const f = files.get(p.fileId);
-    if (!f) continue;
-    out.push({ file: f, localPath: p.localPath, href: path.relative(linkBase, p.localPath), target: p.target, openUrl: `${cfg.server.replace(/\/$/, '')}/api/canvas/files/${p.fileId}/open` });
-  }
-  return out;
+/**
+ * The user's hook after files land. Env: COLLECTED_PLACED (paths, newline-separated), COLLECTED_COURSES (codes,
+ * comma-separated), COLLECTED_COURSE_ROOTS (the touched courses' folders, newline-separated).
+ */
+export function runOnPlace(cfg: AgentConfig, paths: string[], courses: Map<string, string>): number | null {
+  if (!cfg.onPlace) return 0;
+  const env = { ...process.env, COLLECTED_PLACED: paths.join('\n'), COLLECTED_COURSES: [...courses.keys()].join(','), COLLECTED_COURSE_ROOTS: [...courses.values()].join('\n') };
+  return spawnSync('/bin/sh', ['-c', cfg.onPlace], { stdio: 'inherit', env }).status;
 }
 
-const rel = (p: string): string => p.replace(process.env.HOME ?? '~', '~');
+/** One index per course when the course has an `index` path; otherwise a `_collected.md` in each folder holding files. */
+function writeIndexes(cfg: AgentConfig, state: AgentState, mc: FileSyncManifestCourse, decisions: Map<string, FileSyncDecision | null>): void {
+  const files = new Map(mc.files.map((f) => [f.fileId, f]));
+  const server = cfg.server.replace(/\/$/, '');
+  const entry = (p: Placement, base: string): IndexEntry => {
+    const f = files.get(p.fileId);
+    const m = f ? metaOf(f) : p.meta;
+    const title = m?.title ?? path.basename(p.localPath);
+    return {
+      fileId: p.fileId,
+      title,
+      localPath: p.localPath,
+      href: path.relative(base, p.localPath),
+      target: p.target,
+      adopted: !!p.adopted,
+      moduleName: m?.moduleName ?? null,
+      modulePosition: m?.modulePosition ?? null,
+      canvasPath: `${m?.folderPath && m.folderPath !== '/' ? m.folderPath : ''}/${title}`,
+      updatedAt: p.updatedAt,
+      size: m?.size ?? null,
+      openUrl: `${server}/api/canvas/files/${p.fileId}/open`,
+    };
+  };
+  const mine = Object.values(state.placements).filter((p) => p.courseId === mc.course.id && existsSync(p.localPath));
+  const indexFile = courseIndexPath(cfg, mc.course.id);
+  if (indexFile) {
+    const base = path.dirname(indexFile);
+    const live = mine.filter((p) => files.has(p.fileId)).map((p) => entry(p, base));
+    const removed = mine.filter((p) => !files.has(p.fileId)).map((p) => entry(p, base));
+    const held = new Set(mine.map((p) => p.fileId));
+    const skipped: SkippedEntry[] = mc.files
+      .filter((f) => decisions.get(f.fileId)?.target === FILE_SYNC_SKIP && !held.has(f.fileId))
+      .map((f) => ({ fileId: f.fileId, title: f.title, canvasPath: `${f.folderPath && f.folderPath !== '/' ? f.folderPath : ''}/${f.title}`, size: f.size, reason: decisions.get(f.fileId)!.reason, openUrl: `${server}/api/canvas/files/${f.fileId}/open` }));
+    if (live.length || removed.length || skipped.length || existsSync(indexFile)) writeIfChanged(indexFile, renderIndex(`${mc.course.code} · Canvas files`, live, removed, skipped));
+    return;
+  }
+  const byDir = new Map<string, Placement[]>();
+  for (const p of mine) byDir.set(path.dirname(p.localPath), [...(byDir.get(path.dirname(p.localPath)) ?? []), p]);
+  for (const [dir, ps] of byDir) {
+    const live = ps.filter((p) => files.has(p.fileId)).map((p) => entry(p, dir));
+    const removed = ps.filter((p) => !files.has(p.fileId)).map((p) => entry(p, dir));
+    writeIfChanged(path.join(dir, '_collected.md'), renderIndex(`${mc.course.code} · ${ps[0]!.target}`, live, removed));
+  }
+}

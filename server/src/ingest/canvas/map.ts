@@ -468,18 +468,26 @@ export function folderPath(folder: CanvasFolder | undefined): string | null {
   return `/${rel}`.replace(/\/+$/, '') || '/';
 }
 
-/** Module name per file id, from module items of type File (one file can sit in several modules; the first wins). */
-export function moduleNamesByFileId(mods: CanvasModule[]): Map<string, string> {
-  const out = new Map<string, string>();
+export interface ModuleRef {
+  name: string;
+  /** module position × 1000 + item position, the same ordering module_item rows use. */
+  position: number;
+}
+
+/** Module per file id, from module items of type File (one file can sit in several modules; the first wins). */
+export function moduleNamesByFileId(mods: CanvasModule[]): Map<string, ModuleRef> {
+  const out = new Map<string, ModuleRef>();
   for (const m of mods) {
     for (const it of m.items ?? []) {
-      if (it.type === 'File' && it.content_id != null && !out.has(String(it.content_id))) out.set(String(it.content_id), m.name);
+      if (it.type === 'File' && it.content_id != null && !out.has(String(it.content_id))) {
+        out.set(String(it.content_id), { name: m.name, position: (m.position ?? 0) * 1000 + (it.position ?? 0) });
+      }
     }
   }
   return out;
 }
 
-export function filesToContent(files: CanvasFile[], courseId: string, folders: CanvasFolder[] = [], moduleByFile: Map<string, string> = new Map()): ContentRow[] {
+export function filesToContent(files: CanvasFile[], courseId: string, folders: CanvasFolder[] = [], moduleByFile: Map<string, ModuleRef> = new Map()): ContentRow[] {
   const folderById = new Map(folders.map((f) => [String(f.id), f]));
   return files
     .filter((f) => !f.hidden_for_user && !f.locked_for_user)
@@ -488,7 +496,7 @@ export function filesToContent(files: CanvasFile[], courseId: string, folders: C
       courseId,
       kind: 'file',
       externalId: String(f.id),
-      moduleName: moduleByFile.get(String(f.id)) ?? null,
+      moduleName: moduleByFile.get(String(f.id))?.name ?? null,
       title: f.display_name || f.filename || `file ${f.id}`,
       url: f.url ?? null,
       position: i,
@@ -498,6 +506,7 @@ export function filesToContent(files: CanvasFile[], courseId: string, folders: C
         updatedAt: f.updated_at ?? f.modified_at ?? null,
         filename: f.filename ?? f.display_name ?? null,
         folderPath: folderPath(f.folder_id != null ? folderById.get(String(f.folder_id)) : undefined),
+        modulePosition: moduleByFile.get(String(f.id))?.position ?? null,
       },
     }));
 }
