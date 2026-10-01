@@ -108,9 +108,9 @@ describe('removePlacement', () => {
 
 describe('index and model inputs', () => {
   it('renders a table with Canvas metadata the filename lacks', () => {
-    const md = renderIndex('LING260', 'slides', [{ file: file(), localPath: '/x/slides/lecture03_knn.pdf', openUrl: 'https://c/api/canvas/files/90735997/open' }]);
+    const md = renderIndex('LING260 · slides', [{ file: file(), localPath: '/x/slides/lecture03_knn.pdf', href: 'lecture03_knn.pdf', target: 'slides', openUrl: 'https://c/api/canvas/files/90735997/open' }]);
     expect(md).toContain('# LING260 · slides');
-    expect(md).toContain('| [lecture03_knn.pdf](lecture03_knn.pdf) | Week 3 | /Lectures | 2026-09-05 | 510 KB | [canvas](https://c/api/canvas/files/90735997/open) |');
+    expect(md).toContain('| [lecture03_knn.pdf](lecture03_knn.pdf) | slides | Week 3 | /Lectures | 2026-09-05 | 510 KB | [canvas](https://c/api/canvas/files/90735997/open) |');
   });
   it('builds the model subject and criteria from the course config', () => {
     expect(subjectFor(file())).toEqual({ title: 'Lecture 03: kNN.pdf', filename: 'lecture03_knn.pdf', folder: '/Lectures', module: 'Week 3', type: 'application/pdf' });

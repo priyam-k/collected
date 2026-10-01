@@ -33,7 +33,7 @@ export function installLaunchd(intervalMinutes: number): string {
   <key>StandardErrorPath</key><string>${esc(logFile)}</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>PATH</key><string>${esc(homedir())}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     <key>HOME</key><string>${esc(homedir())}</string>
   </dict>
 </dict>

@@ -96,7 +96,7 @@ describe('runSync', () => {
     const placed = path.join(school, 'slides', 'L01.pdf');
     const cached = path.join(home, 'cache', COURSE, '1-202609010000', 'L01.pdf');
     expect(statSync(placed).ino).toBe(statSync(cached).ino);
-    expect(readFileSync(path.join(school, 'slides', '_collected.md'), 'utf8')).toContain('| [L01.pdf](L01.pdf) |  | /Lectures | 2026-09-01 |');
+    expect(readFileSync(path.join(school, 'slides', '_collected.md'), 'utf8')).toContain('| [L01.pdf](L01.pdf) | slides |  | /Lectures | 2026-09-01 |');
     const report = api.reports[1]!;
     expect(report.device).toBe('test-mac');
     expect(report.placed.map((p) => [p.fileId, p.target])).toEqual([['1', 'slides'], ['2', 'unsorted']]);
@@ -145,6 +145,35 @@ describe('runSync', () => {
     expect(s).toMatchObject({ removed: 1, skipped: 1 });
     expect(ls(path.join(school, 'slides'))).toEqual(['_collected.md']);
     expect(api.reports.at(-1)!.removed).toEqual([{ courseId: COURSE, fileId: '1' }]);
+  });
+
+  it('copy mode and a course-wide index for folders a sync service owns (iCloud, Obsidian _data)', async () => {
+    const api = new FakeApi([
+      { fileId: '1', filename: 'L01.pdf', folderPath: '/Lectures', updatedAt: '2026-09-01T00:00:00Z', bytes: 'lecture one' },
+      { fileId: '2', filename: 'hw1.pdf', folderPath: '/Homework', updatedAt: '2026-09-02T00:00:00Z', bytes: 'homework' },
+    ]);
+    const c = cfg();
+    c.linkMode = 'copy';
+    c.courses[COURSE] = { root: school, targets: { slides: path.join(school, 'Slides') }, index: '_data/canvas.md' };
+    const s = await runSync(c, { api });
+    expect(s).toMatchObject({ placed: 2, errors: [] });
+    const placed = path.join(school, 'Slides', 'L01.pdf');
+    const cached = path.join(home, 'cache', COURSE, '1-202609010000', 'L01.pdf');
+    expect(statSync(placed).ino).not.toBe(statSync(cached).ino); // a copy, not a link
+    expect(ls(path.join(school, 'Slides'))).toEqual(['L01.pdf']); // no _collected.md per folder
+    const idx = readFileSync(path.join(school, '_data', 'canvas.md'), 'utf8');
+    expect(idx).toContain('# LING260 · Canvas files');
+    expect(idx).toContain('| [L01.pdf](../Slides/L01.pdf) | slides |');
+    expect(idx).toContain('| [hw1.pdf](../unsorted/hw1.pdf) | unsorted |');
+    // Copies are still recognised as ours by hash: a skip removes the copy, an edit protects it.
+    api.files[1]!.manualTarget = 'skip';
+    await runSync(c, { api });
+    expect(existsSync(path.join(school, 'unsorted', 'hw1.pdf'))).toBe(false);
+    writeFileSync(placed, 'annotated');
+    api.files[0]!.manualTarget = 'skip';
+    const s2 = await runSync(c, { api });
+    expect(existsSync(placed)).toBe(true);
+    expect(s2.errors[0]!.message).toMatch(/changed locally/);
   });
 
   it('reports a missing folder mapping once per target instead of failing silently', async () => {

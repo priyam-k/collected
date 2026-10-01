@@ -38,9 +38,13 @@ const sameInode = (a: string, b: string): boolean => {
   }
 };
 
-/** Hard link; falls back to a copy across filesystems (external drive, iCloud folder). */
-export function linkOrCopy(src: string, dest: string): void {
+/** Hard link (falls back to a copy across filesystems), or a plain copy when asked. */
+export function linkOrCopy(src: string, dest: string, mode: 'hardlink' | 'copy' = 'hardlink'): void {
   mkdirSync(path.dirname(dest), { recursive: true });
+  if (mode === 'copy') {
+    copyFileSync(src, dest);
+    return;
+  }
   try {
     linkSync(src, dest);
   } catch (err) {
@@ -96,6 +100,9 @@ export function removePlacement(p: Placement): boolean {
 export interface IndexEntry {
   file: FileSyncFile;
   localPath: string;
+  /** Link target relative to where the index is written. */
+  href: string;
+  target: string;
   openUrl: string;
 }
 
@@ -111,30 +118,29 @@ const cell = (s: string | null | undefined): string => (s ?? '').replace(/\|/g, 
  * `_collected.md`: what is in this folder and where it came from. The metadata Canvas had (module, folder,
  * date) that the filename alone does not carry, for tools that search an index before opening PDFs.
  */
-export function renderIndex(courseCode: string, target: string, entries: IndexEntry[]): string {
+export function renderIndex(title: string, entries: IndexEntry[]): string {
   const rows = entries
     .slice()
     .sort((a, b) => (b.file.updatedAt ?? '').localeCompare(a.file.updatedAt ?? ''))
     .map((e) => {
       const f = e.file;
       const date = f.updatedAt ? f.updatedAt.slice(0, 10) : '';
-      return `| [${cell(path.basename(e.localPath))}](${encodeURI(path.basename(e.localPath))}) | ${cell(f.moduleName)} | ${cell(f.folderPath)} | ${date} | ${fmtSize(f.size)} | [canvas](${e.openUrl}) |`;
+      return `| [${cell(path.basename(e.localPath))}](${encodeURI(e.href)}) | ${cell(e.target)} | ${cell(f.moduleName)} | ${cell(f.folderPath)} | ${date} | ${fmtSize(f.size)} | [canvas](${e.openUrl}) |`;
     });
   return [
-    `# ${courseCode} · ${target}`,
+    `# ${title}`,
     '',
     `Synced from Canvas by collected-agent. ${entries.length} file${entries.length === 1 ? '' : 's'}. Edit the files freely; this index is rewritten on every sync.`,
     '',
-    '| File | Module | Canvas folder | Updated | Size | Source |',
-    '| --- | --- | --- | --- | --- | --- |',
+    '| File | Saved to | Module | Canvas folder | Updated | Size | Source |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
     ...rows,
     '',
   ].join('\n');
 }
 
-export function writeIndex(dir: string, content: string): void {
-  mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, '_collected.md');
+export function writeIndex(file: string, content: string): void {
+  mkdirSync(path.dirname(file), { recursive: true });
   if (existsSync(file) && readFileSync(file, 'utf8') === content) return;
   writeFileSync(file, content);
 }

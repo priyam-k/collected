@@ -18,10 +18,15 @@ export interface AgentConfig {
   };
   /** Name this machine reports; defaults to the hostname. */
   device: string;
-  /** Pristine copies live here; targets are hard links into it. */
+  /** Pristine copies live here; targets are hard links (or copies) of it. */
   cacheDir: string;
-  /** courseId → root folder and per-target overrides. An unmapped target is <root>/<target>. */
-  courses: Record<string, { root?: string; targets?: Record<string, string> }>;
+  /** hardlink (default) shares bytes with the cache; copy for folders a sync service manages (iCloud Drive, Dropbox). */
+  linkMode?: 'hardlink' | 'copy';
+  /**
+   * courseId → root folder and per-target overrides. An unmapped target is <root>/<target>. `index` is a file to
+   * write one course-wide manifest to (e.g. <root>/_data/canvas.md) instead of a `_collected.md` in each target.
+   */
+  courses: Record<string, { root?: string; targets?: Record<string, string>; index?: string }>;
   /** Shell command run once after a sync that placed files. Env: COLLECTED_PLACED (newline-separated paths), COLLECTED_COURSES. */
   onPlace?: string;
   model: { enabled: boolean };
@@ -47,7 +52,14 @@ export function saveConfig(cfg: AgentConfig): void {
   writeFileSync(configPath(), `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600 });
 }
 
-const expandHome = (p: string): string => (p.startsWith('~/') ? path.join(homedir(), p.slice(2)) : p);
+export const expandHome = (p: string): string => (p.startsWith('~/') ? path.join(homedir(), p.slice(2)) : p);
+
+/** Absolute path of the course-wide index file, when configured. */
+export function courseIndexPath(cfg: AgentConfig, courseId: string): string | null {
+  const c = cfg.courses[courseId];
+  if (!c?.index) return null;
+  return path.resolve(c.root ? expandHome(c.root) : process.cwd(), expandHome(c.index));
+}
 
 /** Absolute folder for a target on this machine, or null when neither a mapping nor a course root exists. */
 export function targetDir(cfg: AgentConfig, courseId: string, target: string): string | null {

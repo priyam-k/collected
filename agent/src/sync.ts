@@ -4,7 +4,7 @@ import path from 'node:path';
 import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type FileSyncFileView, type FileSyncManifestCourse, type FileSyncReport } from '@collected/shared';
 import { Api, type SyncApi } from './api.js';
 import { classify, loadModel } from './classify.js';
-import { knownTargets, targetDir, type AgentConfig } from './config.js';
+import { courseIndexPath, knownTargets, targetDir, type AgentConfig } from './config.js';
 import { cachePathFor, chooseLinkName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
 import { loadState, saveState, stateKey, type Placement } from './state.js';
 
@@ -138,7 +138,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         }
         const name = chooseLinkName(dir, f.filename, cachePath, prev);
         const dest = path.join(dir, name);
-        if (!existsSync(dest)) linkOrCopy(cachePath, dest);
+        if (!existsSync(dest)) linkOrCopy(cachePath, dest, cfg.linkMode ?? 'hardlink');
         const placement: Placement = { courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: dest, sha256: sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso() };
         state.placements[key] = placement;
         report.placed.push({ courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: dest });
@@ -154,10 +154,21 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   }
 
   if (!opts.dryRun) {
+    // Indexes: one per course when the course has an `index` path, else a `_collected.md` in each target folder.
+    const perCourse = new Set<string>();
     for (const [dir, info] of indexDirs) {
-      const entries = indexEntries(cfg, state, manifest.courses, info.courseId, dir);
+      const indexFile = courseIndexPath(cfg, info.courseId);
+      if (indexFile) {
+        if (perCourse.has(info.courseId)) continue;
+        perCourse.add(info.courseId);
+        const entries = indexEntries(cfg, state, manifest.courses, info.courseId, null, path.dirname(indexFile));
+        if (entries.length || existsSync(indexFile)) writeIndex(indexFile, renderIndex(`${info.courseCode} · Canvas files`, entries));
+        continue;
+      }
+      const file = path.join(dir, '_collected.md');
+      const entries = indexEntries(cfg, state, manifest.courses, info.courseId, dir, dir);
       // No index (and no folder) for a target nothing has landed in yet; an existing index is kept current, even at zero.
-      if (entries.length || existsSync(path.join(dir, '_collected.md'))) writeIndex(dir, renderIndex(info.courseCode, info.target, entries));
+      if (entries.length || existsSync(file)) writeIndex(file, renderIndex(`${info.courseCode} · ${info.target}`, entries));
     }
     state.lastRunAt = nowIso();
     saveState(state);
@@ -175,14 +186,15 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   return sum;
 }
 
-function indexEntries(cfg: AgentConfig, state: ReturnType<typeof loadState>, courses: FileSyncManifestCourse[], courseId: string, dir: string): IndexEntry[] {
+/** Placements of a course (in one folder, or all when `dir` is null) as index rows with links relative to `linkBase`. */
+function indexEntries(cfg: AgentConfig, state: ReturnType<typeof loadState>, courses: FileSyncManifestCourse[], courseId: string, dir: string | null, linkBase: string): IndexEntry[] {
   const files = new Map<string, FileSyncFileView>(courses.find((c) => c.course.id === courseId)?.files.map((f) => [f.fileId, f]) ?? []);
   const out: IndexEntry[] = [];
   for (const p of Object.values(state.placements)) {
-    if (p.courseId !== courseId || path.dirname(p.localPath) !== dir || !existsSync(p.localPath)) continue;
+    if (p.courseId !== courseId || (dir && path.dirname(p.localPath) !== dir) || !existsSync(p.localPath)) continue;
     const f = files.get(p.fileId);
     if (!f) continue;
-    out.push({ file: f, localPath: p.localPath, openUrl: `${cfg.server.replace(/\/$/, '')}/api/canvas/files/${p.fileId}/open` });
+    out.push({ file: f, localPath: p.localPath, href: path.relative(linkBase, p.localPath), target: p.target, openUrl: `${cfg.server.replace(/\/$/, '')}/api/canvas/files/${p.fileId}/open` });
   }
   return out;
 }
