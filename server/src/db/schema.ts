@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import type { CourseLink, CourseSchedule, GradingConfig, LayoutItem } from '@collected/shared';
+import type { CourseLink, CourseSchedule, FileSyncConfig, GradingConfig, LayoutItem } from '@collected/shared';
 
 const nowIso = () => new Date().toISOString();
 
@@ -39,6 +39,8 @@ export const courses = sqliteTable(
     archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
     // null = auto (Canvas groups). Nullable so the column could be added to existing rows.
     grading: text('grading', { mode: 'json' }).$type<GradingConfig | null>(),
+    // null = file sync never configured for this course (DESIGN "File sync to a laptop").
+    fileSync: text('file_sync', { mode: 'json' }).$type<FileSyncConfig | null>(),
     ...timestamps,
   },
   (t) => [
@@ -175,6 +177,29 @@ export const courseContent = sqliteTable(
   ],
 );
 
+/**
+ * One row per (course, Canvas file) the sync has an opinion about. Rule decisions are not stored (derived from
+ * courses.file_sync on read); this holds the user's override, the model's answer, and where the agent put it.
+ */
+export const fileSyncState = sqliteTable(
+  'file_sync_state',
+  {
+    courseId: text('course_id').notNull(),
+    fileId: text('file_id').notNull(),
+    manualTarget: text('manual_target'),
+    modelTarget: text('model_target'),
+    modelConfidence: real('model_confidence'),
+    modelProbabilities: text('model_probabilities', { mode: 'json' }).$type<Record<string, number> | null>(),
+    modelAt: text('model_at'),
+    placedTarget: text('placed_target'),
+    placedPath: text('placed_path'),
+    placedDevice: text('placed_device'),
+    placedAt: text('placed_at'),
+    updatedAt: text('updated_at').notNull().$defaultFn(nowIso).$onUpdateFn(nowIso),
+  },
+  (t) => [primaryKey({ columns: [t.courseId, t.fileId] })],
+);
+
 export const widgetInstances = sqliteTable('widget_instances', {
   id: text('id').primaryKey(),
   type: text('type').notNull(),
@@ -203,4 +228,5 @@ export type OverrideRow = typeof overrides.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type JobStateRow = typeof jobState.$inferSelect;
 export type CourseContentRow = typeof courseContent.$inferSelect;
+export type FileSyncStateRow = typeof fileSyncState.$inferSelect;
 export type WidgetInstanceRow = typeof widgetInstances.$inferSelect;

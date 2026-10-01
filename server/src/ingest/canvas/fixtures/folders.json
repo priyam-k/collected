@@ -1,0 +1,20 @@
+[
+  {
+    "id": 5550,
+    "name": "course files",
+    "full_name": "course files",
+    "parent_folder_id": null
+  },
+  {
+    "id": 5551,
+    "name": "Lectures",
+    "full_name": "course files/Lectures",
+    "parent_folder_id": 5550
+  },
+  {
+    "id": 5552,
+    "name": "Code",
+    "full_name": "course files/Homework/Code",
+    "parent_folder_id": 5550
+  }
+]

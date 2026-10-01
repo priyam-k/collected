@@ -25,6 +25,8 @@ export function fixtureCanvasClient(baseUrl = 'https://umd.instructure.com'): Ca
     [/\/api\/v1\/courses\/\d+\/modules/, () => []],
     [/\/api\/v1\/courses\/1408462\/files/, () => loadFixture('files.json')],
     [/\/api\/v1\/courses\/\d+\/files/, () => []],
+    [/\/api\/v1\/courses\/1408462\/folders/, () => loadFixture('folders.json')],
+    [/\/api\/v1\/courses\/\d+\/folders/, () => []],
     [/\/api\/v1\/courses\/1408462\/assignment_groups/, () => loadFixture('assignment_groups.json')],
     [/\/api\/v1\/courses\/\d+\/assignment_groups/, () => []],
   ];

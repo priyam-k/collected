@@ -11,9 +11,14 @@ export type AuthVariables = { user: string | null };
  */
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
-/** Resolves the authenticated user (email) for a request, or null. "dev" when AUTH_DISABLED. */
+/**
+ * Resolves the authenticated identity for a request, or null. "dev" when AUTH_DISABLED; "helper" for the shared
+ * LOCAL_HELPER_KEY (scripts in local use); an email for a person who passed the Access login; "service:<name>" for an
+ * Access service token (the agent), whose JWT carries `common_name` and an empty `sub` (DECISIONS 038).
+ */
 export async function verifyAccess(env: Env, c: Context): Promise<string | null> {
   if (env.AUTH_DISABLED) return 'dev';
+  if (helperKeyMatches(env, c.req.header('x-collected-key'))) return 'helper';
   const team = env.CF_ACCESS_TEAM_DOMAIN!;
   const issuer = `https://${team}`;
   jwksCache ??= createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
@@ -21,7 +26,10 @@ export async function verifyAccess(env: Env, c: Context): Promise<string | null>
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, jwksCache, { issuer, audience: env.CF_ACCESS_AUD! });
-    return typeof payload.email === 'string' ? payload.email : (payload.sub ?? 'unknown');
+    if (typeof payload.email === 'string' && payload.email) return payload.email;
+    const cn = (payload as { common_name?: unknown }).common_name;
+    if (typeof cn === 'string' && cn) return `service:${cn}`;
+    return typeof payload.sub === 'string' && payload.sub ? payload.sub : null;
   } catch {
     return null;
   }

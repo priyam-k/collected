@@ -10,6 +10,7 @@ const toPublic = (r: typeof courses.$inferSelect): Course => ({
   ...r,
   role: r.role as Course['role'],
   submitsVia: r.submitsVia as Course['submitsVia'],
+  fileSync: r.fileSync ?? null,
 });
 
 export function coursesRoutes(ctx: AppContext) {

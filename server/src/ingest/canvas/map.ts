@@ -134,6 +134,15 @@ export interface CanvasFile {
   modified_at?: string;
   hidden_for_user?: boolean;
   locked_for_user?: boolean;
+  folder_id?: number | string;
+}
+
+export interface CanvasFolder {
+  id: number | string;
+  name: string;
+  /** e.g. "course files/Lectures/Week 3" */
+  full_name: string;
+  hidden_for_user?: boolean;
 }
 
 /* ---------- helpers ---------- */
@@ -452,7 +461,26 @@ export function modulesToContent(mods: CanvasModule[], courseId: string, baseUrl
   return out;
 }
 
-export function filesToContent(files: CanvasFile[], courseId: string): ContentRow[] {
+/** Canvas folder full names start with the root "course files"; the sync and the UI want the path below it. */
+export function folderPath(folder: CanvasFolder | undefined): string | null {
+  if (!folder) return null;
+  const rel = folder.full_name.replace(/^course files\/?/i, '');
+  return `/${rel}`.replace(/\/+$/, '') || '/';
+}
+
+/** Module name per file id, from module items of type File (one file can sit in several modules; the first wins). */
+export function moduleNamesByFileId(mods: CanvasModule[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of mods) {
+    for (const it of m.items ?? []) {
+      if (it.type === 'File' && it.content_id != null && !out.has(String(it.content_id))) out.set(String(it.content_id), m.name);
+    }
+  }
+  return out;
+}
+
+export function filesToContent(files: CanvasFile[], courseId: string, folders: CanvasFolder[] = [], moduleByFile: Map<string, string> = new Map()): ContentRow[] {
+  const folderById = new Map(folders.map((f) => [String(f.id), f]));
   return files
     .filter((f) => !f.hidden_for_user && !f.locked_for_user)
     .map((f, i) => ({
@@ -460,11 +488,17 @@ export function filesToContent(files: CanvasFile[], courseId: string): ContentRo
       courseId,
       kind: 'file',
       externalId: String(f.id),
-      moduleName: null,
+      moduleName: moduleByFile.get(String(f.id)) ?? null,
       title: f.display_name || f.filename || `file ${f.id}`,
       url: f.url ?? null,
       position: i,
-      raw: { size: f.size ?? null, contentType: f['content-type'] ?? null, updatedAt: f.updated_at ?? f.modified_at ?? null },
+      raw: {
+        size: f.size ?? null,
+        contentType: f['content-type'] ?? null,
+        updatedAt: f.updated_at ?? f.modified_at ?? null,
+        filename: f.filename ?? f.display_name ?? null,
+        folderPath: folderPath(f.folder_id != null ? folderById.get(String(f.folder_id)) : undefined),
+      },
     }));
 }
 

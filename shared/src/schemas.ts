@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COURSE_EVENT_KINDS, COURSE_ROLES, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS } from './types.js';
+import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERVED_TARGETS, FILE_SYNC_SKIP, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS } from './types.js';
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
@@ -29,6 +29,64 @@ export const gradingConfigSchema = z.object({
   categories: z.array(gradeCategorySchema).default([]),
 });
 
+const regexString = z.string().refine(
+  (v) => {
+    try {
+      new RegExp(v, 'i');
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: 'not a valid regex' },
+);
+const targetName = z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase letters, digits, - and _');
+
+export const fileSyncTargetSchema = z.object({ name: targetName, description: z.string().trim().default('') });
+export const fileSyncRuleSchema = z.object({
+  target: targetName,
+  folder: regexString.nullable().default(null),
+  module: regexString.nullable().default(null),
+  name: regexString.nullable().default(null),
+});
+export const fileSyncConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    targets: z.array(fileSyncTargetSchema).default([]),
+    rules: z.array(fileSyncRuleSchema).default([]),
+    fallback: z.enum(FILE_SYNC_FALLBACKS).default('model'),
+    threshold: z.number().min(0).max(1).default(0.6),
+    skipHint: z.string().trim().default('duplicates, temporary or scratch files, and anything not worth keeping'),
+  })
+  .superRefine((cfg, ctx) => {
+    const names = cfg.targets.map((t) => t.name);
+    for (const n of names) {
+      if ((FILE_SYNC_RESERVED_TARGETS as readonly string[]).includes(n)) ctx.addIssue({ code: 'custom', message: `"${n}" is reserved`, path: ['targets'] });
+    }
+    if (new Set(names).size !== names.length) ctx.addIssue({ code: 'custom', message: 'target names must be unique', path: ['targets'] });
+    cfg.rules.forEach((r, i) => {
+      if (!names.includes(r.target) && r.target !== FILE_SYNC_SKIP) ctx.addIssue({ code: 'custom', message: `rule ${i + 1} points at unknown target "${r.target}"`, path: ['rules', i, 'target'] });
+      if (!r.folder && !r.module && !r.name) ctx.addIssue({ code: 'custom', message: `rule ${i + 1} has nothing to match`, path: ['rules', i] });
+    });
+  });
+
+/** Manual override for one file: a target name, `skip`, or null to go back to rules/model. */
+export const fileSyncOverrideSchema = z.object({ target: targetName.nullable() });
+
+/** What the agent posts after a run. */
+export const fileSyncReportSchema = z.object({
+  device: z.string().trim().min(1).max(80),
+  model: z.boolean().default(false),
+  targets: z.record(z.string(), z.record(z.string(), z.string())).default({}),
+  decisions: z
+    .array(z.object({ courseId: z.string(), fileId: z.string(), target: targetName, confidence: z.number().min(0).max(1).nullable(), probabilities: z.record(z.string(), z.number()).nullable().default(null) }))
+    .default([]),
+  placed: z.array(z.object({ courseId: z.string(), fileId: z.string(), target: targetName, localPath: z.string() })).default([]),
+  removed: z.array(z.object({ courseId: z.string(), fileId: z.string() })).default([]),
+  errors: z.array(z.object({ courseId: z.string().optional(), fileId: z.string().optional(), message: z.string() })).default([]),
+});
+export type FileSyncReport = z.infer<typeof fileSyncReportSchema>;
+
 export const courseInputSchema = z.object({
   term: z.string().min(1),
   code: z.string().min(1).transform((s) => s.toUpperCase().replace(/\s+/g, '')),
@@ -44,6 +102,7 @@ export const courseInputSchema = z.object({
   notes: z.string().nullable().optional(),
   archived: z.boolean().default(false),
   grading: gradingConfigSchema.nullable().optional(),
+  fileSync: fileSyncConfigSchema.nullable().optional(),
 });
 export type CourseInput = z.infer<typeof courseInputSchema>;
 

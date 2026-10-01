@@ -9,6 +9,7 @@ import { canvasRoutes } from './canvas.js';
 import { coursesRoutes } from './courses.js';
 import { googleRoutes } from './google.js';
 import { exportRoutes } from './export.js';
+import { fileSyncRoutes } from './file-sync.js';
 import { gradesRoutes } from './grades.js';
 import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
@@ -55,6 +56,7 @@ export function createApi(ctx: AppContext) {
   api.route('/canvas', canvasRoutes(ctx));
   api.route('/grades', gradesRoutes(ctx));
   api.route('/todoist', todoistRoutes(ctx));
+  api.route('/file-sync', fileSyncRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 
   api.notFound((c) => c.json({ error: 'not found' }, 404));

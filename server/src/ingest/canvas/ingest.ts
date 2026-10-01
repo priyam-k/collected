@@ -22,7 +22,9 @@ import {
   type CanvasAssignmentGroup,
   type CanvasCourse,
   type CanvasFile,
+  type CanvasFolder,
   type CanvasModule,
+  moduleNamesByFileId,
   type CourseCtx,
   type PlannerItem,
 } from './map.js';
@@ -123,12 +125,14 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
   counts.created = result.created;
   counts.deleted = result.deleted;
 
-  // Course content for the class widget: syllabus, module items, recent files.
+  // Course content for the class widget and the file sync: syllabus, module items, files.
   let content = 0;
   for (const [canvasId, cc] of ctxByCanvasId) {
     const detail = await client.tryGet<{ syllabus_body?: string | null }>(`/api/v1/courses/${canvasId}`, { 'include[]': ['syllabus_body'] }, signal);
     const mods = await client.tryGetAll<CanvasModule>(`/api/v1/courses/${canvasId}/modules`, { 'include[]': ['items'] }, { signal, maxPages: 3 });
-    const files = await client.tryGetAll<CanvasFile>(`/api/v1/courses/${canvasId}/files`, { sort: 'updated_at', order: 'desc', per_page: 30 }, { signal, maxPages: 1 });
+    // Every file, with its folder: the file sync sorts on folder path and module name (DESIGN "File sync to a laptop").
+    const files = await client.tryGetAll<CanvasFile>(`/api/v1/courses/${canvasId}/files`, { sort: 'updated_at', order: 'desc' }, { signal, maxPages: 10 });
+    const folders = files.length ? await client.tryGetAll<CanvasFolder>(`/api/v1/courses/${canvasId}/folders`, {}, { signal, maxPages: 5 }) : [];
     // Grades: assignment groups (weights, drop rules) and Canvas's own totals for the enrollment. Not for TA courses.
     const groups = cc.role === 'ta' ? [] : await client.tryGetAll<CanvasAssignmentGroup>(`/api/v1/courses/${canvasId}/assignment_groups`, {}, { signal, maxPages: 2 });
     const canvasCourse = canvasCourseById.get(canvasId);
@@ -136,7 +140,7 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
     const contentRows = [
       ...(syllabus ? [syllabus] : []),
       ...modulesToContent(mods, cc.courseId, baseUrl),
-      ...filesToContent(files, cc.courseId),
+      ...filesToContent(files, cc.courseId, folders, moduleNamesByFileId(mods)),
       ...gradeGroupsToContent(groups, cc.courseId),
       ...(canvasCourse && cc.role !== 'ta' ? [gradeSummaryToContent(canvasCourse, cc.courseId, baseUrl)] : []),
     ];

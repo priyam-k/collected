@@ -129,6 +129,102 @@ export interface GradingConfig {
   categories: GradeCategory[];
 }
 
+/* ---------- file sync (course files → laptop folders through the agent) ---------- */
+
+export const FILE_SYNC_FALLBACKS = ['model', 'unsorted', 'skip'] as const;
+export type FileSyncFallback = (typeof FILE_SYNC_FALLBACKS)[number];
+/** Reserved target names: `skip` = don't place; `unsorted` = low confidence or no rule, surfaced for correction. */
+export const FILE_SYNC_SKIP = 'skip';
+export const FILE_SYNC_UNSORTED = 'unsorted';
+export const FILE_SYNC_RESERVED_TARGETS = [FILE_SYNC_SKIP, FILE_SYNC_UNSORTED] as const;
+
+/** A named destination. The path for it lives in the agent's config on each device, never here. */
+export interface FileSyncTarget {
+  name: string;
+  /** One line the model reads as the criterion for this target, and the UI shows as a hint. */
+  description: string;
+}
+
+/** Every given regex must match (case-insensitive). folder = Canvas folder path, module = module name, name = filename. */
+export interface FileSyncRule {
+  target: string;
+  folder: string | null;
+  module: string | null;
+  name: string | null;
+}
+
+export interface FileSyncConfig {
+  enabled: boolean;
+  targets: FileSyncTarget[];
+  rules: FileSyncRule[];
+  /** What happens to a file no rule matched: ask the model, drop it in `unsorted`, or skip it. */
+  fallback: FileSyncFallback;
+  /** Model confidence below this goes to `unsorted` instead of the model's choice. */
+  threshold: number;
+  /** The model's criterion for `skip`. */
+  skipHint: string;
+}
+
+export type FileSyncDecidedBy = 'manual' | 'rule' | 'model' | 'fallback';
+
+export interface FileSyncDecision {
+  target: string;
+  decidedBy: FileSyncDecidedBy;
+  /** Model confidence for the chosen target, when decidedBy is model. */
+  confidence: number | null;
+  /** Human-readable: the rule that matched, or "model 0.82", or "fallback". */
+  reason: string;
+}
+
+/** A Canvas file as the sync sees it. */
+export interface FileSyncFile {
+  courseId: string;
+  fileId: string;
+  title: string;
+  filename: string;
+  folderPath: string | null;
+  moduleName: string | null;
+  contentType: string | null;
+  size: number | null;
+  updatedAt: string | null;
+}
+
+export interface FileSyncPlacement {
+  target: string;
+  localPath: string;
+  device: string;
+  placedAt: string;
+}
+
+export interface FileSyncFileView extends FileSyncFile {
+  /** null = waiting for the agent's model. */
+  decision: FileSyncDecision | null;
+  model: { target: string; confidence: number | null; probabilities: Record<string, number> | null; at: string } | null;
+  manualTarget: string | null;
+  placed: FileSyncPlacement | null;
+}
+
+export interface FileSyncManifestCourse {
+  course: { id: string; code: string; color: string | null };
+  config: FileSyncConfig;
+  files: FileSyncFileView[];
+}
+
+export interface FileSyncManifest {
+  generatedAt: string;
+  courses: FileSyncManifestCourse[];
+}
+
+/** What a device last told the server: when it ran and where each target lives on it. */
+export interface FileSyncDevice {
+  device: string;
+  lastRunAt: string;
+  model: boolean;
+  /** courseId → target name → absolute path on that device. */
+  targets: Record<string, Record<string, string>>;
+  errors: { courseId?: string; fileId?: string; message: string }[];
+}
+
 export interface GradedAssignment {
   id: string;
   title: string;
@@ -195,6 +291,7 @@ export interface Course {
   notes: string | null;
   archived: boolean;
   grading: GradingConfig | null;
+  fileSync: FileSyncConfig | null;
   createdAt: string;
   updatedAt: string;
 }
