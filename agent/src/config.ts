@@ -65,9 +65,11 @@ export function courseIndexPath(cfg: AgentConfig, courseId: string): string | nu
 export function targetDir(cfg: AgentConfig, courseId: string, target: string): string | null {
   const c = cfg.courses[courseId];
   if (!c) return null;
+  // A target path may be absolute, ~-relative, or relative to the course root ("Slides").
+  const base = c.root ? expandHome(c.root) : process.cwd();
   const explicit = c.targets?.[target];
-  if (explicit) return path.resolve(expandHome(explicit));
-  if (c.root) return path.resolve(expandHome(c.root), target);
+  if (explicit) return path.resolve(base, expandHome(explicit));
+  if (c.root) return path.resolve(base, target);
   return null;
 }
 
