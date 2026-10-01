@@ -3,6 +3,7 @@ import {
   decideFile,
   fileSyncConfigSchema,
   type FileSyncConfig,
+  type FileLinkedFrom,
   type FileSyncDevice,
   type FileSyncFile,
   type FileSyncFileView,
@@ -32,7 +33,8 @@ export async function listSyncFiles(ctx: AppContext, courseId: string): Promise<
     .where(and(eq(courseContent.courseId, courseId), eq(courseContent.kind, 'file')))
     .orderBy(asc(courseContent.position));
   return rows.map((r) => {
-    const raw = r.raw as { size?: number | null; contentType?: string | null; updatedAt?: string | null; folderPath?: string | null; modulePosition?: number | null };
+    const raw = r.raw as { size?: number | null; contentType?: string | null; updatedAt?: string | null; folderPath?: string | null; modulePosition?: number | null; linkedFrom?: FileLinkedFrom | null };
+    const linkedFrom = raw.linkedFrom ?? null;
     return {
       courseId,
       fileId: r.externalId,
@@ -40,12 +42,14 @@ export async function listSyncFiles(ctx: AppContext, courseId: string): Promise<
       // Canvas's display name: what the course page shows. The upload name (raw.filename) is URL-encoded and often a
       // leftover from the instructor's disk ("Chapter4+2.pdf" for "Lecture9_Sept29.pdf").
       filename: r.title,
-      folderPath: raw.folderPath ?? null,
+      // An assignment's attachment has no folder the user can see; its home is the assignment (Assignments/<title>/).
+      folderPath: raw.folderPath ?? (linkedFrom?.kind === 'assignment' ? `/${linkedFrom.title.replace(/[\\/]+/g, '-').trim()}` : null),
       moduleName: r.moduleName,
       modulePosition: raw.modulePosition ?? null,
       contentType: raw.contentType ?? null,
       size: raw.size ?? null,
       updatedAt: raw.updatedAt ?? null,
+      linkedFrom,
     };
   });
 }

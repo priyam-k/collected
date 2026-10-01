@@ -22,6 +22,7 @@ export const subjectFor = (f: FileSyncFile): Record<string, string> => {
   if (f.folderPath) s.folder = f.folderPath;
   if (f.moduleName) s.module = f.moduleName;
   if (f.contentType) s.type = f.contentType;
+  if (f.linkedFrom) s.linked_from = f.linkedFrom.kind === 'syllabus' ? 'the syllabus page' : `${f.linkedFrom.kind}: ${f.linkedFrom.title}`;
   return s;
 };
 

@@ -350,7 +350,7 @@ function writeIndexes(cfg: AgentConfig, state: AgentState, mc: FileSyncManifestC
       adopted: !!p.adopted,
       moduleName: m?.moduleName ?? null,
       modulePosition: m?.modulePosition ?? null,
-      canvasPath: `${m?.folderPath && m.folderPath !== '/' ? m.folderPath : ''}/${title}`,
+      canvasPath: f?.linkedFrom ? `${title} (linked from ${f.linkedFrom.kind === 'syllabus' ? 'the syllabus page' : `${f.linkedFrom.kind} "${f.linkedFrom.title}"`})` : `${m?.folderPath && m.folderPath !== '/' ? m.folderPath : ''}/${title}`,
       updatedAt: p.updatedAt,
       size: m?.size ?? null,
       openUrl: `${server}/api/canvas/files/${p.fileId}/open`,

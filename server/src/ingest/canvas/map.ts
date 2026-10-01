@@ -487,28 +487,55 @@ export function moduleNamesByFileId(mods: CanvasModule[]): Map<string, ModuleRef
   return out;
 }
 
+/** How a file outside the Files listing was found. Best source wins when several link the same file. */
+export interface LinkedFrom {
+  kind: 'syllabus' | 'assignment' | 'announcement' | 'module';
+  title: string;
+}
+export const LINK_RANK: Record<LinkedFrom['kind'], number> = { syllabus: 0, assignment: 1, announcement: 2, module: 3 };
+
+/** Canvas file ids linked in an HTML body: `/courses/1/files/123`, `/files/123/download`, `data-api-endpoint=".../files/123"`. */
+export function linkedFileIds(html: string | null | undefined): string[] {
+  if (!html) return [];
+  const ids = new Set<string>();
+  for (const m of html.matchAll(/\/files\/(\d+)/g)) ids.add(m[1]!);
+  return [...ids];
+}
+
+function fileRow(f: CanvasFile, courseId: string, position: number, folderById: Map<string, CanvasFolder>, moduleByFile: Map<string, ModuleRef>, linkedFrom: LinkedFrom | null): ContentRow {
+  return {
+    id: `${courseId}:file:${f.id}`,
+    courseId,
+    kind: 'file',
+    externalId: String(f.id),
+    moduleName: moduleByFile.get(String(f.id))?.name ?? null,
+    title: f.display_name || f.filename || `file ${f.id}`,
+    url: f.url ?? null,
+    position,
+    raw: {
+      size: f.size ?? null,
+      contentType: f['content-type'] ?? null,
+      updatedAt: f.updated_at ?? f.modified_at ?? null,
+      filename: f.filename ?? f.display_name ?? null,
+      folderPath: folderPath(f.folder_id != null ? folderById.get(String(f.folder_id)) : undefined),
+      modulePosition: moduleByFile.get(String(f.id))?.position ?? null,
+      ...(linkedFrom ? { linkedFrom } : {}),
+    },
+  };
+}
+
 export function filesToContent(files: CanvasFile[], courseId: string, folders: CanvasFolder[] = [], moduleByFile: Map<string, ModuleRef> = new Map()): ContentRow[] {
   const folderById = new Map(folders.map((f) => [String(f.id), f]));
-  return files
-    .filter((f) => !f.hidden_for_user && !f.locked_for_user)
-    .map((f, i) => ({
-      id: `${courseId}:file:${f.id}`,
-      courseId,
-      kind: 'file',
-      externalId: String(f.id),
-      moduleName: moduleByFile.get(String(f.id))?.name ?? null,
-      title: f.display_name || f.filename || `file ${f.id}`,
-      url: f.url ?? null,
-      position: i,
-      raw: {
-        size: f.size ?? null,
-        contentType: f['content-type'] ?? null,
-        updatedAt: f.updated_at ?? f.modified_at ?? null,
-        filename: f.filename ?? f.display_name ?? null,
-        folderPath: folderPath(f.folder_id != null ? folderById.get(String(f.folder_id)) : undefined),
-        modulePosition: moduleByFile.get(String(f.id))?.position ?? null,
-      },
-    }));
+  return files.filter((f) => !f.hidden_for_user && !f.locked_for_user).map((f, i) => fileRow(f, courseId, i, folderById, moduleByFile, null));
+}
+
+/**
+ * Files a page links to that the Files listing does not show (they sit in hidden folders: a syllabus PDF, an
+ * assignment's spec). Hidden is expected here; locked still means the user cannot download it.
+ */
+export function linkedFilesToContent(extra: { file: CanvasFile; from: LinkedFrom }[], courseId: string, folders: CanvasFolder[] = [], moduleByFile: Map<string, ModuleRef> = new Map()): ContentRow[] {
+  const folderById = new Map(folders.map((f) => [String(f.id), f]));
+  return extra.filter((e) => !e.file.locked_for_user).map((e, i) => fileRow(e.file, courseId, 10_000 + i, folderById, moduleByFile, e.from));
 }
 
 export function syllabusToContent(body: string | null | undefined, courseId: string, canvasCourseId: string, baseUrl: string): ContentRow | null {

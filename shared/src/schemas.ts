@@ -49,6 +49,7 @@ export const fileSyncRuleSchema = z.object({
   module: regexString.nullable().default(null),
   name: regexString.nullable().default(null),
   largerThanMb: z.number().min(0).nullable().default(null),
+  linked: regexString.nullable().default(null),
   flatten: z.boolean().default(false),
 });
 export const fileSyncConfigSchema = z
@@ -68,7 +69,7 @@ export const fileSyncConfigSchema = z
     if (new Set(names).size !== names.length) ctx.addIssue({ code: 'custom', message: 'target names must be unique', path: ['targets'] });
     cfg.rules.forEach((r, i) => {
       if (!names.includes(r.target) && r.target !== FILE_SYNC_SKIP) ctx.addIssue({ code: 'custom', message: `rule ${i + 1} points at unknown target "${r.target}"`, path: ['rules', i, 'target'] });
-      if (!r.folder && !r.module && !r.name && r.largerThanMb == null) ctx.addIssue({ code: 'custom', message: `rule ${i + 1} has nothing to match`, path: ['rules', i] });
+      if (!r.folder && !r.module && !r.name && !r.linked && r.largerThanMb == null) ctx.addIssue({ code: 'custom', message: `rule ${i + 1} has nothing to match`, path: ['rules', i] });
     });
   });
 

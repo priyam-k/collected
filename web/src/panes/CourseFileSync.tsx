@@ -39,7 +39,7 @@ function ConfigEditor({ course, initial, onDone }: { course: Course; initial: Fi
     const fileSync: FileSyncConfig = {
       ...cfg,
       targets: cfg.targets.map((t) => ({ name: t.name.trim().toLowerCase(), description: t.description.trim() })).filter((t) => t.name),
-      rules: cfg.rules.map((r) => ({ target: r.target, folder: r.folder?.trim() || null, module: r.module?.trim() || null, name: r.name?.trim() || null, largerThanMb: r.largerThanMb ?? null, flatten: !!r.flatten })),
+      rules: cfg.rules.map((r) => ({ target: r.target, folder: r.folder?.trim() || null, module: r.module?.trim() || null, name: r.name?.trim() || null, largerThanMb: r.largerThanMb ?? null, linked: r.linked || null, flatten: !!r.flatten })),
     };
     save.mutate({ id: course.id, fileSync }, { onSuccess: () => { toast.success('Sync settings saved'); onDone(); }, onError: (e) => toast.error(e.message) });
   };
@@ -65,16 +65,22 @@ function ConfigEditor({ course, initial, onDone }: { course: Course; initial: Fi
       <div>
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-semibold text-sub">Rules</span>
-          <Button size="xs" variant="ghost" onClick={() => setCfg({ ...cfg, rules: [...cfg.rules, { target: names[0] ?? FILE_SYNC_SKIP, folder: '', module: null, name: null, largerThanMb: null, flatten: false }] })}><Plus className="size-3" /> Rule</Button>
+          <Button size="xs" variant="ghost" onClick={() => setCfg({ ...cfg, rules: [...cfg.rules, { target: names[0] ?? FILE_SYNC_SKIP, folder: '', module: null, name: null, largerThanMb: null, linked: null, flatten: false }] })}><Plus className="size-3" /> Rule</Button>
         </div>
         <p className="mb-2 text-xs text-ter">Checked first, in order. Regexes, case-insensitive; every filled field must match (MB = larger than). Files keep their Canvas subfolders under the target; tick “flat” when the top Canvas folder is the category itself (Lecture Notes → slides). Files no rule matches go to the fallback below.</p>
         <div className="space-y-1.5">
           {cfg.rules.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_3.25rem_auto_auto_auto] items-center gap-1.5">
+            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_3.25rem_auto_auto_auto_auto] items-center gap-1.5">
               <Input className="h-7 font-mono text-xs" placeholder="Canvas folder, e.g. ^/Lectures" value={r.folder ?? ''} onChange={(e) => setRule(i, { folder: e.target.value })} />
               <Input className="h-7 font-mono text-xs" placeholder="module, e.g. ^Week" value={r.module ?? ''} onChange={(e) => setRule(i, { module: e.target.value })} />
               <Input className="h-7 font-mono text-xs" placeholder="filename, e.g. \.zip$" value={r.name ?? ''} onChange={(e) => setRule(i, { name: e.target.value })} />
               <Input className="h-7 px-1.5 text-xs" type="number" min={0} step={1} placeholder="MB >" title="Only files larger than this many MB" value={r.largerThanMb ?? ''} onChange={(e) => setRule(i, { largerThanMb: e.target.value === '' ? null : Number(e.target.value) })} />
+              <select className={selectCls} value={r.linked ?? ''} onChange={(e) => setRule(i, { linked: e.target.value || null })} aria-label="Only files linked from" title="Only files that are not in the Files tab and were found through a link">
+                <option value="">any file</option>
+                <option value="^syllabus$">linked in syllabus</option>
+                <option value="^assignment$">linked in an assignment</option>
+                <option value="^announcement$">linked in an announcement</option>
+              </select>
               <label className="flex items-center gap-1 text-[11px] text-ter" title="Drop the top-level Canvas folder: /Lecture Notes/x.pdf lands directly in the target">
                 <input type="checkbox" checked={!!r.flatten} onChange={(e) => setRule(i, { flatten: e.target.checked })} /> flat
               </label>
@@ -126,7 +132,7 @@ function DecisionRow({ f, course, config, last }: { f: FileSyncFileView; course:
   const makeRule = () => {
     if (!d || !f.folderPath) return;
     const folder = `^${f.folderPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
-    save.mutate({ id: course.id, fileSync: { ...config, rules: [...config.rules, { target: d.target, folder, module: null, name: null, largerThanMb: null, flatten: false }] } }, { onSuccess: () => toast.success(`Rule added: ${f.folderPath} → ${d.target}`), onError: (e) => toast.error(e.message) });
+    save.mutate({ id: course.id, fileSync: { ...config, rules: [...config.rules, { target: d.target, folder, module: null, name: null, largerThanMb: null, linked: null, flatten: false }] } }, { onSuccess: () => toast.success(`Rule added: ${f.folderPath} → ${d.target}`), onError: (e) => toast.error(e.message) });
   };
   const runnerUp = f.model?.probabilities
     ? Object.entries(f.model.probabilities).sort((a, b) => b[1] - a[1]).find(([k]) => k !== f.model!.target)

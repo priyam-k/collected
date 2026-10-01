@@ -93,7 +93,7 @@ export class CanvasClient {
   }
 
   /** One GET. Throws NeedsAuthError on anything that looks like a dead session. */
-  async getRaw(path: string, params: Params = {}, signal?: AbortSignal): Promise<{ data: unknown; link: Record<string, string> }> {
+  async getRaw(path: string, params: Params = {}, signal?: AbortSignal, opts: { deniedIsNull?: boolean } = {}): Promise<{ data: unknown; link: Record<string, string> }> {
     const url = buildUrl(this.baseUrl, path, params);
     this.requestCount++;
     const res = await this.fetchWithCookies(url, {
@@ -106,6 +106,7 @@ export class CanvasClient {
     });
     const ct = res.headers.get('content-type') ?? '';
     const finalUrl = res.url || url;
+    if (opts.deniedIsNull && [401, 403, 404].includes(res.status) && !/\/login(\/|\?|$)/.test(finalUrl)) return { data: null, link: {} };
     if (res.status === 401 || res.status === 403 || /\/login(\/|\?|$)/.test(finalUrl)) {
       throw new NeedsAuthError(`Canvas responded ${res.status} at ${safePath(finalUrl)}`);
     }
@@ -130,6 +131,21 @@ export class CanvasClient {
 
   async get<T>(path: string, params: Params = {}, signal?: AbortSignal): Promise<T> {
     return (await this.getRaw(path, params, signal)).data as T;
+  }
+
+  /**
+   * One optional resource, such as a file a page links to. A 401/403/404 here is about that resource (locked,
+   * hidden, deleted), not the session, so it resolves to null instead of flagging the source as needing auth.
+   * Only call it after the run has already made an authenticated request.
+   */
+  async getResource<T>(path: string, signal?: AbortSignal): Promise<T | null> {
+    try {
+      return (await this.getRaw(path, {}, signal, { deniedIsNull: true })).data as T | null;
+    } catch (err) {
+      if (err instanceof NeedsAuthError) throw err;
+      this.log.debug({ err: (err as Error).message, path }, 'canvas optional resource failed');
+      return null;
+    }
   }
 
   /** Follows Link rel=next until exhausted or maxPages. */

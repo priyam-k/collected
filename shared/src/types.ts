@@ -155,6 +155,8 @@ export interface FileSyncRule {
   module: string | null;
   name: string | null;
   largerThanMb: number | null;
+  /** Regex on how an unlisted file was found: syllabus, assignment, announcement, module. Never matches a file from the Files tab. */
+  linked: string | null;
   /**
    * Layout under the target. false (default): mirror the Canvas folder path ("/p1/x.md" → Assignments/p1/x.md).
    * true: the top-level Canvas folder *is* the category, drop it ("/Lecture Notes/x.pdf" → Slides/x.pdf).
@@ -187,6 +189,13 @@ export interface FileSyncDecision {
   flatten?: boolean;
 }
 
+/** Where a file that is not in the course's Files tab was found: a link in a page body, or a module item. */
+export interface FileLinkedFrom {
+  kind: 'syllabus' | 'assignment' | 'announcement' | 'module';
+  /** The assignment's or announcement's title, the module's name, or "Syllabus". */
+  title: string;
+}
+
 /** A Canvas file as the sync sees it. */
 export interface FileSyncFile {
   courseId: string;
@@ -200,6 +209,8 @@ export interface FileSyncFile {
   contentType: string | null;
   size: number | null;
   updatedAt: string | null;
+  /** Set only for files reachable solely through a link (hidden or locked Files folders); null or absent otherwise. */
+  linkedFrom?: FileLinkedFrom | null;
 }
 
 export interface FileSyncPlacement {

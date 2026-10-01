@@ -12,8 +12,9 @@ const test = (pattern: string | null, value: string | null | undefined): boolean
   }
 };
 
-export function ruleMatches(rule: FileSyncRule, file: Pick<FileSyncFile, 'folderPath' | 'moduleName' | 'filename' | 'title' | 'size'>): boolean {
-  if (!rule.folder && !rule.module && !rule.name && rule.largerThanMb == null) return false;
+export function ruleMatches(rule: FileSyncRule, file: Pick<FileSyncFile, 'folderPath' | 'moduleName' | 'filename' | 'title' | 'size' | 'linkedFrom'>): boolean {
+  if (!rule.folder && !rule.module && !rule.name && !rule.linked && rule.largerThanMb == null) return false;
+  if (!test(rule.linked ?? null, file.linkedFrom?.kind)) return false;
   if (rule.largerThanMb != null && !((file.size ?? 0) > rule.largerThanMb * 1024 * 1024)) return false;
   return test(rule.folder, file.folderPath) && test(rule.module, file.moduleName) && test(rule.name, file.filename || file.title);
 }
@@ -24,6 +25,7 @@ export function describeRule(rule: FileSyncRule): string {
   if (rule.module) parts.push(`module ~ /${rule.module}/`);
   if (rule.name) parts.push(`name ~ /${rule.name}/`);
   if (rule.largerThanMb != null) parts.push(`larger than ${rule.largerThanMb} MB`);
+  if (rule.linked) parts.push(`linked from /${rule.linked}/`);
   return parts.join(' and ');
 }
 

@@ -39,7 +39,12 @@ describe('syncCanvas over fixtures', () => {
 
     const content = await ctx.db.select().from(courseContent).where(eq(courseContent.courseId, '2026-fall-cmsc422-0101'));
     const kinds = content.reduce<Record<string, number>>((m, r) => ({ ...m, [r.kind]: (m[r.kind] ?? 0) + 1 }), {});
-    expect(kinds).toEqual({ syllabus: 1, module_item: 4, file: 3, grade_group: 3, grade_summary: 1 });
+    expect(kinds).toEqual({ syllabus: 1, module_item: 4, file: 4, grade_group: 3, grade_summary: 1 });
+    // A PDF the syllabus page links to, in a hidden folder the Files listing omits, is found through the link.
+    const syl = content.find((r) => r.kind === 'file' && r.externalId === '99000001')!;
+    expect(syl.title).toBe('syllabus.pdf');
+    expect(syl.raw).toMatchObject({ linkedFrom: { kind: 'syllabus', title: 'Syllabus' }, folderPath: null });
+    expect(counts.linkedFiles).toBe(1);
     // Files carry their Canvas folder path and the module they sit in, for the file sync.
     const knn = content.find((r) => r.kind === 'file' && r.externalId === '90735997')!;
     expect(knn.raw).toMatchObject({ folderPath: '/Lectures', filename: 'lecture03_knn.pdf' });

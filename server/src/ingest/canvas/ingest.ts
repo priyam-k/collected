@@ -11,6 +11,9 @@ import {
   announcementToRow,
   assignmentToRow,
   filesToContent,
+  LINK_RANK,
+  linkedFileIds,
+  linkedFilesToContent,
   gradeGroupsToContent,
   gradeSummaryToContent,
   matchCourses,
@@ -26,12 +29,15 @@ import {
   type CanvasModule,
   moduleNamesByFileId,
   type CourseCtx,
+  type LinkedFrom,
   type PlannerItem,
 } from './map.js';
 
 export const PLANNER_PAST_DAYS = 14;
 export const PLANNER_FUTURE_DAYS = 60;
 export const ANNOUNCEMENT_PAST_DAYS = 30;
+/** Per course and run: how many linked-but-unlisted files to look up. Each is one request. */
+export const MAX_LINKED_FILES = 40;
 
 /**
  * Runs one Canvas sync against an already-built client. Split from the ingester so tests can inject
@@ -65,11 +71,23 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
 
   // Assignments per course are the authoritative assignment list (full history, has descriptions and submission state).
   const rows = new Map<string, NewItemRow>();
+  // Files that page bodies link to, per Canvas course: fileId → where it was found (DESIGN "File sync": linked files).
+  const linked = new Map<string, Map<string, LinkedFrom>>();
+  const noteLink = (canvasId: string, fileId: string, from: LinkedFrom) => {
+    const m = linked.get(canvasId) ?? new Map<string, LinkedFrom>();
+    const had = m.get(fileId);
+    if (!had || LINK_RANK[from.kind] < LINK_RANK[had.kind]) m.set(fileId, from);
+    linked.set(canvasId, m);
+  };
+  const noteLinks = (canvasId: string, html: string | null | undefined, from: LinkedFrom) => {
+    for (const id of linkedFileIds(html)) noteLink(canvasId, id, from);
+  };
   for (const [canvasId, cc] of ctxByCanvasId) {
     const list = await client.tryGetAll<CanvasAssignment>(`/api/v1/courses/${canvasId}/assignments`, { 'include[]': ['submission'], order_by: 'due_at' }, { signal });
     for (const a of list) {
       if (a.published === false) continue;
       rows.set(`canvas:assignment:${a.id}`, assignmentToRow(a, cc, baseUrl));
+      noteLinks(canvasId, a.description, { kind: 'assignment', title: a.name });
     }
   }
   counts.assignments = rows.size;
@@ -116,6 +134,7 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
     const cc = ctxByCanvasId.get(canvasId);
     if (!cc) continue;
     rows.set(`canvas:announcement:${a.id}`, announcementToRow(a, cc, baseUrl));
+    noteLinks(canvasId, a.message, { kind: 'announcement', title: a.title });
   }
   counts.announcements = anns.length;
 
@@ -127,12 +146,27 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
 
   // Course content for the class widget and the file sync: syllabus, module items, files.
   let content = 0;
+  let linkedFiles = 0;
   for (const [canvasId, cc] of ctxByCanvasId) {
     const detail = await client.tryGet<{ syllabus_body?: string | null }>(`/api/v1/courses/${canvasId}`, { 'include[]': ['syllabus_body'] }, signal);
     const mods = await client.tryGetAll<CanvasModule>(`/api/v1/courses/${canvasId}/modules`, { 'include[]': ['items'] }, { signal, maxPages: 3 });
     // Every file, with its folder: the file sync sorts on folder path and module name (DESIGN "File sync to a laptop").
     const files = await client.tryGetAll<CanvasFile>(`/api/v1/courses/${canvasId}/files`, { sort: 'updated_at', order: 'desc' }, { signal, maxPages: 10 });
     const folders = files.length ? await client.tryGetAll<CanvasFolder>(`/api/v1/courses/${canvasId}/folders`, {}, { signal, maxPages: 5 }) : [];
+    // Files the syllabus, assignment descriptions, announcements or modules point at but the listing does not show:
+    // they live in hidden Files folders (a syllabus PDF, an assignment's spec). One lookup each, capped.
+    const moduleByFile = moduleNamesByFileId(mods);
+    noteLinks(canvasId, detail?.syllabus_body, { kind: 'syllabus', title: 'Syllabus' });
+    for (const m of mods) for (const it of m.items ?? []) if (it.type === 'File' && it.content_id != null) noteLink(canvasId, String(it.content_id), { kind: 'module', title: m.name });
+    const listed = new Set(files.map((f) => String(f.id)));
+    const extra: { file: CanvasFile; from: LinkedFrom }[] = [];
+    for (const [fileId, from] of linked.get(canvasId) ?? []) {
+      if (listed.has(fileId)) continue;
+      if (extra.length >= MAX_LINKED_FILES) break;
+      const f = (await client.getResource<CanvasFile>(`/api/v1/courses/${canvasId}/files/${fileId}`, signal)) ?? (await client.getResource<CanvasFile>(`/api/v1/files/${fileId}`, signal));
+      if (f && f.id != null) extra.push({ file: f, from });
+    }
+    linkedFiles += extra.length;
     // Grades: assignment groups (weights, drop rules) and Canvas's own totals for the enrollment. Not for TA courses.
     const groups = cc.role === 'ta' ? [] : await client.tryGetAll<CanvasAssignmentGroup>(`/api/v1/courses/${canvasId}/assignment_groups`, {}, { signal, maxPages: 2 });
     const canvasCourse = canvasCourseById.get(canvasId);
@@ -140,13 +174,15 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
     const contentRows = [
       ...(syllabus ? [syllabus] : []),
       ...modulesToContent(mods, cc.courseId, baseUrl),
-      ...filesToContent(files, cc.courseId, folders, moduleNamesByFileId(mods)),
+      ...filesToContent(files, cc.courseId, folders, moduleByFile),
+      ...linkedFilesToContent(extra, cc.courseId, folders, moduleByFile),
       ...gradeGroupsToContent(groups, cc.courseId),
       ...(canvasCourse && cc.role !== 'ta' ? [gradeSummaryToContent(canvasCourse, cc.courseId, baseUrl)] : []),
     ];
     content += await replaceCourseContent(ctx, cc.courseId, ['syllabus', 'module_item', 'file', 'grade_group', 'grade_summary'], contentRows);
   }
   counts.content = content;
+  counts.linkedFiles = linkedFiles;
   counts.requests = client.requestCount;
   return counts;
 }
