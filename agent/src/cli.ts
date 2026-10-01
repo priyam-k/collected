@@ -13,6 +13,7 @@ function usage(): never {
   init <server-url>                     write ${configPath()} (device name, cache dir, model on)
   auth service-token <id> <secret>      Cloudflare Access service token (prod)
   auth helper-key <key>                 LOCAL_HELPER_KEY (local dev)
+  auth model <api-key>                  TypeSafe API key for Jev (or set TYPESAFE_API_KEY)
   courses                               what the server wants synced and where it would go here
   link <course> <path>                  root folder for a course; targets become <path>/<target>
   link <course> <target> <path>         one target's folder, overriding the root
@@ -50,13 +51,14 @@ try {
       const cfg = defaultConfig(server);
       if (values.device) cfg.device = values.device;
       saveConfig(cfg);
-      say(`wrote ${configPath()}\nnext: collected-agent auth service-token <id> <secret>   (or auth helper-key <key> for a local server)\n      collected-agent courses`);
+      say(`wrote ${configPath()}\nnext: collected-agent auth service-token <id> <secret>   (or auth helper-key <key> for a local server)\n      collected-agent auth model <typesafe-api-key>         (for the Jev classifier; skip to use rules only)\n      collected-agent courses`);
       break;
     }
     case 'auth': {
       const cfg = loadConfig();
       if (rest[0] === 'service-token' && rest[1] && rest[2]) cfg.auth = { cfAccessClientId: rest[1], cfAccessClientSecret: rest[2] };
       else if (rest[0] === 'helper-key' && rest[1]) cfg.auth = { helperKey: rest[1] };
+      else if (rest[0] === 'model' && rest[1]) cfg.model = { ...cfg.model, enabled: true, apiKey: rest[1] };
       else usage();
       saveConfig(cfg);
       say('saved');

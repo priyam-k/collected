@@ -29,14 +29,25 @@ export interface AgentConfig {
   courses: Record<string, { root?: string; targets?: Record<string, string>; index?: string }>;
   /** Shell command run once after a sync that placed files. Env: COLLECTED_PLACED (newline-separated paths), COLLECTED_COURSES. */
   onPlace?: string;
-  model: { enabled: boolean };
+  model: ModelConfig;
+}
+
+/** The decision model: TypeSafe's hosted Jev by default; any server speaking POST /v1/systemone works (laya-serve locally). */
+export interface ModelConfig {
+  enabled: boolean;
+  /** Default https://api.typesafe.ai */
+  baseUrl?: string;
+  /** Default jev-latest */
+  model?: string;
+  /** Or the TYPESAFE_API_KEY environment variable. Set with: collected-agent auth model <key> */
+  apiKey?: string;
 }
 
 export const agentHome = (): string => process.env.COLLECTED_AGENT_HOME || path.join(homedir(), '.collected');
 export const configPath = (): string => path.join(agentHome(), 'agent.json');
 
 export function defaultConfig(server = 'http://localhost:3000'): AgentConfig {
-  return { server, auth: {}, device: hostname().replace(/\.local$/, ''), cacheDir: path.join(agentHome(), 'cache'), courses: {}, model: { enabled: true } };
+  return { server, auth: {}, device: hostname().replace(/\.local$/, ''), cacheDir: path.join(agentHome(), 'cache'), courses: {}, model: { enabled: true, baseUrl: 'https://api.typesafe.ai', model: 'jev-latest' } };
 }
 
 export function loadConfig(): AgentConfig {

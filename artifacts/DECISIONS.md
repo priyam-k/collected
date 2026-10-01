@@ -187,3 +187,9 @@ Rules out: browser-side downloading (can't write unattended; the CDN would need 
 
 Probing prod showed `POST /api/sources/canvas/cookie` answered with Access's login redirect: the cookie helper's `x-collected-key` never got past the edge, and the SETUP note saying otherwise was wrong. Access service tokens are the mechanism for non-browser clients: Cloudflare exchanges `CF-Access-Client-Id/Secret` for the same JWT the app already verifies, with identity in `common_name` instead of `email`. The verifier now accepts that. `LOCAL_HELPER_KEY` stays as a local/dev credential and is accepted by the API middleware generally rather than on one route.
 Why: one verification path for browsers and scripts, no bypass rules at the edge, revocable from the Cloudflare dashboard.
+
+## 039 — The file-sync classifier is hosted Jev, not local Laya (2026-10-01)
+
+037 chose Laya running inside the agent. Before the first real run it was swapped for TypeSafe's hosted Jev over `POST /v1/systemone`, with the base URL configurable so a local `laya-serve` still works.
+Why: Laya's Node package pulls 1.7 GB of fp32 weights and wants ~2 GB of RAM while classifying, on a laptop that is short on RAM, for a job that is a few hundred tokens per file a few times a week. Jev's price for that is effectively zero, there is nothing to download or keep warm, and the request and response shapes are identical, so the agent's code did not change beyond the transport. The `@receptron/laya` dependency (and its native ONNX runtime) is gone from the workspace.
+Rules out: bundling a model with the agent. A generative LLM for this was never considered: a typed choice with probabilities is the right tool, and both System 1 models return exactly that.

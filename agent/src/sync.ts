@@ -3,7 +3,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type FileSyncFileView, type FileSyncManifestCourse, type FileSyncReport } from '@collected/shared';
 import { Api, type SyncApi } from './api.js';
-import { classify, loadModel } from './classify.js';
+import { classify, modelUnavailable } from './classify.js';
 import { courseIndexPath, knownTargets, targetDir, type AgentConfig } from './config.js';
 import { cachePathFor, chooseLinkName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
 import { loadState, saveState, stateKey, type Placement } from './state.js';
@@ -67,19 +67,25 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
     // Model pass for files nothing else decided.
     const decisions = new Map<string, FileSyncDecision | null>(mc.files.map((f) => [f.fileId, f.decision]));
     const pending = mc.files.filter((f) => !f.decision);
-    if (pending.length && config.fallback === 'model' && cfg.model.enabled && !opts.noModel) {
-      try {
-        const model = await loadModel(log);
+    if (pending.length && config.fallback === 'model' && !opts.noModel) {
+      const why = modelUnavailable(cfg.model);
+      if (why) {
+        if (cfg.model.enabled) err(`${pending.length} file${pending.length === 1 ? '' : 's'} waiting for the model, but ${why}`, mc.course.id);
+        else log(`  ${pending.length} file${pending.length === 1 ? '' : 's'} waiting for the model (${why})`);
+      } else {
         report.model = true;
         for (const f of pending) {
-          const ans = await classify(model, config, f);
-          report.decisions.push({ courseId: mc.course.id, fileId: f.fileId, target: ans.target, confidence: ans.confidence, probabilities: ans.probabilities });
-          decisions.set(f.fileId, decideFile(config, f, { manualTarget: f.manualTarget, model: ans }));
-          sum.classified++;
-          log(`  model: ${f.filename} → ${ans.target}${ans.confidence != null ? ` (${ans.confidence.toFixed(2)})` : ''}`);
+          try {
+            const ans = await classify(cfg.model, config, f);
+            report.decisions.push({ courseId: mc.course.id, fileId: f.fileId, target: ans.target, confidence: ans.confidence, probabilities: ans.probabilities });
+            decisions.set(f.fileId, decideFile(config, f, { manualTarget: f.manualTarget, model: ans }));
+            sum.classified++;
+            log(`  model: ${f.filename} → ${ans.target}${ans.confidence != null ? ` (${ans.confidence.toFixed(2)})` : ''}`);
+          } catch (e) {
+            err(`model failed on ${f.filename}: ${(e as Error).message}`, mc.course.id, f.fileId);
+            if (/check the API key/.test((e as Error).message)) break; // every call would fail the same way
+          }
         }
-      } catch (e) {
-        err(`model failed: ${(e as Error).message}`, mc.course.id);
       }
     }
 

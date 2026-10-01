@@ -9,6 +9,5 @@ export default defineConfig({
   clean: true,
   splitting: false,
   banner: { js: '#!/usr/bin/env node' },
-  // The model package stays external so its native ONNX runtime loads from node_modules.
   noExternal: ['@collected/shared'],
 });

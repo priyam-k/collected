@@ -188,7 +188,7 @@ The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings 
 
 ## Laptop agent (course files → folders)
 
-`collected-agent` (the `agent` workspace) keeps each course's Canvas files in folders on the Mac, sorted by rules and, for anything no rule covers, by Laya, a small decision model that runs locally. DESIGN.md "File sync to a laptop" has the design; this is the setup.
+`collected-agent` (the `agent` workspace) keeps each course's Canvas files in folders on the Mac, sorted by rules and, for anything no rule covers, by Jev, TypeSafe's hosted System 1 decision model (DECISIONS 039). DESIGN.md "File sync to a laptop" has the design; this is the setup.
 
 1. **Access service token**, once. Cloudflare Zero Trust → Access → Service Auth → Service Tokens → Create: name `collected-agent`, pick a long duration. Copy the Client ID and Client Secret (the secret is shown once). Then Access → Applications → `collected` → Policies → Add: name `agents`, action **Service Auth**, Include → Service Token → `collected-agent`. Save. Requests carrying `CF-Access-Client-Id` / `CF-Access-Client-Secret` now get the same JWT the browser does; the app reads the identity from `common_name`.
 2. **Build and point the CLI at prod**:
@@ -199,9 +199,10 @@ The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings 
    collected-agent auth service-token <client-id> <client-secret>
    ```
    Config lands in `~/.collected/agent.json` (mode 600). For a local server: `init http://localhost:3000` and `auth helper-key <LOCAL_HELPER_KEY>` (or nothing at all with `AUTH_DISABLED=true`).
+   For the classifier, make a TypeSafe account at typesafe.ai, create an API key, and `collected-agent auth model <key>` (or export `TYPESAFE_API_KEY`). Without it, rules still work and files no rule matches wait, listed in the dashboard. A local `laya-serve` works instead by setting `model.baseUrl` in `agent.json` to its address.
 3. **Turn sync on per course** in the dashboard: course drawer → Files → Sync to laptop → Set up. Name the folders (`slides`, `assignments`, `admin` are the defaults), add rules if the Canvas folder structure is obvious (`^/Lectures` → slides), pick what happens to unmatched files.
 4. **Link folders on the Mac**: `collected-agent courses` lists what the server wants; then `collected-agent link <course-id> ~/school/ling260` sets a root (targets become `~/school/ling260/slides` etc.), or `link <course-id> slides ~/Notes/LING260` for one target. `unsorted` gets a folder the same way; unmapped targets are reported as errors, never silently skipped.
-5. **Dry run, then run**: `collected-agent sync --dry-run` prints the plan and posts model decisions so the dashboard shows them; `collected-agent sync` downloads (Canvas CDN → Mac, nothing through the box) into `~/.collected/cache` and hard-links into the folders, writing a `_collected.md` index per folder. The first run that needs the model downloads ~1.7 GB of weights to `~/.cache/receptron-laya` and needs ~2 GB RAM while classifying; `--no-model` skips it.
+5. **Dry run, then run**: `collected-agent sync --dry-run` prints the plan and posts model decisions so the dashboard shows them; `collected-agent sync` downloads (Canvas CDN → Mac, nothing through the box) into `~/.collected/cache` and hard-links into the folders, writing a `_collected.md` index per folder. Each file no rule decided costs one Jev call (a few hundred input tokens); `--no-model` skips the model.
 6. **Schedule**: `collected-agent install-launchd --interval 30` writes `~/Library/LaunchAgents/com.collected.agent.plist` (log: `~/.collected/agent.log`). `uninstall-launchd` removes it.
 7. Optional: `"onPlace": "<command>"` in `agent.json` runs after any sync that placed files, with `COLLECTED_PLACED` (newline-separated paths) and `COLLECTED_COURSES` in the environment; point it at whatever ingests your notes.
 

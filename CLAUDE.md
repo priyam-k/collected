@@ -13,7 +13,7 @@ Personal student dashboard: Canvas, Gradescope, Google Calendar, Todoist, and a 
 `artifacts/` is docs only. No code lives there.
 
 ## Stack
-pnpm workspaces: `server` (Hono + Drizzle + libsql + croner), `web` (Vite + React + TS + Tailwind + shadcn + TanStack Query + react-grid-layout), `shared` (types, schemas, the file-sync decision function), `agent` (laptop CLI: course files → local folders, Laya via ONNX), `local` (Mac helper scripts). Docker Compose for prod. Cloudflare Tunnel + Access in front.
+pnpm workspaces: `server` (Hono + Drizzle + libsql + croner), `web` (Vite + React + TS + Tailwind + shadcn + TanStack Query + react-grid-layout), `shared` (types, schemas, the file-sync decision function), `agent` (laptop CLI: course files → local folders, Jev over HTTP for sorting), `local` (Mac helper scripts). Docker Compose for prod. Cloudflare Tunnel + Access in front.
 
 ## Conventions
 - Every ingester is also a CLI command (`pnpm sync <source>`). Build and debug it that way before wiring it to the scheduler.

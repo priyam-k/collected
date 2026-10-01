@@ -65,7 +65,7 @@ Still open:
 ## File sync (started 2026-10-01)
 
 - [x] Server: `courses.file_sync`, `file_sync_state` (migration 0005), folder paths + module names on Canvas file rows (all files, not 30), decision logic in `shared`, `/api/file-sync/*`, service-token and helper-key identities.
-- [x] Agent workspace: `collected-agent init | auth | courses | link | sync | status | install-launchd`, staging cache, hard links, `_collected.md`, Laya classification, report. Unit tests cover placement; the model path is untested until a real run.
+- [x] Agent workspace: `collected-agent init | auth | courses | link | sync | status | install-launchd`, staging cache, hard links, `_collected.md` or a per-course index, Jev classification over HTTP (DECISIONS 039), report. Unit tests cover placement and the model request/response; a live Jev call is untested until the first real run.
 - [x] Web: Sync panel in the course Files tab (folders, rules, fallback, per-file decision and override, make-rule, device paths); folder path and module under files.
 - [ ] You: create the Cloudflare Access service token (SETUP.md), run `collected-agent init`, link one course, `sync --dry-run`.
 
