@@ -4,7 +4,7 @@ import { courseInputSchema, type Course } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { courseContent, courses, itemLinks, items, widgetInstances } from '../db/schema.js';
 import { courseSlug } from '../seed.js';
-import { bad, parseBody } from './util.js';
+import { bad, parseBody, parsePatch } from './util.js';
 
 const toPublic = (r: typeof courses.$inferSelect): Course => ({
   ...r,
@@ -42,8 +42,8 @@ export function coursesRoutes(ctx: AppContext) {
     const id = c.req.param('id');
     const row = await ctx.db.query.courses.findFirst({ where: eq(courses.id, id) });
     if (!row) bad('course not found', 404);
-    const body = await parseBody(c, courseInputSchema.partial());
-    await ctx.db.update(courses).set(body).where(eq(courses.id, id));
+    const body = await parsePatch(c, courseInputSchema);
+    if (Object.keys(body).length) await ctx.db.update(courses).set(body).where(eq(courses.id, id));
     const updated = await ctx.db.query.courses.findFirst({ where: eq(courses.id, id) });
     return c.json(toPublic(updated!));
   });

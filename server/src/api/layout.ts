@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { layouts, widgetInstances } from '../db/schema.js';
-import { bad, parseBody } from './util.js';
+import { bad, parseBody, parsePatch } from './util.js';
 
 export function layoutRoutes(ctx: AppContext) {
   const r = new Hono();
@@ -47,10 +47,10 @@ export function widgetRoutes(ctx: AppContext) {
 
   r.put('/:id', async (c) => {
     const id = c.req.param('id');
-    const body = await parseBody(c, widgetInstanceInputSchema.omit({ id: true }).partial().extend({ type: z.string().min(1).optional() }));
+    const body = await parsePatch(c, widgetInstanceInputSchema.omit({ id: true }));
     const existing = await ctx.db.query.widgetInstances.findFirst({ where: eq(widgetInstances.id, id) });
     if (existing) {
-      await ctx.db.update(widgetInstances).set(body).where(eq(widgetInstances.id, id));
+      if (Object.keys(body).length) await ctx.db.update(widgetInstances).set(body).where(eq(widgetInstances.id, id));
     } else {
       if (!body.type) bad('type required to create a widget instance', 422);
       await ctx.db.insert(widgetInstances).values({ id, type: body.type, config: body.config ?? {}, hidden: body.hidden ?? false });

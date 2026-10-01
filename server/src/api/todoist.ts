@@ -9,7 +9,7 @@ import { syncTodoist, taskToRow, todoistApiForCtx } from '../ingest/todoist/inge
 import { getSettingParsed, setSetting } from '../lib/settings.js';
 import { nowIso } from '../lib/time.js';
 import { executePush, planPush } from '../sync/todoist-push.js';
-import { bad, parseBody } from './util.js';
+import { bad, parseBody, parsePatch } from './util.js';
 
 export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<TodoistApi> = todoistApiForCtx) {
   const r = new Hono();
@@ -31,7 +31,7 @@ export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => 
 
   r.get('/config', async (c) => c.json(await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema)));
   r.put('/config', async (c) => {
-    const body = await parseBody(c, todoistPushConfigSchema.partial());
+    const body = await parsePatch(c, todoistPushConfigSchema);
     const cfg = await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema);
     const next = { ...cfg, ...body };
     await setSetting(ctx, 'todoist.push', next);
