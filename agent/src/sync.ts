@@ -5,7 +5,7 @@ import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type
 import { Api, type SyncApi } from './api.js';
 import { classify, modelUnavailable } from './classify.js';
 import { courseIndexPath, knownTargets, targetDir, type AgentConfig } from './config.js';
-import { cachePathFor, chooseLinkName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
+import { adoptableTwin, cachePathFor, chooseLinkName, isSuffixedName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
 import { loadState, saveState, stateKey, type Placement } from './state.js';
 
 export interface SyncOptions {
@@ -123,6 +123,15 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
 
       const upToDate = prev && prev.updatedAt === f.updatedAt && path.dirname(prev.localPath) === dir && existsSync(prev.localPath);
       if (upToDate) {
+        // Holding a "(2)" name beside an identical plain-named file (a hand download): fold onto the original.
+        if (isSuffixedName(prev.localPath) && existsSync(prev.cachePath)) {
+          const twin = adoptableTwin(dir, f.filename, prev.cachePath);
+          if (twin && twin !== prev.localPath && !opts.dryRun && removePlacement(prev)) {
+            state.placements[key] = { ...prev, localPath: twin, placedAt: nowIso() };
+            report.placed.push({ courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: twin });
+            log(`  adopted ${rel(twin)}, removed duplicate ${path.basename(prev.localPath)}`);
+          }
+        }
         sum.unchanged++;
         continue;
       }
@@ -142,8 +151,9 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
           else if (action === 'move' && !removePlacement(prev)) err(`${rel(prev.localPath)} was changed locally; left there, new copy goes to ${decision.target}/`, mc.course.id, f.fileId);
           // update + modified: keep theirs; chooseLinkName picks a (v2) name
         }
-        const name = chooseLinkName(dir, f.filename, cachePath, prev);
-        const dest = path.join(dir, name);
+        const twin = adoptableTwin(dir, f.filename, cachePath);
+        const dest = twin ?? path.join(dir, chooseLinkName(dir, f.filename, cachePath, prev));
+        if (twin) log(`  adopted existing ${path.basename(twin)} (identical to Canvas)`);
         if (!existsSync(dest)) linkOrCopy(cachePath, dest, cfg.linkMode ?? 'hardlink');
         const placement: Placement = { courseId: mc.course.id, fileId: f.fileId, target: decision.target, localPath: dest, sha256: sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso() };
         state.placements[key] = placement;

@@ -28,7 +28,7 @@ export function withSuffix(filename: string, suffix: string): string {
   return `${stem} ${suffix}${ext}`;
 }
 
-const sameInode = (a: string, b: string): boolean => {
+export const sameInode = (a: string, b: string): boolean => {
   try {
     const sa = statSync(a);
     const sb = statSync(b);
@@ -87,6 +87,23 @@ export function chooseLinkName(dir: string, filename: string, cachePath: string,
     if (free(n) || isThisFile(n)) return n;
   }
   return withSuffix(want, `(${Date.now()})`);
+}
+
+/** `name (2).pdf` / `name (v3).pdf` → true. */
+export const isSuffixedName = (p: string): boolean => /\s\(v?\d+\)(\.[^.]+)?$/.test(path.basename(p));
+
+/**
+ * A file already at the plain name that is byte-identical to the cached download (you downloaded it by hand before
+ * the sync existed) is ours to adopt: no `(2)` copy, the placement just points at it.
+ */
+export function adoptableTwin(dir: string, filename: string, cachePath: string): string | null {
+  const plain = path.join(dir, safeName(filename));
+  if (!existsSync(plain) || sameInode(plain, cachePath)) return null;
+  try {
+    return sha256File(plain) === sha256File(cachePath) ? plain : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Removes a placement we made, only if the bytes are still ours. Returns false when left alone. */

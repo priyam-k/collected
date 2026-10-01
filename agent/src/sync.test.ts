@@ -176,6 +176,26 @@ describe('runSync', () => {
     expect(s2.errors[0]!.message).toMatch(/changed locally/);
   });
 
+  it('adopts an identical hand-downloaded file instead of making a (2) copy, and folds existing (2) copies back', async () => {
+    const api = new FakeApi([
+      { fileId: '1', filename: 'L01.pdf', folderPath: '/Lectures', updatedAt: '2026-09-01T00:00:00Z', bytes: 'lecture one' },
+      { fileId: '2', filename: 'L02.pdf', folderPath: '/Lectures', updatedAt: '2026-09-01T00:00:00Z', bytes: 'lecture two' },
+    ]);
+    mkdirSync(path.join(school, 'slides'), { recursive: true });
+    writeFileSync(path.join(school, 'slides', 'L01.pdf'), 'lecture one'); // identical hand download
+    writeFileSync(path.join(school, 'slides', 'L02.pdf'), 'something else'); // same name, different bytes
+    let s = await runSync(cfg(), { api });
+    expect(s).toMatchObject({ placed: 2, errors: [] });
+    expect(ls(path.join(school, 'slides'))).toEqual(['L01.pdf', 'L02 (2).pdf', 'L02.pdf', '_collected.md']);
+    expect(api.reports.at(-1)!.placed.find((p) => p.fileId === '1')!.localPath).toBe(path.join(school, 'slides', 'L01.pdf'));
+
+    // The user replaces their odd L02.pdf with the real one: next run folds our (2) copy onto it.
+    writeFileSync(path.join(school, 'slides', 'L02.pdf'), 'lecture two');
+    s = await runSync(cfg(), { api });
+    expect(ls(path.join(school, 'slides'))).toEqual(['L01.pdf', 'L02.pdf', '_collected.md']);
+    expect(s.unchanged).toBe(2);
+  });
+
   it('reports a missing folder mapping once per target instead of failing silently', async () => {
     const api = new FakeApi([{ fileId: '1', filename: 'L01.pdf', folderPath: '/Lectures', updatedAt: '2026-09-01T00:00:00Z', bytes: 'x' }]);
     const c = cfg();
