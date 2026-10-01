@@ -19,7 +19,7 @@ Last updated: 2026-09-24. Deploys now run from GitHub Actions on push to `main` 
   - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
   - [x] Ops Agent on the box is inactive and disabled (checked 2026-09-24).
   - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
-  - [ ] Backup cron (SETUP.md VPS step 5).
+  - [ ] Backup cron (SETUP.md VPS step 5). **Do this next**: the 2026-10-01 incident had nothing to restore from.
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.
 
 ## Post-run checklist (needs you)
@@ -70,6 +70,7 @@ Still open:
 - [x] Live on the Mac (2026-10-01): Access service token, five courses linked into the Obsidian vault, launchd every 30 min, Jev key set.
 - [x] Policy and mechanics pass with the vault's ingest session (DECISIONS 040): display names, mirrored folders with `flatten`, adoption by content hash, atomic writes with Canvas mtimes, skip rules, handouts, `pull`, course facts files.
 - [x] Files reachable only through links (syllabus PDFs, assignment specs in hidden folders) are ingested and routed (2026-10-01): 10 found across LING260, ENME480, CMSC422.
+- [x] 2026-10-01 incident: config-only course updates reset schedule and links on five courses (DECISIONS 041). Route fixed and tested; four schedules and one hotlink restored from residual bytes in the database file; **CMSC422's class time needs re-entering**.
 - [ ] Open: whether to skip STAT410-style blank notes (no reliable way to pair them with their filled versions); whether to add a read-only Canvas browsing command (needs a Canvas GET proxy route).
 
 ## Later
