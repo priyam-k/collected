@@ -16,6 +16,8 @@ One Node process. Inside it, three things share one SQLite file:
 - **Scheduler** (croner): one cron entry per ingester, each on its own interval (Canvas 15 min, Gradescope 30, Google/Todoist 5, iCal/jobs 60), staggered so they don't fire together. Five seconds after boot it runs everything once so a fresh deploy isn't empty.
 - **SQLite** via `@libsql/client` + Drizzle, WAL mode, `synchronous=NORMAL`. No queue, no worker, no cache layer.
 
+One thing runs *off* the box: `collected-agent` (the `agent` workspace) on the laptop under launchd. It pulls a manifest of course files and decisions, downloads from the Canvas CDN into local folders, and reports back. The server never touches file bytes.
+
 Why one process (DECISIONS 001, 003): the hard part of this app is scrapers on a timer, which want a boring long-lived runtime you can debug locally with `pnpm sync canvas`. Serverless and edge runtimes fight that. Postgres buys nothing for one user. Hono was picked over Next/SvelteKit because a scheduler wants a plain server process, not request-scoped handlers.
 
 **Boot** (`server/src/bootstrap.ts`, shared by server and CLI): load `.env` → open DB → run pending Drizzle migrations → build the `AppContext` `{env, db, log, crypto, version}` → seed. Seed inserts the six `sources` rows every boot and, only if `courses` is empty, loads `artifacts/seed-config.json`. Every route and ingester receives that one `ctx` object; there is no DI framework, just a struct passed down.
@@ -33,7 +35,8 @@ Twelve tables, in four groups. The boundary between groups 1 and 2 is the most i
 - `overrides` — per item: `hidden`, `done`, `snoozed_until`, `note`. "Done here only" never goes to the source.
 - `item_links` — pairs of items that are the same real-world homework (Canvas + Gradescope). `method=auto` rows are recomputed every sync; `manual` rows are never touched.
 - `job_state` — your relationship with a job: stage, notes, applied date, next action. This *is* the applications tracker (DECISIONS 027).
-- `courses` — your classes, with role, color, links, schedule, `submits_via`, and a grading override. Seeded once, then edited in Settings.
+- `courses` — your classes, with role, color, links, schedule, `submits_via`, a grading override, and a `file_sync` config (target names, rules, fallback). Seeded once, then edited in Settings.
+- `file_sync_state` — per Canvas file: your manual target, the model's answer, where the agent placed it. Rule decisions are derived, not stored.
 
 Because group 2 is separate from group 1, **a re-sync can never wipe a decision**, and any of the three (source data, overrides, links) can be reset without touching the others. That's why the store looks slightly redundant.
 
@@ -113,6 +116,7 @@ Credentials are AES-256-GCM encrypted into `sources.config_enc`. The key is `dat
 - New per-source detail: put it in `raw`, no migration.
 - Adding a source: a folder, an `Ingester` object, one line in the registry, one id in `INGESTED_SOURCE_IDS`, a config schema in `shared`. The runner, scheduler, CLI, and Sources widget pick it up.
 - Adding a route: a file in `api/`, one `api.route(...)` line.
+- Changing how files get sorted: `shared/src/file-sync.ts` is the one decision function; the server, the UI, and the agent all call it.
 - The scheduler, the ORM, the logger. Nothing else knows about them.
 
 **Known soft spots:**

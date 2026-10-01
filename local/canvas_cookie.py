@@ -45,14 +45,18 @@ except ImportError:  # pragma: no cover
 BROWSERS = ["chrome", "chromium", "brave", "edge", "arc", "vivaldi", "opera", "safari", "firefox"]
 
 
-def read_env_key(repo_root: pathlib.Path) -> str | None:
+def read_env_value(repo_root: pathlib.Path, key: str) -> str | None:
     env = repo_root / ".env"
     if not env.exists():
         return None
     for line in env.read_text().splitlines():
-        if line.startswith("LOCAL_HELPER_KEY="):
+        if line.startswith(f"{key}="):
             return line.split("=", 1)[1].strip().strip('"').strip("'") or None
     return None
+
+
+def read_env_key(repo_root: pathlib.Path) -> str | None:
+    return read_env_value(repo_root, "LOCAL_HELPER_KEY")
 
 
 def main() -> int:
@@ -122,6 +126,12 @@ def main() -> int:
     headers = {"Content-Type": "application/json"}
     if args.key:
         headers["X-Collected-Key"] = args.key
+    # Through Cloudflare Access (prod) a script needs a service token too; the key alone never passes the edge.
+    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID") or read_env_value(repo_root, "CF_ACCESS_CLIENT_ID")
+    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET") or read_env_value(repo_root, "CF_ACCESS_CLIENT_SECRET")
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
     req = urllib.request.Request(f"{args.target.rstrip('/')}/api/sources/canvas/cookie", data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=300) as res:

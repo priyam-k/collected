@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type FileSyncFileView, type FileSyncManifestCourse, type FileSyncReport } from '@collected/shared';
-import { Api } from './api.js';
+import { Api, type SyncApi } from './api.js';
 import { classify, loadModel } from './classify.js';
 import { knownTargets, targetDir, type AgentConfig } from './config.js';
 import { cachePathFor, chooseLinkName, linkOrCopy, placementUnmodified, removePlacement, renderIndex, sha256File, writeIndex, type IndexEntry } from './place.js';
@@ -15,6 +15,8 @@ export interface SyncOptions {
   /** Skip the model even if courses ask for it. */
   noModel?: boolean;
   log?: (line: string) => void;
+  /** Tests inject a fake; production builds one from the config. */
+  api?: SyncApi;
 }
 
 export interface SyncSummary {
@@ -38,7 +40,7 @@ const nowIso = () => new Date().toISOString();
  */
 export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise<SyncSummary> {
   const log = opts.log ?? (() => {});
-  const api = new Api(cfg);
+  const api: SyncApi = opts.api ?? new Api(cfg);
   const state = loadState();
   const manifest = await api.getManifest();
   const report: FileSyncReport = { device: cfg.device, model: false, targets: {}, decisions: [], placed: [], removed: [], errors: [] };
@@ -152,7 +154,11 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   }
 
   if (!opts.dryRun) {
-    for (const [dir, info] of indexDirs) writeIndex(dir, renderIndex(info.courseCode, info.target, indexEntries(cfg, state, manifest.courses, info.courseId, dir)));
+    for (const [dir, info] of indexDirs) {
+      const entries = indexEntries(cfg, state, manifest.courses, info.courseId, dir);
+      // No index (and no folder) for a target nothing has landed in yet; an existing index is kept current, even at zero.
+      if (entries.length || existsSync(path.join(dir, '_collected.md'))) writeIndex(dir, renderIndex(info.courseCode, info.target, entries));
+    }
     state.lastRunAt = nowIso();
     saveState(state);
     if (placedPaths.length && cfg.onPlace) {

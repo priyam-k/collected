@@ -43,7 +43,7 @@ Three parts, one process. The **web app** runs in your browser. The **server** i
 ```
 [Canvas: JSON API, session cookie]  [Gradescope: HTML pages, email + password]  [Google Calendar: REST API, OAuth]  [Todoist: REST API, token]  [Simplify jobs: public JSON on GitHub]
 ↓ ingesters read on timers (15 min, 60, 30, 5, 5, 60) ↓
-[server · Node + Hono: /api routes · static files · scheduler · encryption]  [data/collected.db: SQLite, 12 tables, WAL mode · data/.secret_key]
+[server · Node + Hono: /api routes · static files · scheduler · encryption]  [data/collected.db: SQLite, 13 tables, WAL mode · data/.secret_key]
 ↑ browser calls /api/… as JSON; polls every 60 s while visible ↑
 [web app · React: widget grid · side drawer · settings]  [Cloudflare Access + Tunnel: login wall, TLS, no open ports]
 ```
@@ -105,7 +105,7 @@ Every error response is `{"error": "message"}`. 400 for a bad request, 404 not f
 
 ## Every table, every column
 
-Twelve tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1), `real`. "json" means text containing JSON. Timestamps are ISO text. Unless noted, `updated_at` is set on every write and `created_at` on insert.
+Thirteen tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1), `real`. "json" means text containing JSON. Timestamps are ISO text. Unless noted, `updated_at` is set on every write and `created_at` on insert.
 
 **sources — one row per integration**
 
@@ -140,6 +140,7 @@ Twelve tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1),
 | notes | text, nullable | Free text shown in the drawer overview. |
 | archived | integer bool | Archived courses are skipped by ingesters and hidden from widgets. |
 | grading | json, nullable | Grade category override (chapter 9). `{mode: 'auto'\|'manual', categories: [{id, name, weight, groupIds[], match, dropLowest}]}`. Null means use Canvas groups. |
+| file_sync | json, nullable | File sync config (chapter 7b): `{enabled, targets: [{name, description}], rules: [{target, folder, module, name}], fallback: model\|unsorted\|skip, threshold, skipHint}`. Null means never set up. |
 | created_at, updated_at | text |  |
 
 #### How courses get into the system
@@ -246,6 +247,18 @@ What *is* automatic is the link to the source. When the Canvas or Gradescope ing
 | raw | json | syllabus: `{html, text}`. module_item: `{type, indent, moduleId, contentId}`, type is File, Page, Assignment, Quiz, ExternalUrl, ExternalTool. file: `{size, contentType, updatedAt}`. grading: `{dueAt, hardDueAt, submissions, gradingProgress, published, openRegradeRequests}`. grade_group: `{weight, rules: {drop_lowest?, drop_highest?, never_drop?}}`. grade_summary: `{currentScore, finalScore, currentGrade, finalGrade, applyWeights}`. |
 | updated_at | text | Rows are replaced wholesale per course and kind on each sync. |
 
+**file_sync_state — one row per (course, Canvas file) the file sync has an opinion about**
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| course_id, file_id | text, composite pk | The course and Canvas file id. |
+| manual_target | text, nullable | The user's override: a target name or `skip`. Beats everything. |
+| model_target, model_confidence, model_probabilities, model_at | text, real, json, text | What the agent's model answered. The threshold in `courses.file_sync` is applied on read, so changing it re-sorts without re-running. |
+| placed_target, placed_path, placed_device, placed_at | text | Where the agent last put the file, on which machine. |
+| updated_at | text |  |
+
+Rule decisions are not stored; `decideFile` in `shared/src/file-sync.ts` derives the effective decision on every read (manual → first matching rule → model → fallback).
+
 **widget_instances, layouts, settings — the dashboard's own state**
 
 | Table · column | Type | Meaning |
@@ -260,7 +273,7 @@ What *is* automatic is the link to the source. When the Canvas or Gradescope ing
 | settings.key | text, pk | See chapter 11. |
 | settings.value | json | Any JSON. |
 
-Migrations so far: 0000 created everything, 0001 added the Todoist map and course content details, 0002 added applied_at, next_action, next_action_at to job_state, 0003 added grading to courses, 0004 dropped the unused `applications` table (the v1 plan for the tracker before it moved onto `job_state`). Drizzle records applied ones in `__drizzle_migrations`.
+Migrations so far: 0000 created everything, 0001 added the Todoist map and course content details, 0002 added applied_at, next_action, next_action_at to job_state, 0003 added grading to courses, 0004 dropped the unused `applications` table (the v1 plan for the tracker before it moved onto `job_state`), 0005 added `courses.file_sync` and `file_sync_state`. Drizzle records applied ones in `__drizzle_migrations`.
 
 ## Effective items: the one read path
 
@@ -313,7 +326,8 @@ Two helpers do all the writing. `upsertItems(source, rows, scope)` inserts each 
 | GET /api/v1/announcements?context_codes[]=course_<id>&start_date&end_date | 30 days back, 7 ahead, for matched courses. Planner only shows unread ones. |
 | GET /api/v1/courses/:id?include[]=syllabus_body | Syllabus HTML and stripped text → course_content syllabus. |
 | GET /api/v1/courses/:id/modules?include[]=items | Module items (published, not SubHeader) → course_content module_item. |
-| GET /api/v1/courses/:id/files?sort=updated_atℴ=desc&per_page=30 | The 30 most recent visible files → course_content file. |
+| GET /api/v1/courses/:id/files?sort=updated_atℴ=desc | Every visible file → course_content file, with `raw.folderPath`, `raw.filename`, and `module_name` from module items of type File. |
+| GET /api/v1/courses/:id/folders | Folder ids → full names, to turn `folder_id` into `/Lectures/Week 3`. |
 | GET /api/v1/courses/:id/assignment_groups | Student courses only. Groups with weight and drop rules → course_content grade_group. The enrollment's totals → grade_summary. |
 | GET /api/v1/files/:id/public_url | Not in the sync; used by the file-open route (chapter 10). |
 
@@ -376,6 +390,16 @@ Off by default (`todoist.push.enabled`). When on, after every Canvas or Gradesco
 `planPush` reads Todoist (projects, open tasks in the project, 90 days of completed tasks) and the effective items, rebuilds any missing mappings from markers, and emits a list of create, update, close, delete operations with reasons. Updates are only emitted when the task's content, due, or labels differ and the hash of what we'd send differs from the last pushed hash. `executePush` creates the project and any missing labels first, applies the operations one at a time recording each in the map, and collects errors without stopping. Preview in settings is the plan without execution.
 
 The reverse direction is deliberately tiny: closing a task from the to-do widget calls Todoist's close endpoint, marks the local item done, and if the task was a mirror, writes a done override on the assignment so it disappears immediately. Nothing ever writes to Canvas or Gradescope.
+
+## File sync and the agent
+
+Course files land in folders on the laptop (DESIGN "File sync to a laptop", DECISIONS 037). Server side there is one config column, one state table, and four routes; the work happens in `collected-agent`, the `agent` workspace, running on the Mac under launchd.
+
+**Decision** (`shared/src/file-sync.ts`, used by both sides): manual override → first rule whose regexes all match (folder path, module name, filename) → the model's answer if its confidence meets the course threshold, else `unsorted` → the course fallback (`model` = wait, `unsorted`, `skip`). `skip` and `unsorted` are reserved target names.
+
+**Agent run**: `GET /api/file-sync/manifest` (enabled courses, files, config, effective decisions) → classify pending files with Laya locally → download new or changed files via `/api/canvas/files/:id/open`, following the 302 by hand so auth headers never reach the CDN → hard-link from `~/.collected/cache/<course>/<fileId>-<version>/<name>` into the target folder → `_collected.md` per folder → optional `onPlace` hook → `POST /api/file-sync/report`. State in `~/.collected/state.json` records each placement's sha256; a file whose bytes changed is never overwritten or removed (new versions become `name (v2).ext`; moves leave the modified copy and warn). Paths are only in `~/.collected/agent.json`; the server stores target names.
+
+**Auth for scripts** (DECISIONS 038): a Cloudflare Access service token. Access exchanges `CF-Access-Client-Id/Secret` for the usual JWT with the identity in `common_name`; the verifier returns `service:<name>`. `LOCAL_HELPER_KEY` in `x-collected-key` is accepted by the API middleware as well, for local use.
 
 ## Grades
 
@@ -629,6 +653,29 @@ Body `{text}`, up to 500 characters, sent to Todoist's natural-language quick ad
 - **Query:** `download=1` to force a download.
 - **Effect:** Asks Canvas for the file's public_url with the stored session and answers 302 to it. That link is single-use and points at Canvas's CDN, which serves inline, so the browser renders PDFs and no bytes pass through the server. Cache-Control no-store. 404 if Canvas isn't connected or the file is gone, 502 with a reconnect hint if the session is dead (and the source is marked needs_auth).
 
+### File sync
+
+#### GET `/api/file-sync/manifest`
+
+`{generatedAt, courses: [{course: {id, code, color}, config, files: FileSyncFileView[]}]}` for every non-archived course with `file_sync.enabled`. Each file: the Canvas metadata (`fileId, title, filename, folderPath, moduleName, contentType, size, updatedAt`), `decision` (`{target, decidedBy, confidence, reason}` or null while waiting for the model), `model`, `manualTarget`, `placed`.
+
+#### POST `/api/file-sync/report`
+
+- **Body:** `{device, model, targets: {courseId: {name: path}}, decisions: [{courseId, fileId, target, confidence, probabilities}], placed: [{courseId, fileId, target, localPath}], removed: [{courseId, fileId}], errors: [{courseId?, fileId?, message}]}`.
+- **Effect:** Upserts model answers and placements into `file_sync_state`; records the device under the `fileSync.devices` setting.
+
+#### GET `/api/file-sync/devices`
+
+`FileSyncDevice[]`: `{device, lastRunAt, model, targets, errors}` per machine that has reported, newest first.
+
+#### GET `/api/file-sync/courses/:id`
+
+One course's manifest entry (the web panel). 404 when sync was never set up for it.
+
+#### PUT `/api/file-sync/courses/:id/files/:fileId`
+
+Body `{target}`: a target name, `skip`, `unsorted`, or null to clear the override. Returns the updated file view.
+
 ### Export, import, demo
 
 #### GET `/api/export`
@@ -652,6 +699,7 @@ Removes rows the fixture loaders created (tagged `raw.demo`, known fixture ids, 
 | todo.sections | `string[]` of labels in display order | The to-do widget's tabs. Default `["homework"]`. |
 | timezone | string | Reserved; the process uses TZ. |
 | profile.initials | string (stored as given, not validated) | The header avatar. |
+| fileSync.devices | `{device: {device, lastRunAt, model, targets, errors}}` | Written by the agent's report; read by the course pane. |
 
 ### The CLI
 

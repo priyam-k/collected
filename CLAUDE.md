@@ -13,7 +13,7 @@ Personal student dashboard: Canvas, Gradescope, Google Calendar, Todoist, and a 
 `artifacts/` is docs only. No code lives there.
 
 ## Stack
-pnpm workspaces: `server` (Hono + Drizzle + better-sqlite3 + croner), `web` (Vite + React + TS + Tailwind + shadcn + TanStack Query + react-grid-layout), `shared` (types), `local` (Mac helper scripts). Docker Compose for prod. Cloudflare Tunnel + Access in front.
+pnpm workspaces: `server` (Hono + Drizzle + libsql + croner), `web` (Vite + React + TS + Tailwind + shadcn + TanStack Query + react-grid-layout), `shared` (types, schemas, the file-sync decision function), `agent` (laptop CLI: course files → local folders, Laya via ONNX), `local` (Mac helper scripts). Docker Compose for prod. Cloudflare Tunnel + Access in front.
 
 ## Conventions
 - Every ingester is also a CLI command (`pnpm sync <source>`). Build and debug it that way before wiring it to the scheduler.
@@ -22,6 +22,7 @@ pnpm workspaces: `server` (Hono + Drizzle + better-sqlite3 + croner), `web` (Vit
 - Widgets: one folder under `web/src/widgets/<type>/`, one entry in `registry.ts`. Handle every tier from `useWidgetSize()` and render empty/loading/error states.
 - Todoist push sync is one-way and only ever closes tasks. Never write code that reopens a task or touches Canvas/Gradescope from a Todoist event.
 - Tests don't hit real sources. Fixtures for Gradescope HTML and Canvas JSON live next to the parser.
+- File sync: the server stores target *names*; filesystem paths exist only in the agent's `~/.collected/agent.json`. The agent never overwrites or removes a file whose bytes changed since it placed it.
 
 ## Git
 - Commit at meaningful steps: a milestone, a working ingester, a schema change. Not per file, not per tweak.

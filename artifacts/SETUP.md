@@ -181,12 +181,34 @@ The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings 
 
 ## Phase 3 — after deploy
 
-- Paste the Canvas cookie into prod (helper takes a `--target https://collected.priyamkabra.com` flag; it sends a service token header that the app checks, since Access will otherwise block a script).
+- Paste the Canvas cookie into prod: `pnpm canvas-cookie --target https://collected.priyamkabra.com`. Scripts need the Access **service token** from the "Laptop agent" section below (the helper reads `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` from the environment or `.env`); without it Access answers with its login page, whatever headers the script sends (DECISIONS 038).
 - Enter Gradescope credentials and Todoist token in prod settings.
 - Fill in Gradescope course ids and `submits_via` per course.
 - Enable the Todoist push sync once the homework section looks right for a day.
 
+## Laptop agent (course files → folders)
+
+`collected-agent` (the `agent` workspace) keeps each course's Canvas files in folders on the Mac, sorted by rules and, for anything no rule covers, by Laya, a small decision model that runs locally. DESIGN.md "File sync to a laptop" has the design; this is the setup.
+
+1. **Access service token**, once. Cloudflare Zero Trust → Access → Service Auth → Service Tokens → Create: name `collected-agent`, pick a long duration. Copy the Client ID and Client Secret (the secret is shown once). Then Access → Applications → `collected` → Policies → Add: name `agents`, action **Service Auth**, Include → Service Token → `collected-agent`. Save. Requests carrying `CF-Access-Client-Id` / `CF-Access-Client-Secret` now get the same JWT the browser does; the app reads the identity from `common_name`.
+2. **Build and point the CLI at prod**:
+   ```sh
+   pnpm install && pnpm --filter agent build
+   alias collected-agent="node $PWD/agent/dist/cli.js"          # put in ~/.zshrc
+   collected-agent init https://collected.priyamkabra.com
+   collected-agent auth service-token <client-id> <client-secret>
+   ```
+   Config lands in `~/.collected/agent.json` (mode 600). For a local server: `init http://localhost:3000` and `auth helper-key <LOCAL_HELPER_KEY>` (or nothing at all with `AUTH_DISABLED=true`).
+3. **Turn sync on per course** in the dashboard: course drawer → Files → Sync to laptop → Set up. Name the folders (`slides`, `assignments`, `admin` are the defaults), add rules if the Canvas folder structure is obvious (`^/Lectures` → slides), pick what happens to unmatched files.
+4. **Link folders on the Mac**: `collected-agent courses` lists what the server wants; then `collected-agent link <course-id> ~/school/ling260` sets a root (targets become `~/school/ling260/slides` etc.), or `link <course-id> slides ~/Notes/LING260` for one target. `unsorted` gets a folder the same way; unmapped targets are reported as errors, never silently skipped.
+5. **Dry run, then run**: `collected-agent sync --dry-run` prints the plan and posts model decisions so the dashboard shows them; `collected-agent sync` downloads (Canvas CDN → Mac, nothing through the box) into `~/.collected/cache` and hard-links into the folders, writing a `_collected.md` index per folder. The first run that needs the model downloads ~1.7 GB of weights to `~/.cache/receptron-laya` and needs ~2 GB RAM while classifying; `--no-model` skips it.
+6. **Schedule**: `collected-agent install-launchd --interval 30` writes `~/Library/LaunchAgents/com.collected.agent.plist` (log: `~/.collected/agent.log`). `uninstall-launchd` removes it.
+7. Optional: `"onPlace": "<command>"` in `agent.json` runs after any sync that placed files, with `COLLECTED_PLACED` (newline-separated paths) and `COLLECTED_COURSES` in the environment; point it at whatever ingests your notes.
+
+Your edits are safe: the agent records what it placed and never overwrites or removes a file whose bytes changed; a newer Canvas version lands beside it as `name (v2).pdf`.
+
 ## Where the Mac still matters
 
 - The Canvas cookie helper reads Chrome on the Mac. Run it when the Sources widget says Canvas needs auth (should be rare if the ingester keeps polling).
+- The file-sync agent runs under launchd and needs the Mac awake to pull new files; the dashboard itself does not.
 - Later: the resume pipeline (Claude Code + resume skill) runs on the Mac via launchd, pulls matched jobs from the API, posts results back. Neither needs the Mac awake for the dashboard itself to work.

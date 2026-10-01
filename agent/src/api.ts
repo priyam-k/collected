@@ -15,8 +15,15 @@ export class ApiError extends Error {
   }
 }
 
+/** What the sync needs from the server; `Api` is the real one, tests pass a fake. */
+export interface SyncApi {
+  getManifest(): Promise<FileSyncManifest>;
+  postReport(report: FileSyncReport): Promise<unknown>;
+  download(fileId: string, dest: string): Promise<void>;
+}
+
 /** Talks to collected. Auth is an Access service token (prod) or the helper key (local); see DECISIONS 038. */
-export class Api {
+export class Api implements SyncApi {
   constructor(private readonly cfg: AgentConfig) {}
 
   private headers(): Record<string, string> {
