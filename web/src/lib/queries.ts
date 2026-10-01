@@ -3,6 +3,9 @@ import type {
   Course,
   CourseGrades,
   CourseInput,
+  FileSyncDevice,
+  FileSyncFileView,
+  FileSyncManifestCourse,
   ManualEventInput,
   ManualJobInput,
   EffectiveItem,
@@ -32,6 +35,8 @@ export const qk = {
   courseContent: (id: string) => ['courses', id, 'content'] as const,
   grades: ['grades'] as const,
   courseGrades: (id: string) => ['grades', id] as const,
+  fileSync: (id: string) => ['file-sync', id] as const,
+  fileSyncDevices: ['file-sync', 'devices'] as const,
 };
 
 /** Widgets poll on this cadence while the tab is visible. */
@@ -284,7 +289,32 @@ export function useSaveCourse() {
   return useMutation({
     mutationFn: ({ id, ...body }: Partial<CourseInput> & { id?: string }) =>
       id ? api<Course>(`/courses/${id}`, { method: 'PUT', json: body }) : api<Course>('/courses', { method: 'POST', json: body }),
-    onSettled: () => inv(qk.courses, qk.widgets, qk.grades),
+    onSettled: () => inv(qk.courses, qk.widgets, qk.grades, ['file-sync']),
+  });
+}
+
+/* ---------- file sync (course files → laptop) ---------- */
+
+export function useFileSyncCourse(courseId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.fileSync(courseId ?? ''),
+    queryFn: () => api<FileSyncManifestCourse>(`/file-sync/courses/${encodeURIComponent(courseId!)}`),
+    enabled: !!courseId && enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useFileSyncDevices() {
+  return useQuery({ queryKey: qk.fileSyncDevices, queryFn: () => api<FileSyncDevice[]>('/file-sync/devices'), staleTime: 30_000 });
+}
+
+/** Manual override for one file: a target name, 'skip', or null for back to rules/model. */
+export function useSetFileSyncTarget() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: ({ courseId, fileId, target }: { courseId: string; fileId: string; target: string | null }) =>
+      api<FileSyncFileView>(`/file-sync/courses/${encodeURIComponent(courseId)}/files/${encodeURIComponent(fileId)}`, { method: 'PUT', json: { target } }),
+    onSettled: () => inv(['file-sync']),
   });
 }
 

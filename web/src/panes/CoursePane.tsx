@@ -12,6 +12,7 @@ import { FileLink } from '@/widgets/FileLink';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { DueLabel, StatusBadge, manualRaw, meetingExceptions, nextMeeting } from '@/widgets/shared';
 import { CourseDates } from './CourseDates';
+import { CourseFileSync } from './CourseFileSync';
 import { CourseGrades } from './CourseGrades';
 
 const DAY_LABEL: Record<Meeting['day'], string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
@@ -58,13 +59,17 @@ const Well = ({ children, className }: { children: ReactNode; className?: string
 const EmptyWell = ({ children }: { children: ReactNode }) => <div className="rounded-2xl bg-well p-4 text-center text-[13px] text-ter">{children}</div>;
 const More = ({ onClick, children }: { onClick(): void; children: ReactNode }) => <button className="text-[12.5px] text-indigo hover:underline" onClick={onClick}>{children}</button>;
 
-function FileRow({ f, last }: { f: CourseContentRow; last?: boolean }) {
+function FileRow({ f, last, detail }: { f: CourseContentRow; last?: boolean; detail?: boolean }) {
+  const where = detail ? [f.raw.folderPath, f.moduleName].filter(Boolean).join(' · ') : '';
   return (
     <div className={cn('group/row flex items-center gap-3 px-3.5 py-[11px] transition-colors hover:bg-well2', !last && 'border-b border-line')}>
       <span className="grid size-[30px] shrink-0 place-items-center rounded-[9px] bg-card text-[9.5px] font-bold text-sub">{typeBadge(f.title)}</span>
-      <FileLink file={{ fileId: f.externalId, title: f.title, contentType: String(f.raw.contentType ?? ''), size: Number(f.raw.size) || null }} className="min-w-0 flex-1 truncate text-[13.5px]">
-        {f.title}
-      </FileLink>
+      <div className="min-w-0 flex-1">
+        <FileLink file={{ fileId: f.externalId, title: f.title, contentType: String(f.raw.contentType ?? ''), size: Number(f.raw.size) || null }} className="block truncate text-[13.5px]">
+          {f.title}
+        </FileLink>
+        {where && <div className="truncate text-[11px] text-ter" title={String(where)}>{where}</div>}
+      </div>
       <a href={canvasFileUrl(f.externalId, { download: true })} className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/row:opacity-100" title="Download" aria-label={`Download ${f.title}`}>
         <Download className="size-3.5" />
       </a>
@@ -74,10 +79,10 @@ function FileRow({ f, last }: { f: CourseContentRow; last?: boolean }) {
   );
 }
 
-function FileList({ rows, limit }: { rows: CourseContentRow[]; limit?: number }) {
+function FileList({ rows, limit, detail }: { rows: CourseContentRow[]; limit?: number; detail?: boolean }) {
   if (!rows.length) return <EmptyWell>No files synced.</EmptyWell>;
   const shown = rows.slice(0, limit ?? rows.length);
-  return <Well>{shown.map((f, i) => <FileRow key={f.id} f={f} last={i === shown.length - 1} />)}</Well>;
+  return <Well>{shown.map((f, i) => <FileRow key={f.id} f={f} last={i === shown.length - 1} detail={detail} />)}</Well>;
 }
 
 /** Module tree, in Canvas order. File items preview in place; everything else goes to Canvas. */
@@ -390,8 +395,9 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
 
         {tab === 'files' && (
           <div className="flex flex-col gap-[18px]">
+            <Section title="Sync to laptop"><CourseFileSync course={course} /></Section>
             <Section title="Modules">{contentQ.isPending ? <div className="h-16 animate-pulse rounded-2xl bg-well" /> : <Modules rows={moduleItems} />}</Section>
-            <Section title={`Files · ${files.length}`}><FileList rows={files} /></Section>
+            <Section title={`Files · ${files.length}`}><FileList rows={files} detail /></Section>
           </div>
         )}
 
