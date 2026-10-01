@@ -140,7 +140,7 @@ Thirteen tables. Types are SQLite's: `text`, `integer` (used for booleans as 0/1
 | notes | text, nullable | Free text shown in the drawer overview. |
 | archived | integer bool | Archived courses are skipped by ingesters and hidden from widgets. |
 | grading | json, nullable | Grade category override (chapter 9). `{mode: 'auto'\|'manual', categories: [{id, name, weight, groupIds[], match, dropLowest}]}`. Null means use Canvas groups. |
-| file_sync | json, nullable | File sync config: `{enabled, targets: [{name, description}], rules: [{target, folder, module, name, largerThanMb, flatten}], fallback: model\|unsorted\|skip, threshold, skipHint}`. Null means never set up. |
+| file_sync | json, nullable | File sync config: `{enabled, targets: [{name, description}], rules: [{target, folder, module, name, largerThanMb, linked, flatten}], fallback: model\|unsorted\|skip, threshold, skipHint}`. Null means never set up. |
 | created_at, updated_at | text |  |
 
 #### How courses get into the system
@@ -328,6 +328,7 @@ Two helpers do all the writing. `upsertItems(source, rows, scope)` inserts each 
 | GET /api/v1/courses/:id/modules?include[]=items | Module items (published, not SubHeader) → course_content module_item. |
 | GET /api/v1/courses/:id/files?sort=updated_atℴ=desc | Every visible file → course_content file, with `raw.folderPath`, `raw.filename`, and `module_name` from module items of type File. |
 | GET /api/v1/courses/:id/folders | Folder ids → full names, to turn `folder_id` into `/Lectures/Week 3`. |
+| GET /api/v1/courses/:id/files/:fileId (then /api/v1/files/:fileId) | Only for file ids linked in assignment descriptions, the syllabus body, announcements, or module File items that the listing did not return (hidden folders). Up to 40 per course per run; a 401/403/404 means that file is locked or gone and is skipped without touching the source status. Stored as a file row with `raw.linkedFrom: {kind, title}`. |
 | GET /api/v1/courses/:id/assignment_groups | Student courses only. Groups with weight and drop rules → course_content grade_group. The enrollment's totals → grade_summary. |
 | GET /api/v1/files/:id/public_url | Not in the sync; used by the file-open route (chapter 10). |
 
@@ -657,7 +658,7 @@ Body `{text}`, up to 500 characters, sent to Todoist's natural-language quick ad
 
 #### GET `/api/file-sync/manifest`
 
-`{generatedAt, courses: [{course: {id, code, color}, config, files: FileSyncFileView[]}]}` for every non-archived course with `file_sync.enabled`. Each file: the Canvas metadata (`fileId, title, filename` (the display name), `folderPath, moduleName, modulePosition, contentType, size, updatedAt`), `decision` (`{target, decidedBy, confidence, reason, flatten?}` or null while waiting for the model), `model`, `manualTarget`, `placed`.
+`{generatedAt, courses: [{course: {id, code, color}, config, files: FileSyncFileView[]}]}` for every non-archived course with `file_sync.enabled`. Each file: the Canvas metadata (`fileId, title, filename` (the display name), `folderPath, moduleName, modulePosition, contentType, size, updatedAt, linkedFrom`), `decision` (`{target, decidedBy, confidence, reason, flatten?}` or null while waiting for the model), `model`, `manualTarget`, `placed`.
 
 #### POST `/api/file-sync/report`
 

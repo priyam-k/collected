@@ -69,6 +69,7 @@ Still open:
 - [x] Web: Sync panel in the course Files tab (folders, rules, fallback, per-file decision and override, make-rule, device paths); folder path and module under files.
 - [x] Live on the Mac (2026-10-01): Access service token, five courses linked into the Obsidian vault, launchd every 30 min, Jev key set.
 - [x] Policy and mechanics pass with the vault's ingest session (DECISIONS 040): display names, mirrored folders with `flatten`, adoption by content hash, atomic writes with Canvas mtimes, skip rules, handouts, `pull`, course facts files.
+- [x] Files reachable only through links (syllabus PDFs, assignment specs in hidden folders) are ingested and routed (2026-10-01): 10 found across LING260, ENME480, CMSC422.
 - [ ] Open: whether to skip STAT410-style blank notes (no reliable way to pair them with their filled versions); whether to add a read-only Canvas browsing command (needs a Canvas GET proxy route).
 
 ## Later
