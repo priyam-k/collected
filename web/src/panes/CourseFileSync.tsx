@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FolderSync, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderSync, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FILE_SYNC_SKIP, FILE_SYNC_UNSORTED, type Course, type FileSyncConfig, type FileSyncFileView, type FileSyncRule, type FileSyncTarget } from '@collected/shared';
 import { Button } from '@/components/ui/button';
@@ -157,8 +157,10 @@ function DecisionRow({ f, course, config, last }: { f: FileSyncFileView; course:
 
 type Filter = 'all' | 'unsorted' | 'pending' | 'skip';
 
+/** Collapsed by default: the drawer is for the course, this is plumbing. The header line says the little that matters. */
 export function CourseFileSync({ course }: { course: Course }) {
   const cfg = course.fileSync;
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const save = useSaveCourse();
@@ -166,30 +168,50 @@ export function CourseFileSync({ course }: { course: Course }) {
   const devicesQ = useFileSyncDevices();
   const devices = useMemo(() => (devicesQ.data ?? []).filter((d) => d.targets[course.id]), [devicesQ.data, course.id]);
 
-  if (!cfg) {
-    return (
-      <div className="rounded-2xl bg-well p-4 text-[13px]">
-        <div className="mb-1 flex items-center gap-2 font-medium"><FolderSync className="size-4 text-indigo" /> Keep this course's files in folders on your laptop</div>
-        <p className="mb-3 text-xs text-ter">New Canvas files land in named folders (slides, assignments, …) automatically, sorted by rules you write or by a small model that runs on your laptop. Nothing is overwritten once you've edited it.</p>
-        {editing ? <ConfigEditor course={course} initial={DEFAULT_CONFIG} onDone={() => setEditing(false)} /> : <Button size="xs" onClick={() => setEditing(true)}>Set up</Button>}
-      </div>
-    );
-  }
-
   const files = viewQ.data?.files ?? [];
   const counts = {
     unsorted: files.filter((f) => f.decision?.target === FILE_SYNC_UNSORTED).length,
     pending: files.filter((f) => !f.decision).length,
     skip: files.filter((f) => f.decision?.target === FILE_SYNC_SKIP).length,
   };
+  const summary = !cfg
+    ? 'not set up'
+    : !cfg.enabled
+      ? 'paused'
+      : [`${files.length} files`, counts.unsorted && `${counts.unsorted} unsorted`, counts.pending && `${counts.pending} waiting for model`, devices[0] && `synced ${friendlyDate(devices[0].lastRunAt)}`].filter(Boolean).join(' · ');
+  const attention = !!cfg?.enabled && (counts.unsorted > 0 || counts.pending > 0);
+
+  const header = (
+    <button type="button" className="flex w-full items-center gap-1.5 px-1.5 pb-2 text-left" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      {open ? <ChevronDown className="size-3.5 shrink-0 text-ter" /> : <ChevronRight className="size-3.5 shrink-0 text-ter" />}
+      <span className="text-[13px] font-semibold text-sub">Sync to laptop</span>
+      <span className={cn('min-w-0 truncate text-[12px]', attention ? 'text-amber' : 'text-ter')}>· {summary}</span>
+    </button>
+  );
+  if (!open) return <section>{header}</section>;
+
+  if (!cfg) {
+    return (
+      <section>
+        {header}
+        <div className="rounded-2xl bg-well p-4 text-[13px]">
+          <div className="mb-1 flex items-center gap-2 font-medium"><FolderSync className="size-4 text-indigo" /> Keep this course's files in folders on your laptop</div>
+          <p className="mb-3 text-xs text-ter">New Canvas files land in named folders (slides, assignments, …) automatically, sorted by rules you write or by a decision model for the rest. Nothing is overwritten once you've edited it.</p>
+          {editing ? <ConfigEditor course={course} initial={DEFAULT_CONFIG} onDone={() => setEditing(false)} /> : <Button size="xs" onClick={() => setEditing(true)}>Set up</Button>}
+        </div>
+      </section>
+    );
+  }
+
   const shown = files.filter((f) => (filter === 'all' ? true : filter === 'pending' ? !f.decision : f.decision?.target === filter));
   const toggle = (enabled: boolean) => save.mutate({ id: course.id, fileSync: { ...cfg, enabled } }, { onError: (e) => toast.error(e.message) });
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <section className="flex flex-col gap-2.5">
+      {header}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[13px]">
         <Switch size="sm" checked={cfg.enabled} onCheckedChange={toggle} aria-label="Sync this course's files" />
-        <span className={cn(!cfg.enabled && 'text-ter')}>
+        <span className={cn('min-w-0 truncate', !cfg.enabled && 'text-ter')}>
           {cfg.enabled ? 'Syncing' : 'Paused'} · {cfg.targets.map((t) => t.name).join(', ')} · {cfg.rules.length} rule{cfg.rules.length === 1 ? '' : 's'} · unmatched: {cfg.fallback === 'model' ? `model ≥ ${cfg.threshold}` : cfg.fallback}
         </span>
         <span className="flex-1" />
@@ -200,9 +222,13 @@ export function CourseFileSync({ course }: { course: Course }) {
       <div className="px-1 text-[11.5px] text-ter">
         {devices.length ? (
           devices.map((d) => (
-            <div key={d.device} className="truncate">
+            <div key={d.device} className="truncate" title={Object.entries(d.targets[course.id] ?? {}).map(([n, p]) => `${n} → ${p}`).join('\n')}>
               <span className="font-medium text-sub">{d.device}</span> · synced {friendlyDate(d.lastRunAt)}{d.model ? ' · model on' : ''} ·{' '}
-              {Object.entries(d.targets[course.id] ?? {}).map(([n, p]) => `${n} → ${p.replace(/^\/Users\/[^/]+/, '~')}`).join(' · ') || 'no folders linked'}
+              {(() => {
+                const paths = Object.values(d.targets[course.id] ?? {});
+                const root = paths.length ? paths[0]!.replace(/\/[^/]+$/, '').replace(/^\/Users\/[^/]+/, '~') : null;
+                return root ? `${root}/{${Object.keys(d.targets[course.id] ?? {}).join(',')}}` : 'no folders linked';
+              })()}
               {d.errors.length > 0 && <span className="text-amber"> · {d.errors.length} error{d.errors.length === 1 ? '' : 's'}: {d.errors[0]!.message}</span>}
             </div>
           ))
@@ -216,9 +242,10 @@ export function CourseFileSync({ course }: { course: Course }) {
           {(['all', 'unsorted', 'pending', 'skip'] as Filter[]).map((k) => {
             const n = k === 'all' ? files.length : counts[k];
             if (k !== 'all' && !n) return null;
+            const label = k === 'pending' ? 'waiting for model' : k;
             return (
-              <button key={k} className={cn('chip', filter === k && 'chip-on')} onClick={() => setFilter(k)}>
-                {k === 'pending' ? 'waiting for model' : k} <span className="opacity-70">{n}</span>
+              <button key={k} type="button" className={cn('chip', filter === k && 'chip-on')} onClick={() => setFilter(k)}>
+                {`${label} · ${n}`}
               </button>
             );
           })}
@@ -232,6 +259,6 @@ export function CourseFileSync({ course }: { course: Course }) {
       ) : (
         <div className="rounded-2xl bg-well p-4 text-center text-[13px] text-ter">{files.length ? 'Nothing here.' : 'No files synced from Canvas yet.'}</div>
       )}
-    </div>
+    </section>
   );
 }

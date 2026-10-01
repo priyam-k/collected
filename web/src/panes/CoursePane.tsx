@@ -395,7 +395,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
 
         {tab === 'files' && (
           <div className="flex flex-col gap-[18px]">
-            <Section title="Sync to laptop"><CourseFileSync course={course} /></Section>
+            <CourseFileSync course={course} />
             <Section title="Modules">{contentQ.isPending ? <div className="h-16 animate-pulse rounded-2xl bg-well" /> : <Modules rows={moduleItems} />}</Section>
             <Section title={`Files · ${files.length}`}><FileList rows={files} detail /></Section>
           </div>
