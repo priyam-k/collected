@@ -1,0 +1,26 @@
+{
+  "name": "@collected/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Laptop agent: downloads Canvas course files from collected into local folders, sorted by rules and a local decision model.",
+  "bin": { "collected-agent": "./dist/cli.js" },
+  "files": ["dist"],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@collected/shared": "workspace:*",
+    "@receptron/laya": "^0.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.13",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

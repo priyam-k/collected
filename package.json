@@ -15,7 +15,8 @@
     "sync": "pnpm --filter server sync",
     "cli": "pnpm --filter server cli",
     "db:generate": "pnpm --filter server db:generate",
-    "canvas-cookie": "python3 local/canvas_cookie.py"
+    "canvas-cookie": "python3 local/canvas_cookie.py",
+    "agent": "pnpm --filter agent dev"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

@@ -2,10 +2,13 @@ packages:
   - shared
   - server
   - web
+  - agent
 
 # pnpm 12 blocks postinstall scripts unless allowed here.
 allowBuilds:
   esbuild: true
+  # the agent's local decision model (Laya) runs on ONNX Runtime, which installs a native binary
+  onnxruntime-node: true
 
 # pnpm 12 delays brand-new releases by default; jose's latest was excluded during install.
 minimumReleaseAgeExclude:
