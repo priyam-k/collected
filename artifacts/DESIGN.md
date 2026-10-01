@@ -71,6 +71,7 @@ collected/
       settings/     sources, courses, todoist, jobs, layout
       lib/          api client, query hooks
   shared/           types shared by server and web
+  agent/            laptop agent: downloads course files into local folders (CLI + launchd)
   local/            mac helpers (canvas cookie), later resume pipeline
   docker-compose.yml
   Dockerfile
@@ -78,7 +79,7 @@ collected/
   CLAUDE.md
 ```
 
-pnpm workspaces: `server`, `web`, `shared`.
+pnpm workspaces: `server`, `web`, `shared`, `agent`.
 
 Dev: Vite on 5173 proxies `/api` to the server on 3000. Prod: server on 3000 serves both.
 
@@ -114,6 +115,8 @@ Unique on (`source`, `external_id`). Soft-delete when a source stops returning a
 **Manual items** — `items` rows with `source = manual`: exam, quiz, and final dates, cancelled or virtual sessions, notes on a day. `kind = event`, `raw` is `ManualEventRaw` (`eventKind`, `date`, `start`/`end` or all-day, `location`, `note`, `meetingKind` for session tags). No `sources` row and no ingester; `INGESTED_SOURCE_IDS` is the list with ingesters. Written through `POST/PUT/DELETE /api/items/manual`.
 
 **Grades** — two more `course_content` kinds from Canvas: `grade_group` (assignment group: `raw.weight`, `raw.rules` with drop_lowest etc.) and `grade_summary` (the enrollment's computed current/final score and whether Canvas applies weights). Assignments carry `raw.groupId`, `raw.omitFromFinal`, `raw.excused`. `courses.grading` (nullable JSON, `GradingConfig`) overrides the categories: `mode: manual` with `{ name, weight, groupIds, match (title regex), dropLowest }` per category. `lib/grades.ts` computes the current grade Canvas-style; nothing is stored.
+
+**file_sync_state** — one row per (course, Canvas file) the sync has an opinion about: `manual_target?` (the user's override, `skip` allowed), `model_target?` + `model_confidence?` + `model_probabilities?` + `model_at?` (what the agent's classifier said), `placed_target?` + `placed_path?` + `placed_device?` + `placed_at?` (where the agent last put it). Rule decisions are not stored; they are derived from `courses.file_sync` on every read so editing a rule re-sorts.
 
 **widget_instances** — `id`, `type`, `config` (JSON), `hidden`.
 **layouts** — `breakpoint` (lg | md | sm), `layout` (JSON array of `{i, x, y, w, h}`).
@@ -164,6 +167,22 @@ Direction: store → Todoist, never back. Todoist-side changes never modify Canv
 - Runs after every canvas / gradescope run. Batches writes via the sync endpoint.
 
 The todo widget reads the unified store, not Todoist, so the homework section works with the push sync off.
+
+## File sync to a laptop (agent)
+
+Course files land in folders on the laptop automatically, so local tools (Claude Code over lecture notes, a PDF reader) see them without hand downloads. Three facts shape it: the server can't write to a laptop, the browser can't either unattended, and the box must not carry file bytes (egress). So a small **agent** runs on the laptop under launchd and the bytes go Canvas CDN → laptop; the server only knows files, rules, and decisions.
+
+**Split.** The server stores, per course, `courses.file_sync`: `{ enabled, targets: [{ name, description }], rules: [{ target, folder?, module?, name? }], fallback: model | unsorted | skip, threshold, skipHint }`. Targets are *names* with a one-line description (`slides: "lecture slides and notes"`). Local **paths** live only in the agent's config (`~/.collected/agent.json`): per course a `root` and optional per-target overrides; an unmapped target defaults to `<root>/<name>`. A web page cannot learn a filesystem path, and a path belongs to a device, not to the course.
+
+**Deciding where a file goes**, in precedence order: a manual override; the first rule whose regexes all match (`folder` against the Canvas folder path, `module` against the module name, `name` against the filename, case-insensitive); the model's choice if its confidence is at or above `threshold`, else `unsorted`; otherwise the fallback. `skip` is a reserved target meaning "don't place". `unsorted` is a reserved target the UI surfaces for one-click correction; a correction can be turned into a rule. Nothing is dropped silently.
+
+**The model** is Laya (open-weight System 1 decision model, ModernBERT-large, ONNX via `@receptron/laya`) running on the laptop inside the agent, loaded lazily only when some file has no rule or manual decision and the course's fallback is `model`. Subject = `{ title, filename, folder, module, type }`; criteria = the targets' descriptions plus `skip` with the course's `skipHint`. It returns calibrated probabilities; the agent reports the choice and probabilities, the server applies the threshold on read so changing it re-sorts without re-running. Jev is the hosted alternative with the same request shape; a base-URL swap if local inference ever gets in the way.
+
+**Agent run** (`collected-agent sync`, every 30 min, `--dry-run` for a plan): pull `GET /api/file-sync/manifest` (every enabled course with its files, config, and effective decisions) → classify pending files → download new or updated files into a **staging cache** (`~/.collected/cache/<course>/<fileId>-<version>/<filename>`) via `/api/canvas/files/:id/open`, following the 302 to the CDN *without* forwarding auth headers → **hard-link** from the cache into the target folder → write `_collected.md` in each target folder (title, Canvas folder, module, updated, size, link per file) → run the optional `onPlace` hook → `POST /api/file-sync/report` with decisions, placements, and the device's name→path map so the UI can show them.
+
+**Placement rules.** The cache is the pristine copy; targets are views by hard link, so re-sorting is relink, undoing a skip is instant, and nothing is downloaded twice. The agent records the sha256 of what it placed; if the file at the target no longer matches (annotations saved over it), it is never overwritten or removed: a new Canvas version lands beside it as `name (v2).ext`, a re-sort leaves the modified copy where it is and warns. Name collisions between different files get ` (2)`.
+
+**Auth.** The agent authenticates through Cloudflare Access with a **service token** (`CF-Access-Client-Id/Secret` headers; Access mints a JWT whose identity is `common_name`, which the app accepts like an email). `LOCAL_HELPER_KEY` in `x-collected-key` is accepted by the API middleware as a second credential for local use.
 
 ## Widget system
 
@@ -235,6 +254,10 @@ GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state   { state?, not
 GET  /api/jobs/tracked  GET /api/jobs/:id  POST /api/jobs (manual entry)  DELETE /api/jobs/:id (manual only)
 GET  /api/canvas/files/:id/open?download  (302 to a one-shot inline link)
 POST /api/items/manual  PUT/DELETE /api/items/manual/:externalId   (course dates and session tags)
+GET  /api/file-sync/manifest   (agent: enabled courses, files, effective decisions)
+POST /api/file-sync/report     (agent: model decisions, placements, device target map)
+GET  /api/file-sync/courses/:id   PUT /api/file-sync/courses/:id/files/:fileId { target|null }   (web: decisions, manual override)
+GET  /api/file-sync/devices    (web: per-device last run and target paths)
 GET  /api/grades  (current grade per course)  GET /api/grades/:courseId  (categories, assignments, Canvas's own numbers)
 GET/PUT /api/settings
 GET  /api/export  POST /api/import     (courses, settings, layout, widgets)

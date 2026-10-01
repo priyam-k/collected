@@ -62,6 +62,13 @@ Still open:
 - Jobs settings: per-rule "what this excludes" sample. The live match counter is there.
 - Docker build verification on the Mac (blocked by Docker Desktop networking; see Environment notes). Build on the VPS with `--platform linux/amd64` or natively.
 
+## File sync (started 2026-10-01)
+
+- [ ] Server: `courses.file_sync`, `file_sync_state`, folder paths + module names on Canvas file rows (all files, not 30), decision logic, `/api/file-sync/*`, service-token auth fix.
+- [ ] Agent workspace: `collected-agent link | sync | status | install-launchd`, staging cache, hard links, `_collected.md`, Laya classification, report.
+- [ ] Web: Sync panel in the course Files tab (targets, rules, fallback, per-file decision and override, device paths); folder path on file rows.
+- [ ] You: create the Cloudflare Access service token (SETUP.md), run `collected-agent init`, link one course, `sync --dry-run`.
+
 ## Later
 
 Parked 2026-09-24 while the multi-user question is worked out (see the discussion notes when they land in DESIGN/DECISIONS):
