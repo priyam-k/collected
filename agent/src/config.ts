@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import path from 'node:path';
+import { isInside } from './place.js';
 
 /**
  * ~/.collected/agent.json. Paths live here and only here (DESIGN "File sync to a laptop"): the server knows
@@ -42,8 +43,13 @@ export interface ModelConfig {
   baseUrl?: string;
   /** Default jev-latest */
   model?: string;
-  /** Or the TYPESAFE_API_KEY environment variable. Set with: collected-agent auth model <key> */
+  /** Or the TYPESAFE_API_KEY environment variable. Set with: collected-agent auth model */
   apiKey?: string;
+  /**
+   * The API key is only sent to typesafe.ai hosts. Set true to send it to another `baseUrl` (a proxy of your own);
+   * nothing sets this for you, since the key would go to whatever the URL says.
+   */
+  trustHost?: boolean;
 }
 
 export const agentHome = (): string => process.env.COLLECTED_AGENT_HOME || path.join(homedir(), '.collected');
@@ -61,9 +67,17 @@ export function loadConfig(): AgentConfig {
   return { ...base, ...raw, auth: raw.auth ?? {}, courses: raw.courses ?? {}, model: { ...base.model, ...(raw.model ?? {}) } };
 }
 
+/** Owner-only, written to a temp name and renamed in, so a crash never leaves a truncated or readable copy. */
+export function writePrivate(file: string, content: string): void {
+  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, content, { mode: 0o600 });
+  chmodSync(tmp, 0o600); // `mode` applies only on create; a leftover tmp keeps its old bits otherwise
+  renameSync(tmp, file);
+}
+
 export function saveConfig(cfg: AgentConfig): void {
-  mkdirSync(agentHome(), { recursive: true });
-  writeFileSync(configPath(), `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600 });
+  writePrivate(configPath(), `${JSON.stringify(cfg, null, 2)}\n`);
 }
 
 export const expandHome = (p: string): string => (p.startsWith('~/') ? path.join(homedir(), p.slice(2)) : p);
@@ -88,7 +102,19 @@ export function courseIndexPath(cfg: AgentConfig, courseId: string): string | nu
   return path.resolve(c.root ? expandHome(c.root) : process.cwd(), expandHome(c.index));
 }
 
-/** Absolute folder for a target on this machine, or null when neither a mapping nor a course root exists. */
+const realpathOr = (p: string): string => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+};
+
+/**
+ * Absolute folder for a target on this machine, or null when neither a mapping nor a course root exists. A target
+ * without an explicit mapping is `<root>/<target>` and must stay under the root: lexically, and again after
+ * resolving symlinks on whatever part of it exists. Only an explicit mapping (the user's own path) may point elsewhere.
+ */
 export function targetDir(cfg: AgentConfig, courseId: string, target: string): string | null {
   const c = cfg.courses[courseId];
   if (!c) return null;
@@ -96,8 +122,13 @@ export function targetDir(cfg: AgentConfig, courseId: string, target: string): s
   const base = c.root ? expandHome(c.root) : process.cwd();
   const explicit = c.targets?.[target];
   if (explicit) return path.resolve(base, expandHome(explicit));
-  if (c.root) return path.resolve(base, target);
-  return null;
+  if (!c.root) return null;
+  const root = path.resolve(base);
+  const dir = path.resolve(root, target);
+  if (!isInside(root, dir)) return null;
+  const realRoot = realpathOr(root);
+  const realDir = existsSync(dir) ? realpathOr(dir) : path.join(realRoot, path.relative(root, dir));
+  return isInside(realRoot, realDir) ? dir : null;
 }
 
 /** Every target path this device knows for a course (for the report / UI). */

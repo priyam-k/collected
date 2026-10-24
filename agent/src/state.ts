@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { agentHome } from './config.js';
+import { agentHome, writePrivate } from './config.js';
 
 /** What this machine has placed. Keyed by `${courseId}/${fileId}`. */
 export interface Placement {
@@ -41,9 +41,7 @@ export function loadState(): AgentState {
   return { placements: raw.placements ?? {}, lastRunAt: raw.lastRunAt ?? null };
 }
 
+/** 0600 like agent.json: the placements are a map of the vault. */
 export function saveState(state: AgentState): void {
-  mkdirSync(agentHome(), { recursive: true });
-  const file = statePath();
-  writeFileSync(`${file}.tmp`, `${JSON.stringify(state, null, 2)}\n`);
-  renameSync(`${file}.tmp`, file);
+  writePrivate(statePath(), `${JSON.stringify(state, null, 2)}\n`);
 }

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { allowedTargets, fileSyncOverrideSchema, fileSyncReportSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { courses } from '../db/schema.js';
-import { applyReport, buildManifest, configOf, courseView, listDevices, setManualTarget } from '../lib/file-sync.js';
+import { applyReport, buildManifest, configOf, courseView, listDevices, listSyncFiles, setManualTarget } from '../lib/file-sync.js';
 import { bad, parseBody } from './util.js';
 
 /**
@@ -40,7 +40,9 @@ export function fileSyncRoutes(ctx: AppContext) {
     if (!config) bad('file sync is not set up for this course', 409);
     const { target } = await parseBody(c, fileSyncOverrideSchema);
     if (target && !allowedTargets(config).includes(target)) bad(`unknown target "${target}"`, 422);
-    await setManualTarget(ctx, course.id, c.req.param('fileId'), target);
+    const fileId = c.req.param('fileId');
+    if (!(await listSyncFiles(ctx, course.id)).some((f) => f.fileId === fileId)) bad('no such file in this course', 404);
+    await setManualTarget(ctx, course.id, fileId, target);
     const view = await courseView(ctx, course);
     return c.json(view!.files.find((f) => f.fileId === c.req.param('fileId')) ?? { ok: true });
   });

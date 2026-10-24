@@ -127,5 +127,25 @@ describe('manifest and report', () => {
     expect((await courseView(ctx, row))!.files.find((f) => f.fileId === '2')?.decision).toMatchObject({ target: 'skip', decidedBy: 'manual' });
     await setManualTarget(ctx, 'c1', '2', null);
     expect((await courseView(ctx, row))!.files.find((f) => f.fileId === '2')?.decision?.decidedBy).toBe('model');
+
+    // A report may only speak about files the course has and targets its config names; the rest is dropped, not stored.
+    const r = await applyReport(ctx, {
+      device: 'mbp',
+      model: true,
+      targets: {},
+      decisions: [
+        { courseId: 'c1', fileId: '999', target: 'slides', confidence: 0.9, probabilities: null },
+        { courseId: 'c1', fileId: '2', target: 'exfil', confidence: 0.9, probabilities: null },
+        { courseId: 'nope', fileId: '2', target: 'slides', confidence: 0.9, probabilities: null },
+      ],
+      placed: [{ courseId: 'c1', fileId: '1', target: 'elsewhere', localPath: '/x' }],
+      removed: [],
+      errors: [],
+    });
+    expect(r.ignored).toBe(4);
+    const view = (await courseView(ctx, row))!;
+    expect(view.files.find((f) => f.fileId === '2')?.model?.target).toBe('assignments');
+    expect(view.files.find((f) => f.fileId === '1')?.placed).toMatchObject({ target: 'slides' });
+    expect(view.files.some((f) => f.fileId === '999')).toBe(false);
   });
 });

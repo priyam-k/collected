@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { secureHeaders } from 'hono/secure-headers';
 import { serve } from '@hono/node-server';
 import { createApi } from './api/index.js';
 import { bootstrap } from './bootstrap.js';
@@ -9,6 +10,31 @@ const ctx = await bootstrap();
 const { env, log } = ctx;
 
 const app = new Hono();
+// Everything is same-origin except Canvas file previews, which `/api/canvas/files/:id/open` redirects to the
+// InstFS CDN; CSP checks the redirect target, hence `https:` for images and frames. No inline scripts: the theme
+// bootstrap is a module. Inline styles stay because React, Radix and sonner set them.
+app.use(
+  '*',
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'https:', 'data:'],
+      frameSrc: ["'self'", 'https:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'none'"],
+      objectSrc: ["'none'"],
+      workerSrc: ["'none'"],
+    },
+    referrerPolicy: 'no-referrer',
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+  }),
+);
 app.route('/api', createApi(ctx));
 const servingSpa = mountStatic(app, env);
 

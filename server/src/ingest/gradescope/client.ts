@@ -1,8 +1,12 @@
 import * as cheerio from 'cheerio';
 import makeFetchCookie from 'fetch-cookie';
 import { CookieJar } from 'tough-cookie';
+import { MB, readText, withTimeout } from '../../lib/http.js';
 import type { Logger } from '../../lib/log.js';
 import { NeedsAuthError } from '../types.js';
+
+const REQUEST_TIMEOUT_MS = 45_000;
+const MAX_PAGE_BYTES = 4 * MB;
 
 export const GRADESCOPE_BASE = 'https://www.gradescope.com';
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
@@ -47,9 +51,11 @@ export class GradescopeClient {
   private async raw(path: string, init: RequestInit = {}): Promise<Response> {
     this.requestCount++;
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
+    if (new URL(url).origin !== new URL(this.baseUrl).origin) throw new Error(`refusing to fetch off-host Gradescope URL`);
     return this.fetchWithCookies(url, {
       ...init,
-      redirect: 'follow',
+      signal: withTimeout(init.signal ?? undefined, REQUEST_TIMEOUT_MS),
+      redirect: init.redirect ?? 'follow',
       headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml', ...(init.headers ?? {}) },
     });
   }
@@ -63,11 +69,11 @@ export class GradescopeClient {
   /** GET an HTML page, logging in once if the session is gone. */
   async getHtml(path: string, signal?: AbortSignal): Promise<string> {
     let res = await this.raw(path, { signal });
-    let html = await res.text();
+    let html = await readText(res, MAX_PAGE_BYTES);
     if (GradescopeClient.landedOnLogin(res, html) || res.status === 401) {
       await this.login(signal);
       res = await this.raw(path, { signal });
-      html = await res.text();
+      html = await readText(res, MAX_PAGE_BYTES);
       if (GradescopeClient.landedOnLogin(res, html)) throw new NeedsAuthError('Gradescope still shows the login page after logging in');
     }
     if (!res.ok) throw new Error(`Gradescope ${res.status} for ${path}`);
@@ -77,7 +83,7 @@ export class GradescopeClient {
   async login(signal?: AbortSignal): Promise<void> {
     this.logins++;
     const page = await this.raw('/login', { signal });
-    const html = await page.text();
+    const html = await readText(page, MAX_PAGE_BYTES);
     const $ = cheerio.load(html);
     const form = $('form[action="/login"]').first();
     if (!form.length) throw new Error('Gradescope login form not found');
@@ -92,13 +98,22 @@ export class GradescopeClient {
     body.set('session[email]', this.creds.email);
     body.set('session[password]', this.creds.password);
     body.set('session[remember_me]', '1');
-    const res = await this.raw('/login', {
+    // The credentials go to exactly one URL. A 307/308 would otherwise replay the form body wherever the
+    // redirect points, so the POST is not followed; the landing page is fetched by hand on the same host.
+    let res = await this.raw('/login', {
       method: 'POST',
       body,
       signal,
+      redirect: 'manual',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: `${this.baseUrl}/login`, Origin: this.baseUrl },
     });
-    const after = await res.text();
+    if (res.status >= 300 && res.status < 400) {
+      const location = new URL(res.headers.get('location') ?? '/', this.baseUrl);
+      if (location.origin !== new URL(this.baseUrl).origin) throw new Error('Gradescope login redirected off-host');
+      await res.arrayBuffer().catch(() => undefined);
+      res = await this.raw(location.pathname + location.search, { signal });
+    }
+    const after = await readText(res, MAX_PAGE_BYTES);
     if (GradescopeClient.landedOnLogin(res, after) || /Invalid email\/password/i.test(after)) {
       throw new NeedsAuthError('Gradescope rejected the email/password');
     }

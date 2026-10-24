@@ -14,8 +14,11 @@ export interface UpsertResult {
 /**
  * Upserts rows by id and soft-deletes rows of the same source that were not seen, within `scope`
  * (extra conditions such as kind='assignment' and courseId IN tracked). Restores rows that come back.
+ *
+ * With zero rows the soft-delete is skipped unless `opts.allowEmpty`: an upstream that answers nothing is far
+ * more often broken than empty, and the push sync treats a deleted assignment as "delete the task".
  */
-export async function upsertItems(ctx: AppContext, source: SourceId, rows: NewItemRow[], scope?: SQL[]): Promise<UpsertResult> {
+export async function upsertItems(ctx: AppContext, source: SourceId, rows: NewItemRow[], scope?: SQL[], opts: { allowEmpty?: boolean } = {}): Promise<UpsertResult> {
   const now = nowIso();
   let created = 0;
   const seen = new Set<string>();
@@ -50,7 +53,9 @@ export async function upsertItems(ctx: AppContext, source: SourceId, rows: NewIt
     if (res[0]?.firstSeenAt === now) created++;
   }
   let deleted = 0;
-  if (scope) {
+  if (scope && !seen.size && !opts.allowEmpty) {
+    ctx.log.warn({ source }, 'upstream returned nothing; keeping existing rows instead of soft-deleting them');
+  } else if (scope) {
     const conds = [eq(items.source, source), isNull(items.deletedAt), ...scope];
     if (seen.size) conds.push(notInArray(items.id, [...seen]));
     const gone = await ctx.db.update(items).set({ deletedAt: now }).where(and(...conds)).returning({ id: items.id });

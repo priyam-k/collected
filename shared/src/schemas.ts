@@ -3,6 +3,40 @@ import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERV
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
+/** Free text the UI shows; bounded so a bad client cannot park megabytes in one row. */
+const text = (max: number) => z.string().max(max);
+/** A link the UI will render as an href: http(s) only. */
+export const httpUrlSchema = z
+  .string()
+  .max(2048)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), { message: 'must start with http:// or https://' });
+
+const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+|0\.\d+\.\d+\.\d+|\[?::1\]?|\[?fe80:.*|\[?f[cd][0-9a-f]{2}:.*)$/i;
+/**
+ * A URL the server will fetch on the user's behalf (Canvas host, iCal feed, job feed): https to a public host, or
+ * plain http to loopback for a development fixture server. Keeps the server from being pointed at its own network.
+ */
+export const outboundUrlSchema = z
+  .string()
+  .max(2048)
+  .url()
+  .refine(
+    (raw) => {
+      try {
+        const u = new URL(raw);
+        if (u.username || u.password) return false;
+        const priv = PRIVATE_HOST.test(u.hostname);
+        if (u.protocol === 'https:') return !priv;
+        if (u.protocol === 'http:') return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname);
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'must be an https URL to a public host' },
+  );
+
 export const meetingSchema = z.object({
   day: z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
   start: z.string().regex(/^\d{2}:\d{2}$/),
@@ -14,7 +48,7 @@ export const meetingSchema = z.object({
 export const meetingKindSchema = z.string().regex(/^[a-z][a-z0-9_]*$/, 'kind must be lowercase letters, digits, underscores');
 export const courseScheduleSchema = z.record(meetingKindSchema, z.array(meetingSchema));
 
-export const courseLinkSchema = z.object({ label: z.string().min(1), url: z.string().url() });
+export const courseLinkSchema = z.object({ label: text(200).min(1), url: httpUrlSchema });
 
 export const gradeCategorySchema = z.object({
   id: z.string().min(1),
@@ -78,31 +112,32 @@ export const fileSyncOverrideSchema = z.object({ target: targetName.nullable() }
 
 /** What the agent posts after a run. */
 export const fileSyncReportSchema = z.object({
-  device: z.string().trim().min(1).max(80),
+  device: z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9][A-Za-z0-9 ._-]*$/, 'letters, digits, space, . _ -'),
   model: z.boolean().default(false),
-  targets: z.record(z.string(), z.record(z.string(), z.string())).default({}),
+  targets: z.record(text(120), z.record(targetName, text(1024))).default({}),
   decisions: z
-    .array(z.object({ courseId: z.string(), fileId: z.string(), target: targetName, confidence: z.number().min(0).max(1).nullable(), probabilities: z.record(z.string(), z.number()).nullable().default(null) }))
+    .array(z.object({ courseId: text(120), fileId: text(120), target: targetName, confidence: z.number().min(0).max(1).nullable(), probabilities: z.record(targetName, z.number().min(0).max(1)).nullable().default(null) }))
+    .max(5000)
     .default([]),
-  placed: z.array(z.object({ courseId: z.string(), fileId: z.string(), target: targetName, localPath: z.string() })).default([]),
-  removed: z.array(z.object({ courseId: z.string(), fileId: z.string() })).default([]),
-  errors: z.array(z.object({ courseId: z.string().optional(), fileId: z.string().optional(), message: z.string() })).default([]),
+  placed: z.array(z.object({ courseId: text(120), fileId: text(120), target: targetName, localPath: text(1024) })).max(5000).default([]),
+  removed: z.array(z.object({ courseId: text(120), fileId: text(120) })).max(5000).default([]),
+  errors: z.array(z.object({ courseId: text(120).optional(), fileId: text(120).optional(), message: text(1000) })).max(200).default([]),
 });
 export type FileSyncReport = z.infer<typeof fileSyncReportSchema>;
 
 export const courseInputSchema = z.object({
-  term: z.string().min(1),
-  code: z.string().min(1).transform((s) => s.toUpperCase().replace(/\s+/g, '')),
-  section: z.string().nullable().optional(),
-  name: z.string().nullable().optional(),
+  term: text(40).min(1),
+  code: text(40).min(1).transform((s) => s.toUpperCase().replace(/\s+/g, '')),
+  section: text(40).nullable().optional(),
+  name: text(200).nullable().optional(),
   role: z.enum(COURSE_ROLES).default('student'),
   canvasCourseId: z.string().nullable().optional(),
   gradescopeCourseId: z.string().nullable().optional(),
   submitsVia: z.enum(SUBMITS_VIA).default('both'),
-  color: z.string().nullable().optional(),
-  links: z.array(courseLinkSchema).default([]),
+  color: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, 'expected a hex color').nullable().optional(),
+  links: z.array(courseLinkSchema).max(50).default([]),
   schedule: courseScheduleSchema.default({}),
-  notes: z.string().nullable().optional(),
+  notes: text(20_000).nullable().optional(),
   archived: z.boolean().default(false),
   grading: gradingConfigSchema.nullable().optional(),
   fileSync: fileSyncConfigSchema.nullable().optional(),
@@ -186,23 +221,23 @@ export const overrideInputSchema = z.object({
   hidden: z.boolean().optional(),
   done: z.boolean().optional(),
   snoozedUntil: z.string().nullable().optional(),
-  note: z.string().nullable().optional(),
+  note: text(4000).nullable().optional(),
 });
 
 export const jobStatePatchSchema = z.object({
   state: z.enum(JOB_STATES).optional(),
-  notes: z.string().nullable().optional(),
+  notes: text(10_000).nullable().optional(),
   appliedAt: isoDay.nullable().optional(),
-  nextAction: z.string().nullable().optional(),
+  nextAction: text(500).nullable().optional(),
   nextActionAt: isoDay.nullable().optional(),
-  resumePath: z.string().nullable().optional(),
+  resumePath: text(1024).nullable().optional(),
 });
 
 /** A job you add by hand (not from the feed): referral, career fair, a company site. */
 export const manualJobInputSchema = z.object({
-  company: z.string().trim().min(1),
-  title: z.string().trim().min(1),
-  url: z.union([z.string().url(), z.literal('')]).default(''),
+  company: text(200).trim().min(1),
+  title: text(300).trim().min(1),
+  url: z.union([httpUrlSchema, z.literal('')]).default(''),
   locations: z.array(z.string().trim().min(1)).default([]),
   state: z.enum(JOB_STATES).default('applied'),
   appliedAt: isoDay.nullable().optional(),
@@ -234,13 +269,13 @@ export type ManualEventInput = z.infer<typeof manualEventInputSchema>;
 // Per-source config bodies (secrets). Stored encrypted; never returned by the API.
 export const sourceConfigSchemas = {
   canvas: z.object({
-    baseUrl: z.string().url().default('https://umd.instructure.com'),
+    baseUrl: outboundUrlSchema.default('https://umd.instructure.com'),
     cookieHeader: z.string().optional(), // raw "name=value; name2=value2" pasted from the browser
     cookieJar: z.unknown().optional(), // serialized tough-cookie jar, maintained by the ingester
   }),
-  canvas_ical: z.object({ url: z.string().url() }),
+  canvas_ical: z.object({ url: outboundUrlSchema }),
   gradescope: z.object({ email: z.string().email(), password: z.string().min(1) }),
   gcal: z.object({ refreshToken: z.string().min(1) }),
   todoist: z.object({ token: z.string().min(1) }),
-  jobs: z.object({ sources: z.array(z.object({ id: z.string(), url: z.string().url() })).default([]) }),
+  jobs: z.object({ sources: z.array(z.object({ id: z.string().regex(/^(?!manual$)[a-z0-9][a-z0-9_-]{0,39}$/, 'lowercase id; "manual" is reserved'), url: outboundUrlSchema })).max(20).default([]) }),
 } as const;

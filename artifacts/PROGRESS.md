@@ -19,7 +19,9 @@ Last updated: 2026-09-24. Deploys now run from GitHub Actions on push to `main` 
   - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
   - [x] Ops Agent on the box is inactive and disabled (checked 2026-09-24).
   - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
-  - [ ] Backup cron (SETUP.md VPS step 5). **Do this next**: the 2026-10-01 incident had nothing to restore from.
+  - [ ] Backup cron on the box (`scripts/backup.sh`, SETUP.md step 10). **Do this next**: the 2026-10-01 incident had nothing to restore from; the pre-migration snapshot now covers schema changes only.
+  - [x] Security review (`SECURITY-REVIEW.md`, 2026-10-23): Tiers 1 and 2 fixed (DECISIONS 043). Left: license, fixture scrubbing, `previous.txt`, and the dashboard checks (Access cookie SameSite, GCP snapshots).
+  - [ ] Post-fix manual steps (SETUP.md 9 and 10): `gh secret set DEPLOY_HOST/DEPLOY_USER`, create the `production` environment with a required reviewer, protect `main`, enable Dependabot alerts, add the backup cron on the box and verify a dump; keep GCP snapshots until then.
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.
 
 ## Post-run checklist (needs you)

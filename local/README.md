@@ -13,4 +13,4 @@ pnpm canvas-cookie -- --browser arc    # chrome | chromium | brave | edge | arc 
 pnpm canvas-cookie -- --target https://collected.priyamkabra.com
 ```
 
-The production target sits behind Cloudflare Access, which blocks scripts. Either create an Access **service token** and send its two headers (a one-line change in this script), or paste the cookie into Settings → Sources on the site instead.
+The production target sits behind Cloudflare Access, which blocks scripts. The script reads the Access **service token** and the helper key from `~/.collected/agent.json` once the CLI is set up (`collected auth service-token <id>`, `collected auth helper-key`), falling back to `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` / `LOCAL_HELPER_KEY` in the environment or the repo `.env`. Or paste the cookie into Settings → Sources on the site instead. Only the three Canvas session cookies are sent, and only to an https target (http is accepted for localhost).

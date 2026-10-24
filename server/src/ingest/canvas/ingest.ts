@@ -5,8 +5,8 @@ import { courses, items, type NewItemRow } from '../../db/schema.js';
 import { replaceCourseContent, upsertItems } from '../../lib/items.js';
 import { getSourceConfig, setSourceConfig } from '../../lib/sources.js';
 import { addDays } from '../../lib/time.js';
-import { NotConfiguredError, type Ingester } from '../types.js';
-import { CanvasClient, type CanvasConfig } from './client.js';
+import { NeedsAuthError, NotConfiguredError, type Ingester } from '../types.js';
+import { CanvasClient, isAbort, type CanvasConfig } from './client.js';
 import {
   announcementToRow,
   assignmentToRow,
@@ -82,8 +82,19 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
   const noteLinks = (canvasId: string, html: string | null | undefined, from: LinkedFrom) => {
     for (const id of linkedFileIds(html)) noteLink(canvasId, id, from);
   };
+  // A course whose assignments call failed is left out of the soft-delete scope below: an empty answer from a 5xx
+  // or a cancelled run once read as "every assignment is gone" and the push sync deleted the Todoist tasks.
+  const failedCourses = new Set<string>();
   for (const [canvasId, cc] of ctxByCanvasId) {
-    const list = await client.tryGetAll<CanvasAssignment>(`/api/v1/courses/${canvasId}/assignments`, { 'include[]': ['submission'], order_by: 'due_at' }, { signal });
+    let list: CanvasAssignment[];
+    try {
+      list = await client.getAll<CanvasAssignment>(`/api/v1/courses/${canvasId}/assignments`, { 'include[]': ['submission'], order_by: 'due_at' }, { signal });
+    } catch (err) {
+      if (err instanceof NeedsAuthError || isAbort(err, signal)) throw err;
+      failedCourses.add(cc.courseId);
+      ctx.log.warn({ err: (err as Error).message, course: cc.courseId }, 'canvas assignments unavailable; keeping existing rows');
+      continue;
+    }
     for (const a of list) {
       if (a.published === false) continue;
       rows.set(`canvas:assignment:${a.id}`, assignmentToRow(a, cc, baseUrl));
@@ -91,6 +102,7 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
     }
   }
   counts.assignments = rows.size;
+  counts.coursesFailed = failedCourses.size;
 
   // Planner overlay: planner overrides (marked complete), missing flags, events, announcements in the window.
   const now = new Date();
@@ -139,7 +151,8 @@ export async function syncCanvas(ctx: AppContext, client: CanvasClient, signal?:
   counts.announcements = anns.length;
 
   // Upsert. Soft-delete assignments for tracked courses that Canvas no longer returns; leave events/announcements to age out.
-  const result = await upsertItems(ctx, 'canvas', [...rows.values()], [eq(items.kind, 'assignment'), inArray(items.courseId, trackedCourseIds)]);
+  const deleteScope = trackedCourseIds.filter((id) => !failedCourses.has(id));
+  const result = await upsertItems(ctx, 'canvas', [...rows.values()], deleteScope.length ? [eq(items.kind, 'assignment'), inArray(items.courseId, deleteScope)] : undefined);
   counts.upserted = result.upserted;
   counts.created = result.created;
   counts.deleted = result.deleted;

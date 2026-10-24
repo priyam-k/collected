@@ -6,7 +6,7 @@ import { ITEM_KINDS, SOURCE_IDS, manualEventInputSchema, overrideInputSchema, ty
 import type { AppContext } from '../context.js';
 import { itemLinks, items, overrides, type NewItemRow } from '../db/schema.js';
 import { queryEffectiveItems } from '../lib/effective.js';
-import { bad, csv, parseBody } from './util.js';
+import { bad, csv, intParam, parseBody } from './util.js';
 
 /** A local wall-clock date/time (server TZ) as ISO. Dates in the tracker and course events are days, not instants. */
 const localIso = (date: string, time: string | null | undefined): string => new Date(`${date}T${time ?? '00:00'}:00`).toISOString();
@@ -94,7 +94,7 @@ export function itemsRoutes(ctx: AppContext) {
       includeHidden: q.includeHidden === '1' || q.includeHidden === 'true',
       includeInformational: q.includeInformational === '1' || q.includeInformational === 'true',
       noCollapse: q.noCollapse === '1',
-      limit: q.limit ? Number(q.limit) : undefined,
+      limit: intParam(q.limit, { max: 5000, def: 2000 }),
     });
     return c.json(rows);
   });

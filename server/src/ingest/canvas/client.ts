@@ -1,7 +1,15 @@
 import makeFetchCookie from 'fetch-cookie';
 import { Cookie, CookieJar } from 'tough-cookie';
+import { MB, readText, safeUrlForLog, withTimeout } from '../../lib/http.js';
 import type { Logger } from '../../lib/log.js';
 import { NeedsAuthError, NotConfiguredError } from '../types.js';
+
+/** One Canvas response: a page of 100 assignments with descriptions is well under 1 MB. */
+export const MAX_RESPONSE_BYTES = 8 * MB;
+export const REQUEST_TIMEOUT_MS = 45_000;
+
+/** A fetch that died because the run was cancelled must not look like "that endpoint is unavailable". */
+export const isAbort = (err: unknown, signal?: AbortSignal): boolean => !!signal?.aborted || (err instanceof Error && err.name === 'AbortError');
 
 export interface CanvasConfig {
   baseUrl: string;
@@ -50,14 +58,14 @@ export function buildUrl(baseUrl: string, path: string, params: Params = {}): st
 /** Builds a jar from a pasted "a=b; c=d" cookie header. */
 export async function jarFromCookieHeader(header: string, baseUrl: string): Promise<CookieJar> {
   const jar = new CookieJar();
-  const host = new URL(baseUrl).hostname;
   for (const part of header.split(';')) {
     const idx = part.indexOf('=');
     if (idx <= 0) continue;
     const name = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
     if (!name || name.toLowerCase() === 'cookie:') continue;
-    const cookie = new Cookie({ key: name, value, domain: host, path: '/', secure: true, httpOnly: true });
+    // No explicit domain: the jar makes it host-only, so the session never travels to a sibling subdomain.
+    const cookie = new Cookie({ key: name, value, path: '/', secure: true, httpOnly: true });
     await jar.setCookie(cookie, baseUrl);
   }
   return jar;
@@ -95,9 +103,11 @@ export class CanvasClient {
   /** One GET. Throws NeedsAuthError on anything that looks like a dead session. */
   async getRaw(path: string, params: Params = {}, signal?: AbortSignal, opts: { deniedIsNull?: boolean } = {}): Promise<{ data: unknown; link: Record<string, string> }> {
     const url = buildUrl(this.baseUrl, path, params);
+    // Absolute URLs come from Link headers; a hostile upstream must not steer the session elsewhere.
+    if (new URL(url).origin !== new URL(this.baseUrl).origin) throw new Error(`refusing to fetch ${safeUrlForLog(url)}: not on the Canvas host`);
     this.requestCount++;
     const res = await this.fetchWithCookies(url, {
-      signal,
+      signal: withTimeout(signal, REQUEST_TIMEOUT_MS),
       headers: {
         Accept: 'application/json+canvas-string-ids, application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 collected/0.1',
@@ -114,8 +124,8 @@ export class CanvasClient {
       throw new NeedsAuthError(`Canvas returned ${ct || 'non-JSON'} for ${path}; the session is probably gone`);
     }
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Canvas ${res.status} for ${path}: ${body.slice(0, 200)}`);
+      const body = await readText(res, 64 * 1024).catch(() => '');
+      throw new Error(`Canvas ${res.status} for ${safeUrlForLog(url)}: ${body.slice(0, 200)}`);
     }
     const remainingHeader = res.headers.get('x-rate-limit-remaining');
     if (remainingHeader !== null) {
@@ -125,8 +135,10 @@ export class CanvasClient {
         await sleep(1500);
       }
     }
-    const text = await res.text();
-    return { data: JSON.parse(stripCanvasPrefix(text)), link: parseLinkHeader(res.headers.get('link')) };
+    const text = await readText(res, MAX_RESPONSE_BYTES);
+    const link = parseLinkHeader(res.headers.get('link'));
+    if (link.next && new URL(link.next, url).origin !== new URL(this.baseUrl).origin) delete link.next;
+    return { data: JSON.parse(stripCanvasPrefix(text)), link };
   }
 
   async get<T>(path: string, params: Params = {}, signal?: AbortSignal): Promise<T> {
@@ -142,7 +154,7 @@ export class CanvasClient {
     try {
       return (await this.getRaw(path, {}, signal, { deniedIsNull: true })).data as T | null;
     } catch (err) {
-      if (err instanceof NeedsAuthError) throw err;
+      if (err instanceof NeedsAuthError || isAbort(err, signal)) throw err;
       this.log.debug({ err: (err as Error).message, path }, 'canvas optional resource failed');
       return null;
     }
@@ -167,7 +179,7 @@ export class CanvasClient {
     try {
       return await this.get<T>(path, params, signal);
     } catch (err) {
-      if (err instanceof NeedsAuthError) throw err;
+      if (err instanceof NeedsAuthError || isAbort(err, signal)) throw err;
       this.log.debug({ err: (err as Error).message, path }, 'canvas optional endpoint failed');
       return null;
     }
@@ -177,7 +189,7 @@ export class CanvasClient {
     try {
       return await this.getAll<T>(path, params, opts);
     } catch (err) {
-      if (err instanceof NeedsAuthError) throw err;
+      if (err instanceof NeedsAuthError || isAbort(err, opts.signal)) throw err;
       this.log.debug({ err: (err as Error).message, path }, 'canvas optional list failed');
       return [];
     }

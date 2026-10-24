@@ -63,7 +63,8 @@ describe('commands', () => {
     expect((await resolveCourse(api, '422')).code).toBe('CMSC422');
     expect((await resolveCourse(api, '2026-fall-cmsc330-0103')).code).toBe('CMSC330');
     await expect(resolveCourse(api, 'cmsc')).rejects.toThrow(/no course "cmsc"/);
-    await expect(resolveCourse(api, '0')).rejects.toThrow(/matches ENME480, CMSC330; be more specific/);
+    await expect(resolveCourse(api, '0')).rejects.toThrow(/no course "0"/); // suffixes need three digits
+    await expect(resolveCourse(api, 'e480')).rejects.toThrow(/no course "e480"/);
     expect(isCollectedCommand('assignments')).toBe(true);
     expect(isCollectedCommand('sync')).toBe(false); // the file sync keeps that name
   });

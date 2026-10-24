@@ -14,6 +14,8 @@ import { useSearchParams } from 'react-router';
 import { useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { relative } from '@/lib/time';
+import { safeHref } from '@/lib/url';
+import { safeColor } from '@/lib/color';
 import { Field, PageTitle } from './ui';
 
 const STATUS_VARIANT: Record<Source['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -145,7 +147,7 @@ function DataViewer({ source }: { source: Source }) {
                     {d.recent.map((r) => (
                       <li key={r.id} className="flex items-baseline gap-2 text-xs">
                         <span className="w-20 shrink-0 text-muted-foreground">{r.kind}</span>
-                        {r.url ? <a className="min-w-0 flex-1 truncate hover:underline" href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : <span className="min-w-0 flex-1 truncate">{r.title}</span>}
+                        {safeHref(r.url) ? <a className="min-w-0 flex-1 truncate hover:underline" href={safeHref(r.url)} target="_blank" rel="noreferrer">{r.title}</a> : <span className="min-w-0 flex-1 truncate">{r.title}</span>}
                         <span className="shrink-0 text-muted-foreground">{r.courseId ? d.byCourse.find((c) => c.courseId === r.courseId)?.code : r.labels.length ? r.labels.join(',') : ''}</span>
                         <span className="w-24 shrink-0 text-right text-muted-foreground">{friendlyDate(r.dueAt ?? r.startsAt)}</span>
                         <span className="w-16 shrink-0 text-right text-muted-foreground">{r.status}</span>
@@ -309,6 +311,15 @@ interface GCalMeta {
   demo?: boolean;
 }
 
+/** Fixed messages for the `reason` codes the OAuth callback redirects with; anything else reads as `unknown`. */
+const GOOGLE_ERRORS: Record<string, string> = {
+  denied: 'Google connect failed: access was denied on the consent screen',
+  expired: 'Google connect failed: the sign-in link expired, try again',
+  exchange: 'Google connect failed: Google rejected the token exchange',
+  config: 'Google connect failed: check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and the redirect URL',
+  unknown: 'Google connect failed',
+};
+
 function GoogleForm({ source }: { source: Source }) {
   const meta = (source.meta ?? {}) as GCalMeta;
   const patch = usePatchSourceMeta();
@@ -319,7 +330,7 @@ function GoogleForm({ source }: { source: Source }) {
     if (!g) return;
     if (g === 'connected') toast.success('Google Calendar connected');
     else if (g === 'unconfigured') toast.error('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env first');
-    else toast.error(`Google connect failed: ${params.get('reason') ?? g}`);
+    else toast.error(GOOGLE_ERRORS[params.get('reason') ?? ''] ?? GOOGLE_ERRORS.unknown);
     params.delete('google');
     params.delete('reason');
     setParams(params, { replace: true });
@@ -349,7 +360,7 @@ function GoogleForm({ source }: { source: Source }) {
           {meta.calendars.map((c) => (
             <label key={c.id} className="flex items-center gap-2 text-sm">
               <Checkbox checked={selected.has(c.id)} onCheckedChange={(v) => toggle(c.id, v === true)} />
-              <span className="inline-block size-2.5 rounded-full" style={{ background: c.backgroundColor ?? '#888' }} />
+              <span className="inline-block size-2.5 rounded-full" style={{ background: safeColor(c.backgroundColor) ?? '#888' }} />
               <span className="truncate">{c.summary}</span>
               {c.primary && <span className="text-xs text-muted-foreground">primary</span>}
               {meta.defaultCalendarId === c.id ? (

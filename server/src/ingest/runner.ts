@@ -59,10 +59,21 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
   running.add(ing.id);
   const started = Date.now();
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(new Error('timeout')), ing.timeoutMs ?? 120_000);
+  const timeoutMs = ing.timeoutMs ?? 120_000;
+  let timer: NodeJS.Timeout | undefined;
+  // The signal only cancels fetches that honour it; the race is what guarantees the run is recorded as an error,
+  // the after-hooks (dedup, Todoist push) do not act on partial data, and the mutex is released.
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      ac.abort(new Error('timeout'));
+      reject(new Error(`run exceeded ${Math.round(timeoutMs / 1000)} s`));
+    }, timeoutMs);
+  });
   await setSourceStatus(ctx, ing.id, row.status as SourceStatus, { lastRunAt: nowIso() });
   try {
-    const result = await ing.run(ctx, ac.signal);
+    const run = ing.run(ctx, ac.signal);
+    run.catch(() => {}); // settled later by the abort; the race already reported it
+    const result = await Promise.race([run, timeout]);
     const ms = Date.now() - started;
     await setSourceStatus(ctx, ing.id, 'connected', { lastError: null, lastSuccessAt: nowIso() });
     await mergeSourceMeta(ctx, ing.id, { ...(result.meta ?? {}), lastRun: { at: nowIso(), ms, counts: result.counts ?? {} } });

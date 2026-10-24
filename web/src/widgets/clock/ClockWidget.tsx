@@ -4,6 +4,7 @@ import { meetingLabel } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCourses, useItems, useUpsertWidget } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { meetingExceptions, nextMeeting, windowFromNow, type NextMeeting } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
@@ -31,7 +32,7 @@ function useNextClass(): (NextMeeting & { code: string; color: string | null }) 
     let best: (NextMeeting & { code: string; color: string | null }) | null = null;
     for (const c of (courses.data ?? []).filter((c) => !c.archived)) {
       const m = nextMeeting(c.schedule, meetingExceptions((manual.data ?? []).filter((it) => it.courseId === c.id)));
-      if (m && (!best || m.when < best.when)) best = { ...m, code: c.code, color: c.color };
+      if (m && (!best || m.when < best.when)) best = { ...m, code: c.code, color: safeColor(c.color) ?? null };
     }
     return best;
   }, [courses.data, manual.data]);

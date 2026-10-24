@@ -1,5 +1,6 @@
 import { FILE_SYNC_SKIP, type FileSyncConfig, type FileSyncFile } from '@collected/shared';
 import type { ModelConfig } from './config.js';
+import { assertSecureUrl } from './guard.js';
 
 export interface ModelAnswer {
   target: string;
@@ -33,11 +34,28 @@ export const criteriaFor = (cfg: FileSyncConfig): Record<string, string> => ({
 
 const apiKeyOf = (m: ModelConfig): string | undefined => m.apiKey || process.env.TYPESAFE_API_KEY || undefined;
 
+const isTypesafeHost = (base: string): boolean => {
+  try {
+    const h = new URL(base).hostname.toLowerCase();
+    return h === 'typesafe.ai' || h.endsWith('.typesafe.ai');
+  } catch {
+    return false;
+  }
+};
+
+/** The key goes to TypeSafe's hosts, or to a host the user explicitly vouched for; a local laya-serve needs none. */
+const sendsKey = (m: ModelConfig, base: string): boolean => isTypesafeHost(base) || m.trustHost === true;
+
 /** Why the model can't be called right now, or null when it can. */
 export function modelUnavailable(m: ModelConfig): string | null {
   if (!m.enabled) return 'the model is turned off in agent.json';
   const base = m.baseUrl ?? DEFAULT_MODEL_BASE_URL;
-  if (/typesafe\.ai/.test(base) && !apiKeyOf(m)) return 'no TypeSafe API key (collected-agent auth model <key>)';
+  try {
+    assertSecureUrl(base, 'model.baseUrl');
+  } catch (e) {
+    return (e as Error).message;
+  }
+  if (isTypesafeHost(base) && !apiKeyOf(m)) return 'no TypeSafe API key (collected-agent auth model)';
   return null;
 }
 
@@ -52,9 +70,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** One decision: which target (or skip) this course file belongs to, with the model's confidence in that pick. */
 export async function classify(m: ModelConfig, cfg: FileSyncConfig, file: FileSyncFile, fetchImpl: typeof fetch = fetch): Promise<ModelAnswer> {
   const base = (m.baseUrl ?? DEFAULT_MODEL_BASE_URL).replace(/\/$/, '');
+  assertSecureUrl(base, 'model.baseUrl');
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
   const key = apiKeyOf(m);
-  if (key) headers.authorization = `Bearer ${key}`;
+  if (key && sendsKey(m, base)) headers.authorization = `Bearer ${key}`;
+  const criteria = criteriaFor(cfg);
   const body = JSON.stringify({
     model: m.model ?? DEFAULT_MODEL,
     state: subjectFor(file),
@@ -62,16 +82,17 @@ export async function classify(m: ModelConfig, cfg: FileSyncConfig, file: FileSy
       target: {
         type: 'choice',
         instructions: 'This is a file posted to a university course page. Which local folder should it be saved to, or should it be skipped?',
-        criteria: criteriaFor(cfg),
+        criteria,
       },
     },
   });
+  const call = () => fetchImpl(`${base}/v1/systemone`, { method: 'POST', headers, body, signal: AbortSignal.timeout(30_000) });
 
-  let res = await fetchImpl(`${base}/v1/systemone`, { method: 'POST', headers, body });
+  let res = await call();
   if (res.status === 429 || res.status === 529) {
     const wait = Math.min(10_000, Number(res.headers.get('retry-after') ?? 2) * 1000 || 2000);
     await sleep(wait);
-    res = await fetchImpl(`${base}/v1/systemone`, { method: 'POST', headers, body });
+    res = await call();
   }
   if (!res.ok) {
     const text = (await res.text().catch(() => '')).slice(0, 200);
@@ -80,7 +101,11 @@ export async function classify(m: ModelConfig, cfg: FileSyncConfig, file: FileSy
   const data = (await res.json()) as { answers?: Record<string, SystemOneAnswer> };
   const a = data.answers?.target;
   if (!a?.choice) throw new Error('model returned no choice');
-  const probabilities = a.probabilities ?? null;
-  const confidence = a.confidence ?? (probabilities ? (probabilities[a.choice] ?? null) : null);
+  // The answer becomes a folder name: only a criterion we offered counts, and numbers must be numbers.
+  if (typeof a.choice !== 'string' || !Object.hasOwn(criteria, a.choice)) throw new Error(`model chose "${String(a.choice).slice(0, 40)}", not one of the targets`);
+  const inRange = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
+  const probabilities =
+    a.probabilities && typeof a.probabilities === 'object' ? Object.fromEntries(Object.entries(a.probabilities).filter(([k, v]) => Object.hasOwn(criteria, k) && inRange(v))) : null;
+  const confidence = a.confidence == null ? (probabilities?.[a.choice] ?? null) : inRange(a.confidence) ? a.confidence : null;
   return { target: a.choice, confidence, probabilities };
 }

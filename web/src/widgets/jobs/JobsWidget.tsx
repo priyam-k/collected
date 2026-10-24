@@ -7,6 +7,7 @@ import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useJobStats, useJobs, useMarkJobsSeen, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeHref } from '@/lib/url';
 import { usePane } from '@/panes/PaneContext';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
@@ -95,9 +96,11 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
     >
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{job.company}</span>
-        <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/card:opacity-100" title="Open the posting" aria-label="Open the posting" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-          <ExternalLink className="size-3" />
-        </a>
+        {safeHref(job.url) && (
+          <a href={safeHref(job.url)} target="_blank" rel="noreferrer" className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/card:opacity-100" title="Open the posting" aria-label="Open the posting" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+            <ExternalLink className="size-3" />
+          </a>
+        )}
         <span className="shrink-0 text-[11px] text-ter">{friendlyDate(job.postedAt)}</span>
       </div>
       <div className={cn('text-[12.5px] leading-[1.4] text-sub', compact ? 'truncate' : 'line-clamp-2')} title={job.title}>{job.title}</div>

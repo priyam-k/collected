@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateManualEvent, useDeleteManualEvent, useItems, useUpdateManualEvent } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeHref } from '@/lib/url';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { manualRaw } from '@/widgets/shared';
 
@@ -205,7 +206,7 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
             <Button size="icon-xs" variant="ghost" aria-label="Remove" className="text-destructive" onClick={() => remove(r.item)}><Trash2 className="size-3" /></Button>
           </span>
         ) : (
-          r.item.url && <a href={r.item.url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100" title="Open in Canvas"><ExternalLink className="size-3" /></a>
+          safeHref(r.item.url) && <a href={safeHref(r.item.url)} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100" title="Open in Canvas"><ExternalLink className="size-3" /></a>
         )}
       </li>
     );

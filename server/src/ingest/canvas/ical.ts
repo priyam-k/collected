@@ -3,11 +3,12 @@ import { eq } from 'drizzle-orm';
 import { sourceConfigSchemas } from '@collected/shared';
 import type { AppContext } from '../../context.js';
 import { courses, type CourseRow, type NewItemRow } from '../../db/schema.js';
+import { assertAllowedOutboundUrl, MB, readText, withTimeout } from '../../lib/http.js';
 import { upsertItems } from '../../lib/items.js';
 import { getSourceConfig } from '../../lib/sources.js';
 import { isoOrNull } from '../../lib/time.js';
 import { NotConfiguredError, type Ingester } from '../types.js';
-import { normCode } from './map.js';
+import { httpOnly, normCode } from './map.js';
 
 interface VEvent {
   type: 'VEVENT';
@@ -49,7 +50,7 @@ export function parseCanvasIcs(text: string, ours: CourseRow[]): NewItemRow[] {
         courseId: course?.id ?? null,
         title,
         description: ev.description?.slice(0, 2000) ?? null,
-        url: ev.url ?? null,
+        url: httpOnly(ev.url),
         dueAt: isoOrNull(ev.start ?? null),
         startsAt: null,
         endsAt: null,
@@ -70,7 +71,7 @@ export function parseCanvasIcs(text: string, ours: CourseRow[]): NewItemRow[] {
         courseId: course?.id ?? null,
         title,
         description: ev.description?.slice(0, 2000) ?? null,
-        url: ev.url ?? null,
+        url: httpOnly(ev.url),
         startsAt: isoOrNull(ev.start ?? null),
         endsAt: isoOrNull(ev.end ?? null),
         dueAt: null,
@@ -94,9 +95,11 @@ export const canvasIcalIngester: Ingester = {
     const config = await getSourceConfig<{ url: string }>(ctx, 'canvas_ical');
     if (!config?.url) throw new NotConfiguredError('Canvas iCal feed URL not set');
     const { url } = sourceConfigSchemas.canvas_ical.parse(config);
-    const res = await fetch(url, { signal, headers: { 'User-Agent': 'collected/0.1' } });
+    assertAllowedOutboundUrl(url, 'the iCal feed URL');
+    const res = await fetch(url, { signal: withTimeout(signal, 45_000), headers: { 'User-Agent': 'collected/0.1' } });
     if (!res.ok) throw new Error(`iCal fetch ${res.status}`);
-    const text = await res.text();
+    if (!res.url.startsWith(new URL(url).origin)) throw new Error('iCal feed redirected to another host');
+    const text = await readText(res, 10 * MB);
     if (!/BEGIN:VCALENDAR/.test(text)) throw new Error('iCal URL did not return a calendar');
     const ours = await ctx.db.select().from(courses).where(eq(courses.archived, false));
     const rows = parseCanvasIcs(text, ours);

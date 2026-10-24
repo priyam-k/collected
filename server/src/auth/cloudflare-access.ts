@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -47,8 +48,7 @@ export function accessAuth(env: Env): MiddlewareHandler<{ Variables: AuthVariabl
 /** Shared-secret check for scripts (the Canvas cookie helper). Accepts if the header matches LOCAL_HELPER_KEY. */
 export function helperKeyMatches(env: Env, headerValue: string | undefined): boolean {
   if (!env.LOCAL_HELPER_KEY || !headerValue) return false;
-  if (headerValue.length !== env.LOCAL_HELPER_KEY.length) return false;
-  let diff = 0;
-  for (let i = 0; i < headerValue.length; i++) diff |= headerValue.charCodeAt(i) ^ env.LOCAL_HELPER_KEY.charCodeAt(i);
-  return diff === 0;
+  // Compare digests: constant time, and the key's length is not observable either.
+  const digest = (s: string) => createHash('sha256').update(s).digest();
+  return timingSafeEqual(digest(headerValue), digest(env.LOCAL_HELPER_KEY));
 }

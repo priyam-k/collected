@@ -5,8 +5,10 @@
     python3 local/canvas_cookie.py --target https://collected.priyamkabra.com
     pnpm canvas-cookie                                              # same thing
 
-The helper key is read from --key, $LOCAL_HELPER_KEY, or LOCAL_HELPER_KEY= in the repo's .env.
-Nothing about the cookie is printed.
+Credentials come from ~/.collected/agent.json when the collected CLI has been set up (auth.helperKey,
+auth.cfAccessClientId, auth.cfAccessClientSecret), else from --key / $LOCAL_HELPER_KEY / $CF_ACCESS_CLIENT_ID /
+$CF_ACCESS_CLIENT_SECRET, else from the repo's .env. Only the session cookies are sent, only over https (or http
+to this machine). Nothing about the cookie is printed.
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ import os
 import pathlib
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import subprocess
@@ -55,20 +58,44 @@ def read_env_value(repo_root: pathlib.Path, key: str) -> str | None:
     return None
 
 
-def read_env_key(repo_root: pathlib.Path) -> str | None:
-    return read_env_value(repo_root, "LOCAL_HELPER_KEY")
+def read_agent_auth() -> dict[str, str]:
+    """The `auth` block of ~/.collected/agent.json (the collected CLI's config), or {} when there is none."""
+    home = pathlib.Path(os.environ.get("COLLECTED_AGENT_HOME") or pathlib.Path.home() / ".collected")
+    try:
+        auth = json.loads((home / "agent.json").read_text()).get("auth") or {}
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in auth.items() if isinstance(v, str) and v}
+
+
+def credential(agent_auth: dict[str, str], agent_key: str, env_key: str, repo_root: pathlib.Path) -> str | None:
+    return agent_auth.get(agent_key) or os.environ.get(env_key) or read_env_value(repo_root, env_key)
+
+
+LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+
+def check_target(url: str) -> None:
+    u = urllib.parse.urlsplit(url)
+    if u.scheme == "https":
+        return
+    if u.scheme == "http" and u.hostname in LOOPBACK:
+        return
+    sys.exit(f"--target must be https (plain http only to localhost): {url}")
 
 
 def main() -> int:
     repo_root = pathlib.Path(__file__).resolve().parent.parent
+    agent_auth = read_agent_auth()
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--target", default=os.environ.get("COLLECTED_URL", "http://localhost:3000"))
     p.add_argument("--domain", default="umd.instructure.com")
     p.add_argument("--browser", default="chrome", choices=BROWSERS)
-    p.add_argument("--key", default=os.environ.get("LOCAL_HELPER_KEY") or read_env_key(repo_root))
+    p.add_argument("--key", default=credential(agent_auth, "helperKey", "LOCAL_HELPER_KEY", repo_root))
     p.add_argument("--cookie-file", default=None, help="path to a specific Chromium profile Cookies DB (auto-detected otherwise)")
     p.add_argument("--dry-run", action="store_true", help="only report which cookies were found")
     args = p.parse_args()
+    check_target(args.target)
 
     loader = getattr(browser_cookie3, args.browser)
     session_names = ("canvas_session", "_normandy_session", "_legacy_normandy_session")
@@ -78,7 +105,8 @@ def main() -> int:
         if cookie_file:
             kwargs["cookie_file"] = cookie_file
         jar = loader(**kwargs)
-        return {c.name: c.value for c in jar if args.domain in (c.domain or "")}
+        # Only the session cookies leave this machine; analytics and preference cookies for the domain stay here.
+        return {c.name: c.value for c in jar if args.domain in (c.domain or "") and c.name in session_names}
 
     candidates: list[str | None] = [args.cookie_file] if args.cookie_file else [None]
     if not args.cookie_file and args.browser in ("chrome", "chromium", "brave", "edge", "arc", "vivaldi"):
@@ -117,7 +145,7 @@ def main() -> int:
             f"no Canvas session cookie ({' / '.join(session_names)}) for {args.domain} in {args.browser}; "
             f"open Canvas in that browser and log in first, or pass --cookie-file for a specific profile{hint}"
         )
-    print(f"found {len(cookies)} cookies for {args.domain} in {args.browser}{' profile ' + used if used else ''}: {', '.join(sorted(cookies))}")
+    print(f"found {len(cookies)} session cookie{'s' if len(cookies) != 1 else ''} for {args.domain} in {args.browser}{' profile ' + used if used else ''}: {', '.join(sorted(cookies))}")
     if args.dry_run:
         return 0
 
@@ -127,8 +155,8 @@ def main() -> int:
     if args.key:
         headers["X-Collected-Key"] = args.key
     # Through Cloudflare Access (prod) a script needs a service token too; the key alone never passes the edge.
-    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID") or read_env_value(repo_root, "CF_ACCESS_CLIENT_ID")
-    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET") or read_env_value(repo_root, "CF_ACCESS_CLIENT_SECRET")
+    cf_id = credential(agent_auth, "cfAccessClientId", "CF_ACCESS_CLIENT_ID", repo_root)
+    cf_secret = credential(agent_auth, "cfAccessClientSecret", "CF_ACCESS_CLIENT_SECRET", repo_root)
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret

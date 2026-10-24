@@ -1,0 +1,17 @@
+# Dependabot *updates* (pull requests). Dependabot *alerts* are a separate switch under
+# Settings → Code security; turn that on too, it is what makes `pnpm audit` findings visible on the repo.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

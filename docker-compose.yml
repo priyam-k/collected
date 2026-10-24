@@ -6,12 +6,23 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
+      # The only writable path besides /tmp: collected.db, .secret_key (created on first boot), backups/ snapshots.
       - ./data:/data
+    # The image's root filesystem is immutable at runtime; the process has no capabilities and cannot gain any.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file: .env
     environment:
       DATA_DIR: /data
       TZ: ${TZ:-America/New_York}
-      # Registered in artifacts/SETUP.md; override in .env
-      PUBLIC_URL: ${PUBLIC_URL:-https://collected.priyamkabra.com}
+      # Registered in artifacts/SETUP.md; set in .env. No default: compose refuses to start without it.
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      # Pinned here so a dev .env copied onto a box cannot switch the login check off. `environment` beats `env_file`.
+      AUTH_DISABLED: "false"
       # Keeps V8 collecting instead of growing into swap on a 1 GB box; steady state is well under 100 MB.
       NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=384}

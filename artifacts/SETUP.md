@@ -81,7 +81,7 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
 1. Console → select the `collected` project → **Billing** → link a billing account (needs a card; new accounts also get trial credit). Compute Engine won't create VMs without billing enabled, but the Always Free discount is applied on the invoice.
 2. **APIs & Services → Library → Compute Engine API → Enable.**
 3. **Compute Engine → VM instances → Create instance.** Name `collected`. Region `us-east1` (any zone). Machine: series **E2**, type **e2-micro**. Boot disk → Change: **Ubuntu 24.04 LTS (x86/64)**, disk type **Standard persistent disk** (not Balanced), size **30 GB**. Leave firewall boxes unchecked (nothing inbound is needed). The newer Console wizard adds several more pages before Create — none change the price except one:
-   - **Backups**: defaults to a **Snapshot schedule**, which bills for snapshot storage (small, but not $0). Switch to **No backups** — the nightly `sqlite3 .backup` in Phase 2 already covers what actually matters.
+   - **Backups**: defaults to a **Snapshot schedule**, which bills for snapshot storage (small, but not $0). Keep it until the nightly `scripts/backup.sh` cron in step 10 has produced a dump you have restored from once; after that it is optional (the dump plus `.secret_key` is the whole state).
    - **Networking / Network performance**: leave every default (no HTTP/HTTPS firewall rules, Tier_1 networking bandwidth unchecked, default NIC). All free.
    - **Observability**: **uncheck Ops Agent.** Its two collectors (`otelopscol`, `fluent-bit`) hold ~80 MB RAM and a few percent CPU permanently, which is real money on a 1 GB box that already swaps. If it's already installed, turn it off:
      ```sh
@@ -118,7 +118,7 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
    (Clones straight into `/srv/collected`, which already exists and is owned by you — don't `mkdir` it again first.) Future updates are just `git pull` on the box. `gh auth login` is the alternative if the box will need broader GitHub access later, but it authenticates your whole account rather than one repo, so it's more than this single-purpose VM needs.
 
    Without GitHub at all: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/` from the Mac — no key setup, but no real git history on the box either, and every future update means re-running it by hand.
-6. `cd /srv/collected && cp .env.example .env` and set `AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty.
+6. `cd /srv/collected && cp .env.example .env` and set `PUBLIC_URL=https://collected.priyamkabra.com` (required: `docker compose` refuses to start without it), `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty. `AUTH_DISABLED` is pinned to `false` in `docker-compose.yml` and cannot be switched on from `.env` in a container; the container also runs with a read-only root filesystem, no capabilities and `no-new-privileges` (only `/data` and `/tmp` are writable).
    Then create the data directory owned by the container's user: `mkdir -p data && sudo chown 1000:1000 data`. The image runs as `node` (uid 1000) and the bind mount in `docker-compose.yml` replaces the ownership baked into the image; skip this and the app crash-loops with `EACCES: permission denied, open '/data/.secret_key'`. (On Ubuntu images uid 1000 is the `ubuntu` account, which is why the files show up as owned by `ubuntu`.)
 7. Build the image on the Mac and ship it. The box cannot build it: `tsc` plus Vite need ~500 MB and on 1 GB with a 0.25-vCPU share the build sat in `tsc` for 15 minutes, swapped the box into the ground, and took SSH down with it (2026-09-07). From the repo on the Mac:
    ```sh
@@ -141,10 +141,24 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
    gcloud compute instances add-metadata collected-instance-2 --zone us-east1-c --metadata-from-file ssh-keys=/tmp/ssh-keys.txt
    # what the workflow reads
    gh secret set DEPLOY_SSH_KEY < ~/.ssh/gha_deploy
-   gh variable set DEPLOY_HOST --body "$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(networkInterfaces[0].accessConfigs[0].natIP)')"
-   gh variable set DEPLOY_USER --body priyamkabra
+   gh secret set DEPLOY_HOST --body "$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(networkInterfaces[0].accessConfigs[0].natIP)')"
+   gh secret set DEPLOY_USER --body priyamkabra
+   # these used to be repository *variables*; secrets are masked in the (public, once the repo is) workflow logs
+   gh variable delete DEPLOY_HOST && gh variable delete DEPLOY_USER
    ```
-   The box's host key is pinned in the workflow; if the box is ever rebuilt, replace it with the output of `ssh-keyscan -t ed25519 <ip>`. The external IP is ephemeral (no reserved address): stopping and starting the instance changes it, so update `DEPLOY_HOST` then, or reserve the current one with `gcloud compute addresses create collected-ip --addresses <ip> --region us-east1` (check GCP's current static-IPv4 pricing first; it is no longer free). Rollback on the box: `docker tag collected:prev collected:latest && docker compose up -d`. Step 7 by hand still works as a fallback. Never `--build` on the box.
+   Then two things in the GitHub UI, once: **Settings → Environments → New environment** `production`, add yourself as a required reviewer (the `deploy` job waits for a click; the `build` job runs unattended and has no secrets), and **Settings → Branches → Add rule** for `main` (require a pull request, require the `ci` check). Anyone who can push to `main` deploys to the box, so `main` should not take direct pushes. Pull requests and other branches run `.github/workflows/ci.yml` (typecheck, tests, `pnpm audit`) with no secrets.
+
+   The box's host key is pinned in the workflow; if the box is ever rebuilt, replace it with the output of `ssh-keyscan -t ed25519 <ip>`. The external IP is ephemeral (no reserved address): stopping and starting the instance changes it, so update `DEPLOY_HOST` then, or reserve the current one with `gcloud compute addresses create collected-ip --addresses <ip> --region us-east1` (check GCP's current static-IPv4 pricing first; it is no longer free).
+
+   What the deploy does on the box (`scripts/deploy.sh`): runs `scripts/backup.sh`, loads the new image as `collected:candidate`, tags the running `collected:latest` as `collected:prev`, promotes the candidate to `latest`, `docker compose up -d`, waits up to three minutes for `/api/health`. If that fails it tags `prev` back to `latest`, restarts, and the workflow fails with `ROLLED BACK` in the log. A rollback does not undo a schema migration: the app writes `data/backups/pre-<migration>-<timestamp>.db` (the three newest are kept) before applying anything, and the `migrations applied` log line names it; see "Restore" in step 10. Manual rollback is the same two commands: `docker tag collected:prev collected:latest && docker compose up -d`. Step 7 by hand still works as a fallback (tag the image `collected:candidate` and run `sh scripts/deploy.sh /tmp/collected.tar.gz`). Never `--build` on the box.
+10. Backups. `scripts/backup.sh` writes a consistent copy of the database to `/srv/collected/backups/collected-YYYY-MM-DD.db.gz` (via `sqlite3 .backup`, or `VACUUM INTO` through the app container when `sqlite3` is not installed, which it is not on the box), copies `data/.secret_key` to `backups/secret_key` the first time, and deletes dumps older than 14 days. The deploy runs it before every restart; cron runs it nightly. On the box, `crontab -e`:
+    ```
+    # nightly 04:10 local; stdout/stderr to a log the box keeps
+    10 4 * * * cd /srv/collected && sh scripts/backup.sh >> /srv/collected/backups/backup.log 2>&1
+    ```
+    Verify it the next morning (`ls -la /srv/collected/backups`, `gunzip -t` the newest file). Off-box copy: set `BACKUP_BUCKET=gs://<bucket>/collected` in the cron line and the dump is also `gcloud storage cp`'d there (the VM's default service account needs Storage Object Creator on the bucket; a bucket with a 30-day lifecycle rule stays within the free 5 GB). With `BACKUP_RCLONE_REMOTE=<remote>` it uses `rclone copyto` instead. The key is never uploaded: put `backups/secret_key` in your password manager by hand, once. A dump without the key has every credential encrypted and unreadable, which is what you want from a bucket, and useless to you, which is why the key needs its own home.
+
+    **Restore** (new box, or undoing a bad migration): `docker compose down`, `gunzip -c backups/collected-<date>.db.gz > data/collected.db` (or `cp data/backups/pre-<migration>-<stamp>.db data/collected.db` for the pre-migration snapshot), `rm -f data/collected.db-wal data/collected.db-shm`, make sure `data/.secret_key` is the key that encrypted that database (`cp backups/secret_key data/.secret_key && chmod 600 data/.secret_key`), `sudo chown 1000:1000 data/collected.db data/.secret_key`, then start the image that matches the schema (`docker tag collected:prev collected:latest` if you are undoing a migration) and `docker compose up -d`. The app re-fetches everything else from its sources on boot.
 
 ### How the tunnel works
 
@@ -163,7 +177,7 @@ Normally exposing a server means an open port, a public IP, and DNS pointing at 
    ```
    Run **one** `cloudflared` on the host as a systemd service (`cloudflared service install <token>`), not one per project. It routes every hostname to a local port. Each project's compose stays independent.
 4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, the Cloudflare and Google values from below; leave `SECRET_KEY` empty so the key is created inside the `/data` volume), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
-5. Host cron: nightly `sqlite3 /srv/collected/data/collected.db ".backup /srv/backups/collected-$(date +%F).db"` and delete files older than 14 days. Enable Hetzner weekly snapshots if you want a second copy.
+5. Host cron: nightly `cd /srv/collected && BACKUP_DIR=/srv/backups sh scripts/backup.sh` (see the GCP section, step 10, for what it does and how to restore). Enable Hetzner weekly snapshots if you want a second copy.
 
 Alternative if you'd rather not run a box: Fly.io with a 1 GB volume. Same Dockerfile, `fly launch`, and cloudflared runs as a second process. Slightly more magic, slightly less flexible for hosting other projects.
 

@@ -6,7 +6,7 @@ import { APPLIED_STAGES, JOB_STATES, TRACKED_STATES, jobStatePatchSchema, manual
 import type { AppContext } from '../context.js';
 import { jobState, jobs, type JobRow, type JobStateRow } from '../db/schema.js';
 import { recomputeMatches } from '../ingest/jobs/ingest.js';
-import { bad, csv, parseBody } from './util.js';
+import { bad, csv, intParam, parseBody } from './util.js';
 
 export const MANUAL_SOURCE = 'manual';
 
@@ -43,7 +43,7 @@ export function jobsRoutes(ctx: AppContext) {
     if (states?.length) conds.push(inArray(jobState.state, states));
     else if (q.includeHidden !== '1') conds.push(sql`coalesce(${jobState.state}, 'new') != 'hidden'`);
     if (q.since) conds.push(sql`${jobs.postedAt} >= ${q.since}`);
-    const limit = Math.min(Number(q.limit ?? 200), 1000);
+    const limit = intParam(q.limit, { max: 1000, def: 200 });
     const rows = await ctx.db
       .select({ job: jobs, state: jobState })
       .from(jobs)

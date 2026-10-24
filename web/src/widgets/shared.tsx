@@ -3,29 +3,38 @@ import { ExternalLink } from 'lucide-react';
 import type { CourseEventKind, CourseLink, CourseSchedule, EffectiveItem, ItemStatus, ManualEventRaw, Meeting, MeetingKind } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { friendlyDate, isPast } from '@/lib/time';
+import { safeColor } from '@/lib/color';
+import { safeHref } from '@/lib/url';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
 
 export function CourseDot({ color, className, title }: { color: string | null | undefined; className?: string; title?: string }) {
-  return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: color ?? 'var(--muted-foreground)' }} title={title} />;
+  return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: safeColor(color) ?? 'var(--muted-foreground)' }} title={title} />;
 }
 
 export function HotLinks({ links, compact }: { links: CourseLink[]; compact?: boolean }) {
   if (!links.length) return null;
   return (
     <div className="flex flex-wrap gap-1">
-      {links.map((l) => (
-        <a
-          key={l.url + l.label}
-          href={l.url}
-          target="_blank"
-          rel="noreferrer"
-          className={cn('inline-flex h-7 items-center gap-1 rounded-full border border-line bg-card px-3 text-[12px] font-medium text-ink transition-colors hover:bg-well2', compact && 'h-6 px-2.5 text-[11.5px]')}
-        >
-          {l.label}
-          {!compact && <ExternalLink className="size-3" />}
-        </a>
-      ))}
+      {links.map((l) => {
+        const href = safeHref(l.url);
+        const className = cn('inline-flex h-7 items-center gap-1 rounded-full border border-line bg-card px-3 text-[12px] font-medium text-ink transition-colors hover:bg-well2', compact && 'h-6 px-2.5 text-[11.5px]', !href && 'opacity-50');
+        const inner = (
+          <>
+            {l.label}
+            {!compact && <ExternalLink className="size-3" />}
+          </>
+        );
+        return href ? (
+          <a key={l.url + l.label} href={href} target="_blank" rel="noreferrer" className={className}>
+            {inner}
+          </a>
+        ) : (
+          <span key={l.url + l.label} className={className} title="Link is not http(s)">
+            {inner}
+          </span>
+        );
+      })}
     </div>
   );
 }

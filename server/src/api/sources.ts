@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { INGESTED_SOURCE_IDS, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
+import { INGESTED_SOURCE_IDS, outboundUrlSchema, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { sources } from '../db/schema.js';
@@ -10,6 +10,13 @@ import type { Ingester } from '../ingest/types.js';
 import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
 import { bad, parseBody } from './util.js';
 import { eq } from 'drizzle-orm';
+
+/** Opaque sync cursors are state, not something the UI needs; keep them server-side. */
+function stripPrivateMeta(meta: unknown): Record<string, unknown> {
+  if (!meta || typeof meta !== 'object') return {};
+  const { syncTokens: _s, ...rest } = meta as Record<string, unknown>;
+  return rest;
+}
 
 function toPublic(row: typeof sources.$inferSelect): Source {
   return {
@@ -21,7 +28,7 @@ function toPublic(row: typeof sources.$inferSelect): Source {
     lastError: row.lastError,
     hasConfig: !!row.configEnc,
     running: isRunning(row.id as IngestedSourceId),
-    meta: row.meta,
+    meta: stripPrivateMeta(row.meta),
     updatedAt: row.updatedAt,
   };
 }
@@ -113,6 +120,9 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const id = sourceIdSchema.safeParse(c.req.param('id'));
     if (!id.success) bad('unknown source', 404);
     const patch = await parseBody(c, z.record(z.string(), z.unknown()));
+    if ('syncTokens' in patch || 'lastRun' in patch) bad('that meta key is server-managed', 422);
+    // The jobs ingester reads its feed list from meta, so feed URLs are validated like any other outbound URL.
+    if (id.data === 'jobs' && 'sources' in patch) patch.sources = sourceConfigSchemas.jobs.parse({ sources: patch.sources }).sources;
     await mergeSourceMeta(ctx, id.data, patch);
     return c.json(toPublic(await getSourceRow(ctx, id.data)));
   });
@@ -173,7 +183,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const viaHelper = helperKeyMatches(ctx.env, c.req.header('x-collected-key'));
     const user = viaHelper ? 'helper' : await verifyAccess(ctx.env, c);
     if (!user) return c.json({ error: 'unauthorized' }, 401);
-    const body = await parseBody(c, z.object({ cookieHeader: z.string().min(10), baseUrl: z.string().url().optional() }));
+    const body = await parseBody(c, z.object({ cookieHeader: z.string().min(10), baseUrl: outboundUrlSchema.optional() }));
     const existing = (await getSourceConfig<{ baseUrl?: string }>(ctx, 'canvas')) ?? {};
     await setSourceConfig(ctx, 'canvas', {
       baseUrl: body.baseUrl ?? existing.baseUrl ?? 'https://umd.instructure.com',

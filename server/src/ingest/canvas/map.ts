@@ -163,9 +163,13 @@ export const normCode = (s: string | null | undefined): string => (s ?? '').toUp
 
 export function absUrl(baseUrl: string, url: string | null | undefined): string | null {
   if (!url) return null;
-  if (/^https?:\/\//.test(url)) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return null; // javascript:, data:, anything that is not a path
   return `${baseUrl.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`;
 }
+
+/** A URL an upstream handed us as-is (file download links, event URLs): keep only http(s). */
+export const httpOnly = (url: string | null | undefined): string | null => (url && /^https?:\/\//i.test(url) ? url : null);
 
 export function enrollmentRole(course: CanvasCourse): CourseRole | 'other' {
   const types = new Set((course.enrollments ?? []).map((e) => e.type));
@@ -510,7 +514,7 @@ function fileRow(f: CanvasFile, courseId: string, position: number, folderById: 
     externalId: String(f.id),
     moduleName: moduleByFile.get(String(f.id))?.name ?? null,
     title: f.display_name || f.filename || `file ${f.id}`,
-    url: f.url ?? null,
+    url: httpOnly(f.url),
     position,
     raw: {
       size: f.size ?? null,
@@ -553,8 +557,12 @@ export function syllabusToContent(body: string | null | undefined, courseId: str
   };
 }
 
+/** Upstream bodies are capped before any regex pass: the passes are linear on bounded input, and nothing downstream keeps more than 40 KB. */
+export const MAX_HTML_BYTES = 200_000;
+
 export function stripHtml(html: string): string {
   return html
+    .slice(0, MAX_HTML_BYTES)
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<br\s*\/?>(?=.)/gi, '\n')
@@ -566,7 +574,9 @@ export function stripHtml(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/[ \t]+\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

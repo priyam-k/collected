@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { todoistPushConfigSchema } from '@collected/shared';
 import { courses, items, todoistMap } from '../db/schema.js';
 import { MockTodoistApi } from '../ingest/todoist/mock-api.js';
+import { setSourceStatus } from '../lib/sources.js';
 import { testContext } from '../test-util.js';
 import { executePush, markerIn, planPush } from './todoist-push.js';
 
@@ -77,6 +78,7 @@ describe('todoist push', () => {
     const api = new MockTodoistApi();
     await executePush(ctx, api, await planPush(ctx, api, cfg), cfg);
     const { eq } = await import('drizzle-orm');
+    await setSourceStatus(ctx, 'canvas', 'connected');
     await ctx.db.update(items).set({ title: 'HW01: Warm up (extended)', dueAt: due(4) }).where(eq(items.id, 'canvas:assignment:1'));
     await ctx.db.update(items).set({ deletedAt: new Date().toISOString() }).where(eq(items.id, 'canvas:assignment:2'));
     const plan = await planPush(ctx, api, cfg);
@@ -89,6 +91,35 @@ describe('todoist push', () => {
     expect(res.done.delete).toBe(1);
     expect(api.tasks.map((t) => t.content)).toEqual(['HW01: Warm up (extended)']);
     expect(api.tasks[0]!.due?.datetime).toBe(due(4));
+  });
+
+  it('never deletes while the source is not connected, and refuses a mass removal', async () => {
+    const ctx = await setup();
+    const api = new MockTodoistApi();
+    await executePush(ctx, api, await planPush(ctx, api, cfg), cfg);
+    const { eq } = await import('drizzle-orm');
+    const gone = new Date().toISOString();
+    await ctx.db.update(items).set({ deletedAt: gone }).where(eq(items.id, 'canvas:assignment:2'));
+
+    // A failed or timed-out Canvas run leaves the source in `error`: the removal is not believed.
+    await setSourceStatus(ctx, 'canvas', 'error', { lastError: 'run exceeded 240 s' });
+    const held = await planPush(ctx, api, cfg);
+    expect(held.ops.filter((o) => o.op === 'delete')).toEqual([]);
+    expect(held.skipped.some((s) => s.reason.includes('not connected'))).toBe(true);
+    expect(api.tasks.map((t) => t.content).sort()).toEqual(['HW01: Warm up', 'HW02: Trees']);
+
+    // Connected, but every mapped assignment vanished at once: the fuse trips.
+    await setSourceStatus(ctx, 'canvas', 'connected');
+    await ctx.db.update(items).set({ deletedAt: gone }).where(eq(items.id, 'canvas:assignment:1'));
+    const fused = await planPush(ctx, api, cfg);
+    expect(fused.ops.filter((o) => o.op === 'delete')).toEqual([]);
+    expect(fused.skipped.filter((s) => s.reason.includes('vanished at once')).length).toBe(2);
+  });
+
+  it('reads the marker only from its own line, not from a URL that contains one', () => {
+    expect(markerIn('https://x.test/a?x=collected:canvas:assignment:777\nCMSC422\n\ncollected:canvas:assignment:5')).toBe('canvas:assignment:5');
+    expect(markerIn('https://x.test/a?x=collected:canvas:assignment:777')).toBeNull();
+    expect(markerIn('  collected:gradescope:assignment:9  ')).toBe('gradescope:assignment:9');
   });
 
   it('rebuilds the mapping from markers when the map table is empty', async () => {

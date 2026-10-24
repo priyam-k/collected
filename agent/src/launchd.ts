@@ -16,6 +16,8 @@ export function installLaunchd(intervalMinutes: number): string {
   if (!existsSync(cli) || cli.endsWith('.ts')) throw new Error(`built CLI not found at ${cli}; run: pnpm --filter agent build`);
   const logFile = path.join(agentHome(), 'agent.log');
   mkdirSync(agentHome(), { recursive: true });
+  // launchd creates the log 0644; the sync log names every placed path, so make it ours first.
+  if (!existsSync(logFile)) writeFileSync(logFile, '', { mode: 0o600 });
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

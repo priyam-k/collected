@@ -8,6 +8,7 @@ import { useCourses, useGradesSummary, useItems } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
@@ -17,7 +18,7 @@ import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared'
  * course colour on a well track, with a soft halo ring outside rather than a blur.
  */
 export function GradeRing({ course, percent, size = 34 }: { course: Pick<Course, 'role' | 'color'>; percent: number | null | undefined; size?: number }) {
-  const color = course.color ?? 'var(--indigo)';
+  const color = safeColor(course.color) ?? 'var(--indigo)';
   const thickness = size >= 56 ? 5 : 3.5;
   const inner = size - thickness * 2;
   const ta = course.role === 'ta';

@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { Api, type SyncApi } from './api.js';
 import { courseRoot, expandHome, type AgentConfig } from './config.js';
-import { cachePathFor, findIdentical, handoutFor, isMarkdown, placeFile, resolveName, safeName, sha256File, sha256Text, writeTextAtomic } from './place.js';
+import { assertInside, cachePathFor, findIdentical, handoutFor, isMarkdown, placeFile, resolveName, safeName, sha256File, sha256Text, writeTextAtomic } from './place.js';
 import { loadState, saveState, stateKey } from './state.js';
 import { runOnPlace } from './sync.js';
 
@@ -31,7 +31,7 @@ export async function pullFile(cfg: AgentConfig, fileId: string, toDir: string, 
   const { c, f } = hit;
   const state = loadState();
   const key = stateKey(c.course.id, f.fileId);
-  const cachePath = cachePathFor(cfg.cacheDir, f);
+  const cachePath = cachePathFor(cfg.cacheDir, f, c.course.id);
   if (!existsSync(cachePath)) await api.download(f.fileId, cachePath);
 
   const root = courseRoot(cfg, c.course.id);
@@ -57,6 +57,7 @@ export async function pullFile(cfg: AgentConfig, fileId: string, toDir: string, 
   }
   if (existsSync(dir) && !statSync(dir).isDirectory()) throw new Error(`--to must be a folder: ${dir}`);
   const dest = path.join(dir, resolveName(dir, name, f.updatedAt));
+  assertInside(dir, dest);
   if (text != null) writeTextAtomic(dest, text, f.updatedAt);
   else placeFile(cachePath, dest, cfg.linkMode ?? 'hardlink', f.updatedAt);
   state.placements[key] = { ...base, localPath: dest, desired: dest, sha256: text != null ? sha256Text(text) : sha256File(cachePath), handout: md || undefined };

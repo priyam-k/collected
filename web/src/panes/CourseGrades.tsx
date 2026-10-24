@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useCourseGrades, useSaveCourse } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeHref } from '@/lib/url';
 
 const pct = (n: number | null | undefined, digits = 1): string => (n == null ? '—' : `${n.toFixed(digits)}%`);
 const num = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(1));
@@ -27,7 +28,7 @@ function AssignmentRows({ list }: { list: GradedAssignment[] }) {
             <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">{friendlyDate(a.dueAt)}</span>
             <span className="w-20 shrink-0 text-right tabular-nums">{graded ? `${num(a.score!)} / ${a.points != null ? num(a.points) : '?'}` : a.points != null ? <span className="text-muted-foreground">– / {num(a.points)}</span> : '—'}</span>
             <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{graded && a.points ? pct((a.score! / a.points) * 100, 0) : ''}</span>
-            {a.url ? <a href={a.url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground" title="Open"><ExternalLink className="size-3" /></a> : <span className="w-3" />}
+            {safeHref(a.url) ? <a href={safeHref(a.url)} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground" title="Open"><ExternalLink className="size-3" /></a> : <span className="w-3" />}
           </li>
         );
       })}

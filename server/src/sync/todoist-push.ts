@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { eq, inArray, isNotNull } from 'drizzle-orm';
 import { todoistPushConfigSchema, type EffectiveItem, type TodoistPushConfig } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courses, items, todoistMap } from '../db/schema.js';
+import { courses, items, sources, todoistMap } from '../db/schema.js';
 import { queryEffectiveItems } from '../lib/effective.js';
 import { getSettingParsed } from '../lib/settings.js';
 import { addDays, nowIso } from '../lib/time.js';
@@ -35,11 +35,28 @@ export interface PushPlan {
 
 export const markerFor = (item: Pick<EffectiveItem, 'id'>): string => `${MARKER_PREFIX}${item.id}`;
 
-/** Finds `collected:<itemId>` in a task description. */
+/**
+ * Finds `collected:<itemId>` in a task description. The marker is written on its own line and read only from a
+ * whole line, so an upstream URL that happens to contain `collected:` (the assignment link is the first line of
+ * the description) cannot rebind the task to another item.
+ */
 export function markerIn(description: string | null | undefined): string | null {
-  const m = (description ?? '').match(/collected:([a-z_]+:[^\s]+)/);
-  return m ? m[1]! : null;
+  const lines = (description ?? '').split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i]!.trim().match(/^collected:([a-z_]+:\S+)$/);
+    if (m) return m[1]!;
+  }
+  return null;
 }
+
+/**
+ * Deleting tasks is the one destructive thing the push does, so it is fused: no deletes while the source of a
+ * removed assignment is not `connected` (a failed or timed-out run must never read as "the instructor removed
+ * everything"), and none when more than this share of mapped items vanished at once.
+ */
+export const MAX_DELETE_SHARE = 0.25;
+export const MAX_DELETE_FLOOR = 5;
+// ...and never when every mapped assignment vanished in the same run, whatever the count.
 
 function description(item: EffectiveItem): string {
   const lines: string[] = [];
@@ -145,15 +162,29 @@ export async function planPush(ctx: AppContext, api: TodoistApi, cfgIn?: Todoist
   // Mapped items that no longer exist (or fell out of scope because they were deleted at the source): delete open tasks.
   const mappedIds = [...map.keys()].filter((id) => !seenItemIds.has(id));
   if (mappedIds.length) {
-    const rows = await ctx.db.select({ id: items.id, deletedAt: items.deletedAt, title: items.title }).from(items).where(inArray(items.id, mappedIds));
+    const rows = await ctx.db.select({ id: items.id, deletedAt: items.deletedAt, title: items.title, source: items.source }).from(items).where(inArray(items.id, mappedIds));
     const byId = new Map(rows.map((r) => [r.id, r]));
+    const healthy = new Set((await ctx.db.select({ id: sources.id }).from(sources).where(eq(sources.status, 'connected'))).map((r) => r.id));
+    const deletes: PushOp[] = [];
     for (const id of mappedIds) {
       const row = byId.get(id);
       const m = map.get(id)!;
       const task = byTaskId.get(m.todoistTaskId);
       if (!task || isClosed(task)) continue;
-      if (!row || row.deletedAt) ops.push({ op: 'delete', itemId: id, title: row?.title ?? id, taskId: task.id, reason: 'assignment removed at the source' });
+      if (row && !row.deletedAt) continue;
+      const source = row?.source ?? id.split(':')[0]!;
+      if (!healthy.has(source)) {
+        skipped.push({ itemId: id, reason: `removed at the source but ${source} is not connected; not deleting` });
+        continue;
+      }
+      deletes.push({ op: 'delete', itemId: id, title: row?.title ?? id, taskId: task.id, reason: 'assignment removed at the source' });
     }
+    const fuse = Math.max(MAX_DELETE_FLOOR, Math.ceil(map.size * MAX_DELETE_SHARE));
+    const everything = map.size >= 2 && deletes.length >= map.size;
+    if (deletes.length > fuse || everything) {
+      ctx.log.warn({ deletes: deletes.length, mapped: map.size }, 'todoist push: too many removals at once; refusing to delete tasks');
+      for (const d of deletes) skipped.push({ itemId: d.itemId, reason: `${deletes.length} assignments vanished at once; refusing to delete tasks` });
+    } else ops.push(...deletes);
   }
 
   return { ops, projectId, projectName: project?.name ?? cfg.projectName, candidates: candidates.length, mapped: map.size, rebuilt, skipped };

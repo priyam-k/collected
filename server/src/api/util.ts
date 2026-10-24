@@ -6,8 +6,25 @@ export function bad(message: string, status: 400 | 404 | 409 | 422 = 400): never
   throw new HTTPException(status, { message, res: new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json' } }) });
 }
 
+/** HTML forms cannot send this content type, which is what keeps a cross-site form post out of the JSON routes. */
+function requireJson(c: Context): void {
+  const ct = c.req.header('content-type') ?? '';
+  if (!/^application\/json\b/i.test(ct)) {
+    throw new HTTPException(415, { res: new Response(JSON.stringify({ error: 'content-type must be application/json' }), { status: 415, headers: { 'content-type': 'application/json' } }) });
+  }
+}
+
+/** A bounded positive integer from a query string; the default when absent, a 400 when malformed. */
+export function intParam(v: string | undefined, opts: { min?: number; max: number; def: number }): number {
+  if (v === undefined || v === '') return opts.def;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < (opts.min ?? 1) || n > opts.max) bad(`limit must be an integer between ${opts.min ?? 1} and ${opts.max}`);
+  return n;
+}
+
 /** Parses a JSON body with a zod schema, returning a 400 with issues on failure. */
 export async function parseBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<z.infer<S>> {
+  requireJson(c);
   let raw: unknown;
   try {
     raw = await c.req.json();
@@ -31,6 +48,7 @@ export async function parseBody<S extends z.ZodTypeAny>(c: Context, schema: S): 
  * `.set()` the result of `schema.partial().parse()`; use this.
  */
 export async function parsePatch<S extends z.ZodObject>(c: Context, schema: S): Promise<Partial<z.infer<S>>> {
+  requireJson(c);
   let raw: unknown;
   try {
     raw = await c.req.json();

@@ -23,7 +23,7 @@ export async function bootstrap(opts: { quiet?: boolean } = {}): Promise<AppCont
   const log = createLogger(opts.quiet ? 'warn' : env.LOG_LEVEL, env.NODE_ENV !== 'production');
   const { db } = await openDb(env.DATA_DIR);
   const applied = await runMigrations(db);
-  if (applied.length) log.info({ applied }, 'migrations applied');
+  if (applied.length) log.info({ applied: [...applied], snapshot: applied.snapshot }, 'migrations applied');
   else log.debug('schema up to date');
   const ctx: AppContext = { env, db, log, crypto: createCrypto(env.SECRET_KEY), version: readVersion(env.rootDir) };
   log.debug({ secretKeySource: env.secretKeySource, dataDir: env.DATA_DIR }, 'encryption key loaded');

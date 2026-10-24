@@ -1,4 +1,8 @@
+import { MB, readText, withTimeout } from '../../lib/http.js';
 import { NeedsAuthError } from '../types.js';
+
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_429_RETRIES = 3;
 import type { NewTaskBody, TLabel, TProject, TSection, TTask, TodoistApi, UpdateTaskBody } from './api.js';
 
 export const TODOIST_BASE = 'https://api.todoist.com/api/v1';
@@ -14,30 +18,36 @@ interface Page<T> {
  */
 export class TodoistHttpApi implements TodoistApi {
   requestCount = 0;
+  /** The run's cancellation signal; every request also carries its own deadline. */
+  signal?: AbortSignal;
+
   constructor(
     private readonly token: string,
     private readonly fetchImpl: typeof fetch = fetch,
     readonly base = TODOIST_BASE,
   ) {}
 
-  private async req<T>(method: string, path: string, opts: { query?: Record<string, string | number | undefined>; body?: unknown } = {}): Promise<T> {
+  private async req<T>(method: string, path: string, opts: { query?: Record<string, string | number | undefined>; body?: unknown }, attempt = 0): Promise<T> {
     this.requestCount++;
     const url = new URL(`${this.base}${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
     const res = await this.fetchImpl(url, {
       method,
+      signal: withTimeout(this.signal, REQUEST_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     if (res.status === 401 || res.status === 403) throw new NeedsAuthError(`Todoist rejected the token (${res.status})`);
     if (res.status === 429) {
+      if (attempt >= MAX_429_RETRIES) throw new Error(`Todoist rate limited ${method} ${path} after ${attempt} retries`);
       const retry = Number(res.headers.get('retry-after') ?? 2);
       await new Promise((r) => setTimeout(r, Math.min(30, retry) * 1000));
-      return this.req(method, path, opts);
+      this.signal?.throwIfAborted();
+      return this.req(method, path, opts, attempt + 1);
     }
-    if (!res.ok) throw new Error(`Todoist ${res.status} ${method} ${path}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) throw new Error(`Todoist ${res.status} ${method} ${path}: ${(await readText(res, 64 * 1024)).slice(0, 200)}`);
     if (res.status === 204) return undefined as T;
-    const text = await res.text();
+    const text = await readText(res, 8 * MB);
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
@@ -98,9 +108,9 @@ export class TodoistHttpApi implements TodoistApi {
     return this.req<TTask>('POST', `/tasks/${encodeURIComponent(id)}`, { body });
   }
   async closeTask(id: string) {
-    await this.req<void>('POST', `/tasks/${encodeURIComponent(id)}/close`);
+    await this.req<void>('POST', `/tasks/${encodeURIComponent(id)}/close`, {});
   }
   async deleteTask(id: string) {
-    await this.req<void>('DELETE', `/tasks/${encodeURIComponent(id)}`);
+    await this.req<void>('DELETE', `/tasks/${encodeURIComponent(id)}`, {});
   }
 }

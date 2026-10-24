@@ -84,8 +84,9 @@ export const todoistIngester: Ingester = {
   id: 'todoist',
   intervalMinutes: 5,
   timeoutMs: 120_000,
-  async run(ctx) {
+  async run(ctx, signal) {
     const api = await todoistApiForCtx(ctx);
+    api.signal = signal;
     const counts = await syncTodoist(ctx, api);
     const [projects, labels] = await Promise.all([api.listProjects(), api.listLabels()]);
     return { counts, meta: { projects: projects.map((p) => ({ id: p.id, name: p.name })), labels: labels.map((l) => l.name) } };

@@ -4,10 +4,14 @@
 # typecheck + test → docker build → save as a tarball → scp → docker load → compose up → wait for /api/health.
 # No registry: a tarball over SSH has no storage or transfer quota and is the flow that was already proven.
 #
-# Needs, on the repo (artifacts/SETUP.md, Phase 2 step 8):
-#   variable DEPLOY_HOST  the box's public IP
-#   variable DEPLOY_USER  the login user on the box (member of the docker group)
-#   secret   DEPLOY_SSH_KEY  private half of a keypair whose public half is in the instance's ssh-keys metadata
+# Two jobs on purpose. `build` runs the third-party actions and has no secrets; `deploy` has only the SSH key,
+# runs in the `production` environment (required reviewer, artifacts/SETUP.md Phase 2 step 9), and only in this
+# repo, never in a fork. Every action is pinned to a commit; Dependabot proposes bumps.
+#
+# Needs, on the repo:
+#   secret DEPLOY_HOST     the box's public IP (a secret so it is masked in logs, which are public once the repo is)
+#   secret DEPLOY_USER     the login user on the box (member of the docker group)
+#   secret DEPLOY_SSH_KEY  private half of a keypair whose public half is in the instance's ssh-keys metadata
 name: deploy
 
 on:
@@ -15,24 +19,24 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # One deploy at a time. A second push queues behind the first instead of cancelling it mid-restart.
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      HOST: ${{ vars.DEPLOY_HOST }}
-      USER: ${{ vars.DEPLOY_USER }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # ---- gate: the same checks the Mac ran before a manual build ----
-      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0 (version comes from "packageManager" in package.json)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
@@ -41,20 +45,42 @@ jobs:
       - run: pnpm -r test
 
       # ---- build ----
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
-          tags: collected:latest
+          # Tagged `candidate`, not `latest`: `docker load` on the box must not replace the running image's tag.
+          # scripts/deploy.sh promotes it to latest only after the health check passes.
+          tags: collected:candidate
           # Write the image to a tarball instead of pushing to a registry.
           outputs: type=docker,dest=/tmp/collected.tar
           # Layer cache in GitHub's cache store: unchanged stages (pnpm install, the web build) are reused next run.
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - run: gzip -1 /tmp/collected.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: collected-image
+          path: /tmp/collected.tar.gz
+          retention-days: 1
+          if-no-files-found: error
 
-      # ---- ship ----
+  deploy:
+    needs: build
+    if: github.repository == 'priyam-k/collected'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      HOST: ${{ secrets.DEPLOY_HOST }}
+      USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: collected-image
+          path: /tmp
+
       - name: SSH setup
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -68,26 +94,8 @@ jobs:
       - name: Upload image
         run: scp /tmp/collected.tar.gz box:/tmp/collected.tar.gz
 
-      - name: Load and restart
-        run: |
-          ssh box 'set -e
-            cd /srv/collected
-            git pull --ff-only
-            # Keep the outgoing image as collected:prev. Rollback on the box is:
-            #   docker tag collected:prev collected:latest && docker compose up -d
-            docker tag collected:latest collected:prev 2>/dev/null || true
-            gunzip -c /tmp/collected.tar.gz | docker load
-            rm -f /tmp/collected.tar.gz
-            docker compose up -d
-            docker image prune -f >/dev/null'
-
-      - name: Wait for healthy
-        run: |
-          # Right after a restart the box is busy (image load, migrations, six boot-time syncs); allow a few minutes.
-          for i in $(seq 1 36); do
-            if ssh box 'curl -fsS --max-time 5 http://127.0.0.1:3000/api/health' 2>/dev/null; then echo; echo "healthy"; exit 0; fi
-            sleep 5
-          done
-          echo "app did not become healthy within 3 minutes"
-          ssh box 'cd /srv/collected && docker compose ps && docker compose logs --tail 40 app'
-          exit 1
+      # scripts/deploy.sh (from the commit just pulled): backup → load candidate → latest becomes prev → candidate
+      # becomes latest → compose up → wait for /api/health; on failure it re-tags prev as latest, restarts, prints
+      # `docker compose ps` (no app logs: workflow logs are world-readable on a public repo) and exits 1.
+      - name: Deploy
+        run: ssh box 'cd /srv/collected && git pull --ff-only && sh scripts/deploy.sh /tmp/collected.tar.gz'

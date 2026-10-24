@@ -5,6 +5,7 @@ import type { EffectiveItem } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useItems } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { usePane } from '@/panes/PaneContext';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
@@ -26,7 +27,7 @@ function groupItems(items: EffectiveItem[]): Group[] {
   for (const it of items) {
     if (it.informational) continue;
     const key = it.course?.id ?? (it.kind === 'task' ? 'tasks' : 'other');
-    const g = map.get(key) ?? { id: key, label: it.course?.code ?? (key === 'tasks' ? 'Tasks' : 'Other'), color: it.course?.color ?? 'var(--ter)', done: 0, total: 0, courseId: it.course?.id ?? null };
+    const g = map.get(key) ?? { id: key, label: it.course?.code ?? (key === 'tasks' ? 'Tasks' : 'Other'), color: safeColor(it.course?.color) ?? 'var(--ter)', done: 0, total: 0, courseId: it.course?.id ?? null };
     g.total++;
     if (it.effectiveDone) g.done++;
     map.set(key, g);

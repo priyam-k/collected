@@ -26,7 +26,10 @@ export function settingsRoutes(ctx: AppContext) {
 
   r.put('/:key', async (c) => {
     const key = c.req.param('key');
-    const schema = KNOWN[key] ?? z.unknown();
+    if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$/.test(key)) bad('bad setting key', 422);
+    // fileSync.* is written by the file-sync report handler from a validated shape; a free-form write here would be read back by the agent.
+    if (key.startsWith('fileSync.')) bad('this setting is managed by the server', 409);
+    const schema = Object.hasOwn(KNOWN, key) ? KNOWN[key]! : z.unknown();
     const value = await parseBody(c, schema);
     await setSetting(ctx, key, value);
     return c.json(value);

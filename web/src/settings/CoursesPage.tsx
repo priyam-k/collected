@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useCourseLinks, useCourses, useDeleteCourse, useLinkItems, useSaveCourse } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
+import { safeColor } from '@/lib/color';
 import { ScheduleEditor } from './ScheduleEditor';
 import { Field, PageTitle } from './ui';
 
@@ -108,7 +109,7 @@ export function CoursesPage() {
               {q.data.map((c) => (
                 <tr key={c.id} className="border-t">
                   <td className="px-3 py-2">
-                    <span className="mr-2 inline-block size-2.5 rounded-full align-middle" style={{ background: c.color ?? '#999' }} />
+                    <span className="mr-2 inline-block size-2.5 rounded-full align-middle" style={{ background: safeColor(c.color) ?? '#999' }} />
                     <span className="font-medium">{c.code}</span>
                     {c.section && <span className="text-muted-foreground"> · {c.section}</span>}
                     {c.name && <div className="text-xs text-muted-foreground">{c.name}</div>}

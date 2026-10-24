@@ -66,7 +66,8 @@ export async function resolveCourse(api: Api, key: string | undefined): Promise<
   if (!key) throw new Error('which course? give its code, e.g. enme480');
   const all = await api.get<Course[]>('/api/courses');
   const k = key.toLowerCase();
-  const hits = all.filter((c) => c.id === key || c.code.toLowerCase() === k || c.code.toLowerCase().endsWith(k));
+  const digits = /^\d{3,}$/.test(k); // "480" means ENME480; a shorter or non-numeric suffix matches too much
+  const hits = all.filter((c) => c.id === key || c.code.toLowerCase() === k || (digits && c.code.toLowerCase().endsWith(k)));
   const live = hits.filter((c) => !c.archived);
   const pick = live.length ? live : hits;
   if (pick.length === 1) return pick[0]!;

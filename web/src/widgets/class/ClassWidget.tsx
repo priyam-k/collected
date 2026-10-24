@@ -9,6 +9,7 @@ import { FileLink } from '@/widgets/FileLink';
 import { meetingLabel } from '@collected/shared';
 import { useCourseContent, useCourses, useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
+import { safeHref } from '@/lib/url';
 import { EmptyState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { ItemPopover } from '@/widgets/ItemPopover';
@@ -91,7 +92,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
               return (
                 <li key={g.id} className="text-sm">
                   <div className="flex items-center gap-2">
-                    <a href={g.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">{g.title}</a>
+                    {safeHref(g.url) ? <a href={safeHref(g.url)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">{g.title}</a> : <span className="min-w-0 flex-1 truncate">{g.title}</span>}
                     <span className="text-xs text-muted-foreground">{raw.submissions ?? 0} subs · {pct}% graded{raw.openRegradeRequests ? ` · ${raw.openRegradeRequests} regrades` : ''}{raw.published ? '' : ' · unpublished'}</span>
                   </div>
                   <div className="mt-0.5 h-1 w-full overflow-hidden rounded bg-muted"><div className="h-full rounded bg-primary/70" style={{ width: `${pct}%` }} /></div>

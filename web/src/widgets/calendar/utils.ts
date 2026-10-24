@@ -1,5 +1,6 @@
 import { addDays, endOfDay, endOfMonth, endOfWeek, format, isSameDay, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
+import { safeColor } from '@/lib/color';
 
 export type CalView = 'next' | 'agenda' | 'strip' | 'week' | 'month';
 
@@ -15,9 +16,8 @@ export function itemEnd(item: EffectiveItem): Date | null {
 }
 
 export function itemColor(item: EffectiveItem): string | null {
-  if (item.course?.color) return item.course.color;
   const raw = item.raw as { color?: string | null };
-  return raw.color ?? null;
+  return safeColor(item.course?.color) ?? safeColor(raw.color) ?? null;
 }
 
 export function rangeFor(view: CalView, anchor: Date): { from: Date; to: Date } {

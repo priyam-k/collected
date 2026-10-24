@@ -100,7 +100,7 @@ export class GoogleCalendarApi implements CalendarApi {
   private readonly cal: calendar_v3.Calendar;
 
   constructor(auth: OAuth2Client) {
-    this.cal = calendar({ version: 'v3', auth });
+    this.cal = calendar({ version: 'v3', auth, timeout: 30_000 });
   }
 
   static fromRefreshToken(env: Env, refreshToken: string): GoogleCalendarApi {

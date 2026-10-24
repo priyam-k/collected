@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createClient, type Client } from '@libsql/client';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
@@ -12,6 +12,17 @@ export interface DbHandle {
   file: string;
 }
 
+/** Owner-only mode on the database and its WAL: every credential ciphertext is in there and the key file sits beside it. */
+function restrictMode(file: string): void {
+  for (const f of [file, `${file}-wal`]) {
+    try {
+      chmodSync(f, 0o600);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    }
+  }
+}
+
 export async function openDb(dataDir: string, fileName = 'collected.db'): Promise<DbHandle> {
   mkdirSync(dataDir, { recursive: true });
   const file = path.resolve(dataDir, fileName);
@@ -22,6 +33,7 @@ export async function openDb(dataDir: string, fileName = 'collected.db'): Promis
   await client.execute('PRAGMA synchronous = NORMAL');
   await client.execute('PRAGMA busy_timeout = 5000');
   await client.execute('PRAGMA foreign_keys = ON');
+  restrictMode(file);
   const db = drizzle(client, { schema });
   return { db, client, file };
 }

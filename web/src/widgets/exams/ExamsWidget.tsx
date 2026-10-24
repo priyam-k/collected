@@ -4,6 +4,7 @@ import type { EffectiveItem } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useItems } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { usePane } from '@/panes/PaneContext';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
@@ -85,7 +86,7 @@ export function ExamsWidget({ size }: WidgetProps) {
         <ul className="min-h-0 flex-1 overflow-auto p-1.5">
           {rows.slice(0, limit).map((r) => {
             const c = countdown(r.when);
-            const tone = r.item.course?.color ?? toneFor(r.kind);
+            const tone = safeColor(r.item.course?.color) ?? toneFor(r.kind);
             return (
               <li key={r.item.id}>
                 <ItemPopover item={r.item}>

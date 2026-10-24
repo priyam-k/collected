@@ -24,7 +24,7 @@ export function eventToRow(ev: GEvent, calendarId: string, calendarName: string 
     courseId: null,
     title: ev.summary?.trim() || '(no title)',
     description: ev.description?.slice(0, 2000) ?? null,
-    url: ev.htmlLink ?? null,
+    url: ev.htmlLink && /^https?:\/\//i.test(ev.htmlLink) ? ev.htmlLink : null,
     startsAt,
     endsAt,
     dueAt: null,

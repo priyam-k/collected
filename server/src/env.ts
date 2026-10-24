@@ -18,9 +18,15 @@ const envSchema = z.object({
     .transform((v) => v?.trim() || undefined)
     .pipe(z.string().regex(/^[0-9a-fA-F]{64}$/, 'SECRET_KEY must be 32 bytes as hex (openssl rand -hex 32), or empty to auto-manage').optional()),
   AUTH_DISABLED: bool.default(false),
+  /** Required alongside AUTH_DISABLED when NODE_ENV=production: the only legitimate case is a box nobody but you can reach. */
+  AUTH_DISABLED_ACKNOWLEDGED: bool.default(false),
   CF_ACCESS_TEAM_DOMAIN: z.string().optional(),
   CF_ACCESS_AUD: z.string().optional(),
-  LOCAL_HELPER_KEY: z.string().optional(),
+  LOCAL_HELPER_KEY: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined)
+    .pipe(z.string().min(32, 'LOCAL_HELPER_KEY must be at least 32 characters (openssl rand -hex 32)').optional()),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   PUBLIC_URL: z.string().url().default('http://localhost:5173'),
@@ -51,6 +57,9 @@ export function loadEnv(): Env {
     throw new Error(`Invalid environment:\n  ${issues}`);
   }
   const env = parsed.data;
+  if (env.AUTH_DISABLED && env.NODE_ENV === 'production' && !env.AUTH_DISABLED_ACKNOWLEDGED) {
+    throw new Error('AUTH_DISABLED=true in production makes every credential in the database readable by anyone who reaches the port. Set AUTH_DISABLED_ACKNOWLEDGED=true only if nothing but you can reach it.');
+  }
   if (!env.AUTH_DISABLED && (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD)) {
     throw new Error(
       'AUTH_DISABLED=false requires CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD (Cloudflare Access). For local development set AUTH_DISABLED=true in .env.',

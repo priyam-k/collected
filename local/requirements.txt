@@ -1,1 +1,1 @@
-browser-cookie3>=0.20
+browser-cookie3==0.20.1

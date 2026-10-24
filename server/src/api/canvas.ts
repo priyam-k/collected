@@ -5,6 +5,25 @@ import { CanvasClient, type CanvasConfig } from '../ingest/canvas/client.js';
 import { NeedsAuthError } from '../ingest/types.js';
 import { getSourceConfig, setSourceStatus } from '../lib/sources.js';
 
+/**
+ * The proxied path after URL normalisation: percent-encoded dot segments collapse in `new URL`, so the check has to
+ * run on the parsed result, not the raw string. Returns null for anything that is not `/api/v1/...` on the host.
+ */
+export function canvasApiPath(raw: string, baseUrl: string): string | null {
+  if (!raw.startsWith('/api/v1/') || /%2e|%2f|%5c|\\|#/i.test(raw) || /\s/.test(raw)) return null;
+  let u: URL;
+  try {
+    u = new URL(raw, baseUrl);
+  } catch {
+    return null;
+  }
+  if (u.origin !== new URL(baseUrl).origin || !u.pathname.startsWith('/api/v1/') || u.hash) return null;
+  if (u.pathname.includes('//') || u.pathname.split('/').some((seg) => seg === '.' || seg === '..')) return null;
+  // Canvas honours a token in the query string; the proxy exists to use the stored session and nothing else.
+  for (const k of [...u.searchParams.keys()]) if (/^(access_token|as_user_id)$/i.test(k)) return null;
+  return u.pathname + u.search;
+}
+
 export type CanvasClientFactory = (config: CanvasConfig) => Promise<CanvasClient>;
 
 export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (config) => CanvasClient.fromConfig(config, ctx.log)) {
@@ -26,9 +45,10 @@ export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (
     if (!config) return c.json({ error: 'Canvas is not connected' }, 404);
     const client = await clientFor(sourceConfigSchemas.canvas.parse(config));
     try {
-      const { public_url } = await client.get<{ public_url?: string }>(`/api/v1/files/${id}/public_url`);
+      const { public_url } = await client.get<{ public_url?: string }>(`/api/v1/files/${id}/public_url`, {}, AbortSignal.timeout(30_000));
       if (!public_url) return c.json({ error: 'Canvas returned no URL for this file' }, 502);
       const url = new URL(public_url);
+      if (url.protocol !== 'https:') return c.json({ error: 'Canvas returned a non-https file URL' }, 502);
       if (c.req.query('download') === '1') url.searchParams.set('download', '1');
       c.header('Cache-Control', 'no-store');
       return c.redirect(url.toString(), 302);
@@ -53,20 +73,22 @@ export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (
    * `?all=1` follows pagination (up to 10 pages of 100).
    */
   r.get('/raw', async (c) => {
-    const path = c.req.query('path') ?? '';
-    if (!/^\/api\/v1\/[^\s]*$/.test(path) || path.includes('..') || path.includes('//')) return c.json({ error: 'path must be a Canvas API path starting with /api/v1/' }, 400);
     const config = await getSourceConfig<CanvasConfig>(ctx, 'canvas');
     if (!config) return c.json({ error: 'Canvas is not connected' }, 404);
-    const client = await clientFor(sourceConfigSchemas.canvas.parse(config));
+    const parsed = sourceConfigSchemas.canvas.parse(config);
+    const path = canvasApiPath(c.req.query('path') ?? '', parsed.baseUrl);
+    if (!path) return c.json({ error: 'path must be a Canvas API path starting with /api/v1/' }, 400);
+    const client = await clientFor(parsed);
     c.header('Cache-Control', 'no-store');
+    const signal = AbortSignal.timeout(90_000);
     try {
-      const first = await client.getRaw(path, c.req.query('all') === '1' ? { per_page: 100 } : {}, undefined, { deniedIsNull: true });
+      const first = await client.getRaw(path, c.req.query('all') === '1' ? { per_page: 100 } : {}, signal, { deniedIsNull: true });
       if (first.data === null) return c.json({ error: 'Canvas has no such resource, or it is not available to you' }, 404);
       if (c.req.query('all') !== '1' || !Array.isArray(first.data)) return c.json(first.data as object);
       const out = [...(first.data as unknown[])];
       let next = first.link.next;
       for (let page = 1; next && page < 10; page++) {
-        const more = await client.getRaw(next, {}, undefined, { deniedIsNull: true });
+        const more = await client.getRaw(next, {}, signal, { deniedIsNull: true });
         if (!Array.isArray(more.data)) break;
         out.push(...(more.data as unknown[]));
         next = more.link.next;

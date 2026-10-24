@@ -52,11 +52,11 @@ export function FilePreview({ file, onClose }: { file: PreviewFile | null; onClo
             </div>
           )}
           {file && kind === 'pdf' && (
-            <iframe key={file.fileId} title={file.title} src={src} className={cn('h-full w-full border-0', !loaded && 'opacity-0')} onLoad={() => setLoaded(true)} />
+            <iframe key={file.fileId} title={file.title} src={src} sandbox="allow-scripts allow-same-origin allow-downloads" referrerPolicy="no-referrer" className={cn('h-full w-full border-0', !loaded && 'opacity-0')} onLoad={() => setLoaded(true)} />
           )}
           {file && kind === 'image' && (
             <div className="flex h-full items-center justify-center overflow-auto p-4">
-              <img src={src} alt={file.title} className={cn('max-h-full max-w-full object-contain', !loaded && 'opacity-0')} onLoad={() => setLoaded(true)} />
+              <img src={src} alt={file.title} referrerPolicy="no-referrer" className={cn('max-h-full max-w-full object-contain', !loaded && 'opacity-0')} onLoad={() => setLoaded(true)} />
             </div>
           )}
           {file && !kind && (

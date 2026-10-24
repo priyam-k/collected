@@ -4,8 +4,13 @@
   "private": true,
   "type": "module",
   "description": "Laptop agent: downloads Canvas course files from collected into local folders, sorted by rules and a System 1 decision model (Jev).",
-  "bin": { "collected": "./dist/cli.js", "collected-agent": "./dist/cli.js" },
-  "files": ["dist"],
+  "bin": {
+    "collected": "./dist/cli.js",
+    "collected-agent": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsup",
@@ -20,6 +25,6 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
     "typescript": "~5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }

@@ -2,6 +2,7 @@ import { eq, ne, sql } from 'drizzle-orm';
 import { jobsFilterSchema, type JobsSource } from '@collected/shared';
 import type { AppContext } from '../../context.js';
 import { jobState, jobs } from '../../db/schema.js';
+import { assertAllowedOutboundUrl, MB, readJson, safeUrlForLog, withTimeout } from '../../lib/http.js';
 import { getSettingParsed } from '../../lib/settings.js';
 import { getSourceRow } from '../../lib/sources.js';
 import { nowIso } from '../../lib/time.js';
@@ -33,13 +34,19 @@ export const DEFAULT_JOB_SOURCES: JobsSource[] = [
 
 const epochToIso = (s?: number | null) => (s ? new Date(s * 1000).toISOString() : null);
 
+/** The Simplify feed is ~16k rows, a few MB. */
+export const MAX_FEED_BYTES = 40 * MB;
+
 export async function fetchListings(url: string, signal?: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<SimplifyListing[]> {
-  const res = await fetchImpl(url, { signal, headers: { 'User-Agent': 'collected/0.1 (+personal dashboard)' } });
-  if (!res.ok) throw new Error(`listings fetch ${res.status} for ${url}`);
-  const data = (await res.json()) as unknown;
-  if (!Array.isArray(data)) throw new Error(`listings at ${url} is not an array`);
+  assertAllowedOutboundUrl(url, 'a job feed URL');
+  const res = await fetchImpl(url, { signal: withTimeout(signal, 60_000), headers: { 'User-Agent': 'collected/0.1 (+personal dashboard)' } });
+  if (!res.ok) throw new Error(`listings fetch ${res.status} for ${safeUrlForLog(url)}`);
+  const data = await readJson(res, MAX_FEED_BYTES);
+  if (!Array.isArray(data)) throw new Error(`listings at ${safeUrlForLog(url)} is not an array`);
   return data as SimplifyListing[];
 }
+
+const httpUrl = (u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u);
 
 /** Columns that come from the feed. A listing is rewritten only when one of these differs from the stored row. */
 type ListingValues = {
@@ -116,7 +123,7 @@ export async function upsertListings(
   const seen = new Set<string>();
   let matched = 0;
   for (const l of listings) {
-    if (!l?.id || !l.title || !l.company_name || !l.url) continue;
+    if (!l?.id || !l.title || !l.company_name || !httpUrl(l.url)) continue;
     const id = `${sourceId}:${l.id}`;
     if (seen.has(id)) continue;
     seen.add(id);

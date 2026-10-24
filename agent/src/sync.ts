@@ -6,11 +6,14 @@ import { Api, type SyncApi } from './api.js';
 import { classify, modelUnavailable } from './classify.js';
 import { courseFactsDir, courseIndexPath, courseRoot, knownTargets, targetDir, type AgentConfig } from './config.js';
 import { writeFacts } from './facts.js';
+import { badTarget, unsafePattern } from './guard.js';
 import {
+  assertInside,
   cachePathFor,
   findIdentical,
   fixMtime,
   handoutFor,
+  isInside,
   isMarkdown,
   moveFile,
   mtimeMatches,
@@ -90,9 +93,9 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
   for (const mc of manifest.courses) {
     if (opts.course && mc.course.id !== opts.course && mc.course.code.toLowerCase() !== opts.course.toLowerCase()) continue;
     sum.courses++;
-    const { config } = mc;
     const courseId = mc.course.id;
-    report.targets[courseId] = knownTargets(cfg, courseId, allowedTargets(config));
+    const allowed = allowedTargets(mc.config);
+    report.targets[courseId] = knownTargets(cfg, courseId, allowed);
     if (!cfg.courses[courseId]) {
       log(`${mc.course.code}: no folder on this machine (collected-agent link ${courseId} <path>); ${mc.files.length} files waiting`);
       continue;
@@ -104,6 +107,27 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
       touchedPaths.push(p);
       if (root) touchedCourses.set(mc.course.code, root);
     };
+    // Everything this course may touch: its root and every target folder this machine maps for it.
+    const vaultRoots = [...new Set([...(root ? [root] : []), ...Object.values(report.targets[courseId]!)])];
+    const assertVault = (p: string) => {
+      if (!vaultRoots.some((r) => isInside(r, p))) throw new Error(`refusing to touch ${rel(p)}: outside this course's folders`);
+    };
+    const inVault = (p: string, fileId?: string): boolean => {
+      try {
+        assertVault(p);
+        return true;
+      } catch (e) {
+        err((e as Error).message, courseId, fileId);
+        return false;
+      }
+    };
+    // Rule patterns are compiled here for files the model decides; a pattern built to backtrack is dropped, not run.
+    const rules = mc.config.rules.filter((r) => {
+      const why = unsafePattern(r.folder) ?? unsafePattern(r.module) ?? unsafePattern(r.name) ?? unsafePattern(r.linked);
+      if (why) err(`rule → ${r.target} ignored: ${why}`, courseId);
+      return !why;
+    });
+    const config = rules.length === mc.config.rules.length ? mc.config : { ...mc.config, rules };
 
     // ---- model pass for files nothing else decided
     const decisions = new Map<string, FileSyncDecision | null>(mc.files.map((f) => [f.fileId, f.decision]));
@@ -118,6 +142,8 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         for (const f of pending) {
           try {
             const ans = await classify(cfg.model, config, f);
+            const bad = badTarget(ans.target, allowed);
+            if (bad) throw new Error(bad); // classify() checks this too; the answer becomes a folder name, so check again here
             report.decisions.push({ courseId, fileId: f.fileId, target: ans.target, confidence: ans.confidence, probabilities: ans.probabilities });
             decisions.set(f.fileId, decideFile(config, f, { manualTarget: f.manualTarget, model: ans }));
             sum.classified++;
@@ -143,6 +169,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
           log(`  would fold ${rel(p.localPath)} onto your identical ${path.basename(twin)}`);
           continue;
         }
+        if (!vaultRoots.some((r) => isInside(r, p.localPath))) continue; // a hand-pulled copy elsewhere: not ours to fold
         unlinkSync(p.localPath);
         pruneEmptyDirs(path.dirname(p.localPath), root);
         log(`  folded ${path.basename(p.localPath)} onto your identical ${rel(twin)}`);
@@ -172,6 +199,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
           continue;
         }
         if (opts.dryRun) log(`  would remove ${rel(prev.localPath)} (now skipped: ${decision.reason})`);
+        else if (!inVault(prev.localPath, f.fileId)) continue;
         else if (removePlacement(prev)) {
           delete state.placements[key];
           report.removed.push({ courseId, fileId: f.fileId });
@@ -179,6 +207,15 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
           if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
           log(`  removed ${rel(prev.localPath)} (skipped: ${decision.reason})`);
         } else err(`${rel(prev.localPath)} was changed locally; left in place although it is now skipped`, courseId, f.fileId);
+        continue;
+      }
+      // The manifest's target is a name the server validated; this machine checks again before it becomes a path.
+      const bad = badTarget(decision.target, allowed);
+      if (bad) {
+        if (!missingTargetWarned.has(decision.target)) {
+          missingTargetWarned.add(decision.target);
+          err(`${bad}; its files are left alone`, courseId);
+        }
         continue;
       }
       const dir = targetDir(cfg, courseId, decision.target);
@@ -220,6 +257,8 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         if (placementUnmodified(prev)) {
           const dest = path.join(wantDir, resolveName(wantDir, wantName, f.updatedAt));
           try {
+            assertVault(prev.localPath);
+            assertInside(dir, dest);
             moveFile(prev.localPath, dest);
             fixMtime(dest, f.updatedAt);
             if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
@@ -245,7 +284,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         continue;
       }
       try {
-        const cachePath = cachePathFor(cfg.cacheDir, f);
+        const cachePath = cachePathFor(cfg.cacheDir, f, courseId);
         if (!existsSync(cachePath)) await api.download(f.fileId, cachePath);
 
         // Already here under some name (a hand download)? Adopt it instead of writing a second copy.
@@ -272,6 +311,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         const prevOurs = prev && !prev.adopted && existsSync(prev.localPath);
         if (prevOurs && placementUnmodified(prev)) {
           // Untouched copy of the old version (or the pre-transform handout): replace it.
+          assertVault(prev.localPath);
           unlinkSync(prev.localPath);
           if (root) pruneEmptyDirs(path.dirname(prev.localPath), root);
           dest = path.join(wantDir, resolveName(wantDir, name, f.updatedAt));
@@ -280,6 +320,7 @@ export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise
         } else {
           dest = path.join(wantDir, resolveName(wantDir, name, f.updatedAt));
         }
+        assertInside(dir, dest);
         if (text != null) writeTextAtomic(dest, text, f.updatedAt);
         else placeFile(cachePath, dest, mode, f.updatedAt);
         state.placements[key] = { courseId, fileId: f.fileId, target: decision.target, localPath: dest, desired: wantPath, sha256: text != null ? sha256Text(text) : sha256File(cachePath), updatedAt: f.updatedAt, cachePath, placedAt: nowIso(), handout: md || undefined, meta: metaOf(f) };

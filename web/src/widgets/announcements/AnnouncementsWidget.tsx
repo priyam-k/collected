@@ -3,6 +3,7 @@ import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
@@ -67,7 +68,7 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
         <ul className="min-h-0 flex-1 overflow-auto p-1.5">
           {rows.map((a) => {
             const isNew = !read.has(a.id);
-            const color = a.course?.color ?? 'var(--ter)';
+            const color = safeColor(a.course?.color) ?? 'var(--ter)';
             return (
               <li key={a.id} onClickCapture={() => isNew && mark([a.id])}>
                 <ItemPopover item={a}>

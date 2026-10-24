@@ -4,6 +4,8 @@ import { ChevronDown, ChevronRight, ClipboardCheck, Download, ExternalLink, File
 import { meetingLabel, type Course, type CourseLink, type EffectiveItem, type Meeting } from '@collected/shared';
 import { SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { canvasFileUrl, canvasOrigin } from '@/lib/canvas';
+import { safeColor } from '@/lib/color';
+import { safeHref } from '@/lib/url';
 import { useCourseContent, useCourseGrades, useCourses, useItems, type CourseContentRow } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -57,6 +59,12 @@ function Section({ title, action, children }: { title: ReactNode; action?: React
 }
 const Well = ({ children, className }: { children: ReactNode; className?: string }) => <div className={cn('overflow-hidden rounded-2xl bg-well', className)}>{children}</div>;
 const EmptyWell = ({ children }: { children: ReactNode }) => <div className="rounded-2xl bg-well p-4 text-center text-[13px] text-ter">{children}</div>;
+/** An upstream link; a plain span when the URL is not http(s). */
+function ExtLink({ href, className, title, children }: { href: string | null | undefined; className?: string; title?: string; children: ReactNode }) {
+  const safe = safeHref(href);
+  return safe ? <a href={safe} target="_blank" rel="noreferrer" className={className} title={title}>{children}</a> : <span className={className}>{children}</span>;
+}
+
 const More = ({ onClick, children }: { onClick(): void; children: ReactNode }) => <button className="text-[12.5px] text-indigo hover:underline" onClick={onClick}>{children}</button>;
 
 function FileRow({ f, last, detail }: { f: CourseContentRow; last?: boolean; detail?: boolean }) {
@@ -120,7 +128,7 @@ function Modules({ rows }: { rows: CourseContentRow[] }) {
                       {isFile ? (
                         <FileLink file={{ fileId: String(raw.contentId), title: it.title }} className="min-w-0 flex-1 truncate">{it.title}</FileLink>
                       ) : (
-                        <a href={it.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate" title="Open in Canvas">{it.title}</a>
+                        <ExtLink href={it.url} className="min-w-0 flex-1 truncate" title="Open in Canvas">{it.title}</ExtLink>
                       )}
                       {isFile && (
                         <a href={canvasFileUrl(String(raw.contentId), { download: true })} className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/row:opacity-100" title="Download" aria-label={`Download ${it.title}`}>
@@ -152,8 +160,8 @@ function Announcement({ item, defaultOpen, last }: { item: EffectiveItem; defaul
       {open && (
         <div className="px-4 pb-3 text-[13px] leading-relaxed">
           {item.description ? <p className="whitespace-pre-wrap text-sub">{item.description}</p> : <p className="text-ter">No text (open in Canvas).</p>}
-          {item.url && (
-            <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-indigo hover:underline">
+          {safeHref(item.url) && (
+            <a href={safeHref(item.url)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-indigo hover:underline">
               Open in Canvas <ExternalLink className="size-3" />
             </a>
           )}
@@ -207,7 +215,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   }
 
   const isTa = course.role === 'ta';
-  const color = course.color ?? 'var(--indigo)';
+  const color = safeColor(course.color) ?? 'var(--indigo)';
   const origin = canvasOrigin([...assignments.map((a) => a.url), syllabus?.url, ...files.map((f) => f.url)]);
   const links: CourseLink[] = [
     ...(course.canvasCourseId ? [{ label: 'Canvas', url: `${origin}/courses/${course.canvasCourseId}` }] : []),
@@ -265,9 +273,9 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
         {links.length > 0 && (
           <div className="mt-3.5 flex flex-wrap gap-1.5">
             {links.map((l) => (
-              <a key={l.url + l.label} href={l.url} target="_blank" rel="noreferrer" className="grid h-[30px] place-items-center rounded-full border border-line bg-card px-3 text-[12.5px] font-medium transition-colors hover:bg-well2">
+              <ExtLink key={l.url + l.label} href={l.url} className="grid h-[30px] place-items-center rounded-full border border-line bg-card px-3 text-[12.5px] font-medium transition-colors hover:bg-well2">
                 {l.label} ↗
-              </a>
+              </ExtLink>
             ))}
           </div>
         )}
@@ -354,7 +362,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
                     return (
                       <div key={q.id} className={cn('px-3.5 py-2.5 text-[13.5px]', i < grading.length - 1 && 'border-b border-line')}>
                         <div className="flex items-center gap-2">
-                          <a href={q.url ?? '#'} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate hover:underline">{q.title}</a>
+                          <ExtLink href={q.url} className="min-w-0 flex-1 truncate hover:underline">{q.title}</ExtLink>
                           <span className="text-xs text-ter">{raw.submissions ?? 0} subs · {pct}%{raw.openRegradeRequests ? ` · ${raw.openRegradeRequests} regrades` : ''}{raw.published ? '' : ' · unpublished'}</span>
                         </div>
                         <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-card"><div className="h-full rounded bg-indigo" style={{ width: `${pct}%` }} /></div>
@@ -405,8 +413,8 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
 
         {tab === 'syllabus' && syllabus && (
           <div className="space-y-3">
-            {syllabus.url && (
-              <a href={syllabus.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-indigo hover:underline">
+            {safeHref(syllabus.url) && (
+              <a href={safeHref(syllabus.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-indigo hover:underline">
                 Open in Canvas <ExternalLink className="size-3" />
               </a>
             )}

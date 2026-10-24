@@ -33,14 +33,19 @@ export async function buildExport(ctx: AppContext) {
   };
 }
 
-export async function applyImport(ctx: AppContext, data: z.infer<typeof exportSchema>) {
-  for (const course of data.courses) {
+export async function applyImport(ctx: AppContext, data: z.infer<typeof exportSchema>, raw?: unknown) {
+  // Keys actually present per course in the file: zod fills defaults for the rest, and writing those back would
+  // reset schedule, links, role and submits_via on an existing course (DECISIONS 041).
+  const rawCourses = raw && typeof raw === 'object' && Array.isArray((raw as { courses?: unknown }).courses) ? ((raw as { courses: unknown[] }).courses as Record<string, unknown>[]) : null;
+  for (const [i, course] of data.courses.entries()) {
     const { id: givenId, ...rest } = course;
     const id = givenId ?? courseSlug(rest.term, rest.code, rest.section);
+    const sentKeys = rawCourses?.[i] && typeof rawCourses[i] === 'object' ? new Set(Object.keys(rawCourses[i]!)) : null;
+    const set = sentKeys ? Object.fromEntries(Object.entries(rest).filter(([k]) => sentKeys.has(k))) : rest;
     await ctx.db
       .insert(courses)
       .values({ id, ...rest })
-      .onConflictDoUpdate({ target: courses.id, set: rest });
+      .onConflictDoUpdate({ target: courses.id, set });
     await ctx.db.insert(widgetInstances).values({ id: `class:${id}`, type: 'class', config: { courseId: id }, hidden: true }).onConflictDoNothing();
   }
   for (const [key, value] of Object.entries(data.settings)) {
@@ -76,7 +81,8 @@ export function exportRoutes(ctx: AppContext) {
   });
   r.post('/import', async (c) => {
     const data = await parseBody(c, exportSchema);
-    return c.json(await applyImport(ctx, data));
+    const raw = await c.req.json().catch(() => null); // cached by Hono; the keys per course decide what an existing course keeps
+    return c.json(await applyImport(ctx, data, raw));
   });
   return r;
 }

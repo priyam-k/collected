@@ -1,7 +1,10 @@
+import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { parseArgs } from 'node:util';
 import { Api } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { configPath, defaultConfig, loadConfig, saveConfig, targetDir } from './config.js';
+import { assertSecureUrl } from './guard.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
 import { pullFile } from './pull.js';
 import { loadState } from './state.js';
@@ -14,8 +17,9 @@ function usage(): never {
 
   File sync (course files → folders on this machine)
 
-    init <server-url>                         write ${configPath()} (device name, cache dir, model on)
-    auth service-token <id> <secret> | auth helper-key <key> | auth model <typesafe-api-key>
+    init <server-url>                         write ${configPath()} (device name, cache dir, model on); https, or http://localhost
+    auth service-token <id> [secret] | auth helper-key [key] | auth model [typesafe-api-key]
+                                              leave the secret off to be prompted for it (or pipe it in): it then stays out of shell history
     files courses                             what the server wants synced and where it lands here
     files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
     sync [--dry-run] [--course X] [--no-model]    run the file sync now
@@ -25,6 +29,27 @@ function usage(): never {
 }
 
 const say = (s: string) => console.log(s);
+
+/** A secret typed at a prompt with echo off, or the whole of stdin when piped. Never an argv word. */
+async function readSecret(prompt: string): Promise<string> {
+  let value: string;
+  if (process.stdin.isTTY) {
+    const rl = createInterface({ input: process.stdin, output: new Writable({ write: (_c, _e, cb) => cb() }), terminal: true });
+    process.stderr.write(prompt);
+    try {
+      value = await rl.question('');
+    } finally {
+      rl.close();
+      process.stderr.write('\n');
+    }
+  } else {
+    value = '';
+    for await (const chunk of process.stdin) value += chunk;
+  }
+  value = value.trim();
+  if (!value) throw new Error('no secret given');
+  return value;
+}
 
 try {
   // `files <sub>` is the file sync's own namespace; `link <course-id> <path>` (the old spelling) still means a folder.
@@ -47,6 +72,7 @@ try {
     case 'init': {
       const server = rest[0];
       if (!server) usage();
+      assertSecureUrl(server, 'the server URL');
       const { values } = parseArgs({ args: rest.slice(1), options: { force: { type: 'boolean' }, device: { type: 'string' } } });
       let existing: ReturnType<typeof loadConfig> | null = null;
       try {
@@ -61,17 +87,19 @@ try {
       const cfg = defaultConfig(server);
       if (values.device) cfg.device = values.device;
       saveConfig(cfg);
-      say(`wrote ${configPath()}\nnext: collected auth service-token <id> <secret>   (or auth helper-key <key> for a local server)\n      collected auth model <typesafe-api-key>         (for the Jev classifier; skip to use rules only)\n      collected courses`);
+      say(`wrote ${configPath()}\nnext: collected auth service-token <id>   (prompts for the secret; or auth helper-key for a local server)\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)\n      collected courses`);
       break;
     }
     case 'auth': {
       const cfg = loadConfig();
-      if (rest[0] === 'service-token' && rest[1] && rest[2]) cfg.auth = { cfAccessClientId: rest[1], cfAccessClientSecret: rest[2] };
-      else if (rest[0] === 'helper-key' && rest[1]) cfg.auth = { helperKey: rest[1] };
-      else if (rest[0] === 'model' && rest[1]) cfg.model = { ...cfg.model, enabled: true, apiKey: rest[1] };
+      const [what, a, b] = rest;
+      if (what === 'service-token' && a) cfg.auth = { cfAccessClientId: a, cfAccessClientSecret: b ?? (await readSecret('service token secret: ')) };
+      else if (what === 'helper-key') cfg.auth = { helperKey: a ?? (await readSecret('helper key: ')) };
+      else if (what === 'model') cfg.model = { ...cfg.model, enabled: true, apiKey: a ?? (await readSecret('TypeSafe API key: ')) };
       else usage();
       saveConfig(cfg);
       say('saved');
+      if ((what === 'service-token' && b) || (what !== 'service-token' && a)) console.error('note: a secret on the command line lands in shell history; next time leave it off and type it at the prompt');
       break;
     }
     case 'files-courses': {

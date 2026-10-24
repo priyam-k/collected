@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "files": ["dist", "drizzle"],
+  "files": [
+    "dist",
+    "drizzle"
+  ],
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "build": "tsup",
@@ -17,7 +20,7 @@
   "dependencies": {
     "@collected/shared": "workspace:*",
     "@googleapis/calendar": "^16.0.0",
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.5",
     "@hono/zod-validator": "^0.9.1",
     "@libsql/client": "^0.18.0",
     "cheerio": "^1.2.0",
@@ -25,12 +28,12 @@
     "drizzle-orm": "^0.45.2",
     "fetch-cookie": "^3.2.0",
     "google-auth-library": "^11.0.2",
-    "hono": "^4.13.7",
+    "hono": "^4.13.13",
     "jose": "^6.2.12",
     "node-ical": "^0.27.1",
     "pino": "^10.3.1",
     "tough-cookie": "^6.0.2",
-    "zod": "^4.5.4"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -39,6 +42,6 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.13",
     "typescript": "~5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   }
 }

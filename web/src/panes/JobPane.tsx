@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateJob, useDeleteJob, useJob, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeHref } from '@/lib/url';
 import { usePane } from './PaneContext';
 
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
@@ -144,9 +145,9 @@ export function JobPane({ jobId }: { jobId: string | null }) {
           {!job.active && <span className="text-amber-600 dark:text-amber-400">no longer listed</span>}
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          {job.url && (
+          {safeHref(job.url) && (
             <Button asChild size="sm" variant="secondary">
-              <a href={job.url} target="_blank" rel="noreferrer">Open posting <ExternalLink className="size-3.5" /></a>
+              <a href={safeHref(job.url)} target="_blank" rel="noreferrer">Open posting <ExternalLink className="size-3.5" /></a>
             </Button>
           )}
           <StageSelect value={job.state} allowUntracked onChange={(v) => save({ state: v }, v === 'new' ? 'Removed from tracker' : `Moved to ${JOB_STATE_LABELS[v]}`)} className="h-8" />

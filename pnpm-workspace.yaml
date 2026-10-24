@@ -8,6 +8,7 @@ packages:
 allowBuilds:
   esbuild: true
 
-# pnpm 12 delays brand-new releases by default; jose's latest was excluded during install.
-minimumReleaseAgeExclude:
-  - jose@6.2.12
+# Transitive deps with advisories that the direct dependency has not bumped yet (pnpm audit --prod).
+overrides:
+  undici: ">=7.30.1"
+  "brace-expansion@>=2.0.0 <2.1.7": ">=2.1.7"

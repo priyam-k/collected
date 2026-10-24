@@ -9,6 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useCloseTodoistTask, useSetOverride } from '@/lib/queries';
 import { usePane } from '@/panes/PaneContext';
 import { friendlyDate } from '@/lib/time';
+import { safeColor } from '@/lib/color';
+import { safeHref } from '@/lib/url';
 import { cn } from '@/lib/utils';
 
 function stripHtml(s: string): string {
@@ -26,15 +28,16 @@ function stripHtml(s: string): string {
 
 function linkify(text: string): ReactNode[] {
   const parts = text.split(/(https?:\/\/[^\s)]+)/g);
-  return parts.map((p, i) =>
-    /^https?:\/\//.test(p) ? (
-      <a key={i} href={p} target="_blank" rel="noreferrer" className="break-all underline underline-offset-2">
+  return parts.map((p, i) => {
+    const href = safeHref(p);
+    return href ? (
+      <a key={i} href={href} target="_blank" rel="noreferrer" className="break-all underline underline-offset-2">
         {p}
       </a>
     ) : (
       <span key={i}>{p}</span>
-    ),
-  );
+    );
+  });
 }
 
 function when(item: EffectiveItem): string {
@@ -72,7 +75,7 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-start gap-2">
-        {item.course?.color && <span className="mt-1.5 inline-block size-2.5 shrink-0 rounded-full" style={{ background: item.course.color }} />}
+        {safeColor(item.course?.color) && <span className="mt-1.5 inline-block size-2.5 shrink-0 rounded-full" style={{ background: safeColor(item.course?.color) }} />}
         <div className="min-w-0 flex-1">
           <div className={cn('font-medium leading-snug', item.effectiveDone && 'line-through opacity-70')}>{item.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -105,9 +108,9 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
       </div>
       {desc && <p className="max-h-40 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{linkify(desc.slice(0, 1500))}{desc.length > 1500 ? '…' : ''}</p>}
       <div className="flex items-center gap-2 pt-1">
-        {item.url && (
+        {safeHref(item.url) && (
           <Button asChild size="sm" variant="secondary">
-            <a href={item.url} target="_blank" rel="noreferrer">
+            <a href={safeHref(item.url)} target="_blank" rel="noreferrer">
               Open in {SOURCE_LABELS[item.source].replace(' (iCal fallback)', '')} <ExternalLink className="size-3.5" />
             </a>
           </Button>

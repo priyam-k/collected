@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { courseContent, courses, items } from '../../db/schema.js';
 import { queryEffectiveItems } from '../../lib/effective.js';
@@ -74,6 +74,32 @@ describe('syncCanvas over fixtures', () => {
     expect(counts.deleted).toBe(1);
     const stale = await ctx.db.query.items.findFirst({ where: eq(items.id, 'canvas:assignment:999') });
     expect(stale?.deletedAt).toBeTruthy();
+  });
+
+  it('keeps a course\'s assignments when its assignments call fails instead of soft-deleting them', async () => {
+    const ctx = await testContext();
+    await seedCourses(ctx);
+    await syncCanvas(ctx, fixtureCanvasClient());
+    const before = await ctx.db.select().from(items).where(and(eq(items.source, 'canvas'), eq(items.kind, 'assignment'), isNull(items.deletedAt)));
+    expect(before.length).toBeGreaterThan(0);
+
+    // Canvas answers 502 for one course's assignments (or the run was cut off): that course is left alone, the rest still reconcile.
+    const flaky = fixtureCanvasClient();
+    const real = flaky.getAll.bind(flaky);
+    flaky.getAll = ((path: string, ...rest: unknown[]) => (path.includes('/courses/1408462/assignments') ? Promise.reject(new Error('Canvas 502 for assignments')) : (real as (...a: unknown[]) => Promise<unknown[]>)(path, ...rest))) as typeof flaky.getAll;
+    const counts = await syncCanvas(ctx, flaky);
+    expect(counts.coursesFailed).toBe(1);
+    const after = await ctx.db.select().from(items).where(and(eq(items.source, 'canvas'), eq(items.kind, 'assignment'), isNull(items.deletedAt)));
+    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+
+    // A cancelled run propagates instead of being read as an empty course.
+    const cancelled = fixtureCanvasClient();
+    const real2 = cancelled.getAll.bind(cancelled);
+    cancelled.getAll = ((path: string, ...rest: unknown[]) =>
+      path.includes('/assignments') ? Promise.reject(Object.assign(new Error('This operation was aborted'), { name: 'AbortError' })) : (real2 as (...a: unknown[]) => Promise<unknown[]>)(path, ...rest)) as typeof cancelled.getAll;
+    await expect(syncCanvas(ctx, cancelled)).rejects.toThrow('aborted');
+    const still = await ctx.db.select().from(items).where(and(eq(items.source, 'canvas'), eq(items.kind, 'assignment'), isNull(items.deletedAt)));
+    expect(still.length).toBe(before.length);
   });
 
   it('exposes effective items: done/graded hidden by default, missing flagged, TA rows informational', async () => {

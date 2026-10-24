@@ -1,14 +1,17 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { decideFile, fileSyncConfigSchema, type EffectiveItem, type FileSyncFileView, type FileSyncManifest, type FileSyncReport } from '@collected/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { decideFile, fileSyncConfigSchema, type EffectiveItem, type FileSyncConfig, type FileSyncFileView, type FileSyncManifest, type FileSyncReport } from '@collected/shared';
 import type { SyncApi } from './api.js';
+import { classify } from './classify.js';
 import type { AgentConfig } from './config.js';
 import type { CourseContentRow } from './facts.js';
 import { sha256Text } from './place.js';
 import { pullFile } from './pull.js';
 import { runSync } from './sync.js';
+
+vi.mock('./classify.js', async (orig) => ({ ...(await orig<typeof import('./classify.js')>()), classify: vi.fn() }));
 
 /* The whole placement flow against a fake server, in a temp "vault". */
 
@@ -63,13 +66,14 @@ class FakeApi implements SyncApi {
   assignments: EffectiveItem[] = [];
   announcements: EffectiveItem[] = [];
   content: CourseContentRow[] = [];
+  config: FileSyncConfig = config;
   constructor(public files: FakeFile[]) {}
   async getManifest(): Promise<FileSyncManifest> {
     const views: FileSyncFileView[] = this.files.map((f) => {
       const file = { courseId: COURSE, fileId: f.fileId, title: f.filename, filename: f.filename, folderPath: f.folderPath, moduleName: null, modulePosition: null, contentType: 'application/pdf', size: f.size ?? f.bytes.length, updatedAt: f.updatedAt };
-      return { ...file, decision: decideFile(config, file, { manualTarget: f.manualTarget ?? null, model: null }), model: null, manualTarget: f.manualTarget ?? null, placed: null };
+      return { ...file, decision: decideFile(this.config, file, { manualTarget: f.manualTarget ?? null, model: null }), model: null, manualTarget: f.manualTarget ?? null, placed: null };
     });
-    return { generatedAt: 'now', courses: [{ course: { id: COURSE, code: 'LING260', color: null }, config, files: views }] };
+    return { generatedAt: 'now', courses: [{ course: { id: COURSE, code: 'LING260', color: null }, config: this.config, files: views }] };
   }
   async postReport(report: FileSyncReport): Promise<unknown> {
     this.reports.push(report);
@@ -278,6 +282,37 @@ describe('Markdown handouts', () => {
     expect(s.errors).toEqual([]);
     expect(existsSync(path.join(school, 'admin'))).toBe(false);
     expect(ls(path.join(school, 'assignments', 'p1'))).toEqual([name, '_collected.md']);
+  });
+});
+
+describe('what the server says is checked here', () => {
+  it('leaves a file alone when the manifest names a target that is not a course target or not a name at all', async () => {
+    const api = new FakeApi([lecture({ manualTarget: '../../escape' }), lecture({ fileId: '2', filename: 'L02.pdf', bytes: 'two', manualTarget: '/tmp' }), lecture({ fileId: '3', filename: 'L03.pdf', bytes: 'three', manualTarget: 'readings' })]);
+    const s = await runSync(cfg(), { api });
+    expect(s).toMatchObject({ placed: 1 });
+    expect(s.errors.map((e) => e.message)).toEqual(['target "../../escape" is not a valid name; its files are left alone', 'target "/tmp" is not a valid name; its files are left alone']);
+    expect(ls(school)).toEqual(['readings']);
+    expect(api.downloads).toEqual(['3']);
+    expect(existsSync(path.join(tmp, 'escape'))).toBe(false);
+  });
+
+  it('ignores a rule whose pattern is built to backtrack and says so', async () => {
+    const api = new FakeApi([lecture()]);
+    api.config = fileSyncConfigSchema.parse({ ...config, rules: [{ target: 'slides', name: '^(\\w+\\s?)+$' }, ...config.rules] });
+    const s = await runSync(cfg(), { api });
+    expect(s.errors.map((e) => e.message)).toEqual([expect.stringMatching(/rule → slides ignored: nested quantifier/)]);
+    expect(s.placed).toBe(1);
+  });
+
+  it("treats a model choice outside the course's targets as a model error, not a decision", async () => {
+    const api = new FakeApi([{ fileId: '20', filename: 'mystery.pdf', folderPath: '/misc', updatedAt: T1, bytes: 'm' }, { fileId: '21', filename: 'other.pdf', folderPath: '/misc', updatedAt: T1, bytes: 'o' }]);
+    api.config = fileSyncConfigSchema.parse({ ...config, fallback: 'model' });
+    vi.mocked(classify).mockResolvedValueOnce({ target: '../../Library/LaunchAgents', confidence: 0.99, probabilities: null }).mockResolvedValueOnce({ target: 'slides', confidence: 0.9, probabilities: null });
+    const s = await runSync(cfg({ model: { enabled: true, apiKey: 'k' } }), { api });
+    expect(s).toMatchObject({ placed: 1, pending: 1, classified: 1 });
+    expect(s.errors.map((e) => e.message)).toEqual(['model failed on mystery.pdf: target "../../Library/LaunchAgents" is not a valid name']);
+    expect(api.reports.at(-1)!.decisions.map((d) => d.fileId)).toEqual(['21']);
+    expect(ls(path.join(school, 'slides', 'misc'))).toEqual(['_collected.md', 'other.pdf']);
   });
 });
 

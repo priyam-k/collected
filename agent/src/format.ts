@@ -58,7 +58,9 @@ export function htmlToText(html: string | null | undefined): string {
       }
       return m;
     })
-    .replace(/[ \t]+\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trimEnd()) // not /[ \t]+\n/: that is quadratic on a long run of spaces (SECURITY-REVIEW 1.3)
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

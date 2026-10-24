@@ -7,6 +7,7 @@ import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCloseTodoistTask, useItems, useQuickAddTask, useSetOverride, useSettings, useSources } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { safeColor } from '@/lib/color';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import { windowFromNow } from '@/widgets/shared';
@@ -160,7 +161,7 @@ export function TodoWidget({ size }: WidgetProps) {
                 </ItemPopover>
                 <div className="mt-1 flex items-center gap-2 text-[11.5px]">
                   {it.dueAt ? <span className={cn('font-medium', late ? 'text-coral' : 'text-sub')}>{friendlyDate(it.dueAt, { withTime: true, allDay: it.allDay })}</span> : <span className="text-ter">no date</span>}
-                  {it.course && <span className="font-medium" style={{ color: it.course.color ?? 'var(--sub)' }}>{it.course.code}</span>}
+                  {it.course && <span className="font-medium" style={{ color: safeColor(it.course.color) ?? 'var(--sub)' }}>{it.course.code}</span>}
                   {it.source === 'todoist' && raw.projectName && <span className="text-ter">{raw.projectName}</span>}
                   <span className="flex-1" />
                   <span className="text-ter" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>{sourceTag(it)}</span>

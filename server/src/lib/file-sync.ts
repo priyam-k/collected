@@ -1,6 +1,8 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import {
+  allowedTargets,
   decideFile,
+  FILE_SYNC_SKIP,
   fileSyncConfigSchema,
   type FileSyncConfig,
   type FileLinkedFrom,
@@ -101,25 +103,42 @@ export async function listDevices(ctx: AppContext): Promise<FileSyncDevice[]> {
   return Object.values(all).sort((a, b) => b.lastRunAt.localeCompare(a.lastRunAt));
 }
 
-/** Records what a device did: model answers, placements, removals, and its target paths. */
-export async function applyReport(ctx: AppContext, report: FileSyncReport): Promise<{ decisions: number; placed: number; removed: number }> {
+/**
+ * Records what a device did: model answers, placements, removals, and its target paths. Rows are written only for
+ * files the course actually has and targets its config names: the agent is a credential holder, not an oracle, and
+ * `decideFile` would otherwise act on whatever target it reported.
+ */
+export async function applyReport(ctx: AppContext, report: FileSyncReport): Promise<{ decisions: number; placed: number; removed: number; ignored: number }> {
   const now = nowIso();
   const key = (courseId: string, fileId: string) => `${courseId}\u0000${fileId}`;
   const touched = new Map<string, Partial<typeof fileSyncState.$inferInsert> & { courseId: string; fileId: string }>();
-  const upsert = (courseId: string, fileId: string, patch: Partial<typeof fileSyncState.$inferInsert>) => {
-    const k = key(courseId, fileId);
-    touched.set(k, { ...(touched.get(k) ?? { courseId, fileId }), ...patch });
+  const courseIds = [...new Set([...report.decisions, ...report.placed, ...report.removed].map((r) => r.courseId))];
+  const known = new Map<string, { targets: Set<string>; files: Set<string> }>();
+  if (courseIds.length) {
+    const rows = await ctx.db.select().from(courses).where(inArray(courses.id, courseIds));
+    for (const c of rows) {
+      const config = configOf(c);
+      if (!config?.enabled) continue;
+      known.set(c.id, { targets: new Set(allowedTargets(config)), files: new Set((await listSyncFiles(ctx, c.id)).map((f) => f.fileId)) });
+    }
+  }
+  let ignored = 0;
+  const upsert = (courseId: string, fileId: string, target: string | null, patch: Partial<typeof fileSyncState.$inferInsert>) => {
+    const k = known.get(courseId);
+    if (!k || !k.files.has(fileId) || (target && target !== FILE_SYNC_SKIP && !k.targets.has(target))) {
+      ignored++;
+      return;
+    }
+    const kk = key(courseId, fileId);
+    touched.set(kk, { ...(touched.get(kk) ?? { courseId, fileId }), ...patch });
   };
-  for (const d of report.decisions) upsert(d.courseId, d.fileId, { modelTarget: d.target, modelConfidence: d.confidence, modelProbabilities: d.probabilities, modelAt: now });
-  for (const p of report.placed) upsert(p.courseId, p.fileId, { placedTarget: p.target, placedPath: p.localPath, placedDevice: report.device, placedAt: now });
-  for (const r of report.removed) upsert(r.courseId, r.fileId, { placedTarget: null, placedPath: null, placedDevice: null, placedAt: null });
+  for (const d of report.decisions) upsert(d.courseId, d.fileId, d.target, { modelTarget: d.target, modelConfidence: d.confidence, modelProbabilities: d.probabilities, modelAt: now });
+  for (const p of report.placed) upsert(p.courseId, p.fileId, p.target, { placedTarget: p.target, placedPath: p.localPath, placedDevice: report.device, placedAt: now });
+  for (const r of report.removed) upsert(r.courseId, r.fileId, null, { placedTarget: null, placedPath: null, placedDevice: null, placedAt: null });
+  if (ignored) ctx.log.warn({ device: report.device, ignored }, 'file sync report named files or targets the courses do not have');
 
   if (touched.size) {
-    // Only touch rows for courses that exist; a stale agent could otherwise write junk.
-    const courseIds = [...new Set([...touched.values()].map((t) => t.courseId))];
-    const known = new Set((await ctx.db.select({ id: courses.id }).from(courses).where(inArray(courses.id, courseIds))).map((r) => r.id));
     for (const t of touched.values()) {
-      if (!known.has(t.courseId)) continue;
       const { courseId, fileId, ...patch } = t;
       await ctx.db
         .insert(fileSyncState)
@@ -132,5 +151,5 @@ export async function applyReport(ctx: AppContext, report: FileSyncReport): Prom
   devices[report.device] = { device: report.device, lastRunAt: now, model: report.model, targets: report.targets, errors: report.errors.slice(0, 50) };
   await setSetting(ctx, DEVICES_SETTING, devices);
 
-  return { decisions: report.decisions.length, placed: report.placed.length, removed: report.removed.length };
+  return { decisions: report.decisions.length, placed: report.placed.length, removed: report.removed.length, ignored };
 }

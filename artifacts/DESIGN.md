@@ -199,7 +199,7 @@ Course files land in folders on the laptop automatically, so local tools (Claude
 
 **On demand.** `collected-agent pull <canvas-file-id> --to <folder>` fetches one file whatever the rules say, with the same dedupe and atomic write, and the sync keeps it afterwards.
 
-**Auth.** The agent authenticates through Cloudflare Access with a **service token** (`CF-Access-Client-Id/Secret` headers; Access mints a JWT whose identity is `common_name`, which the app accepts like an email). `LOCAL_HELPER_KEY` in `x-collected-key` is accepted by the API middleware as a second credential for local use.
+**Auth.** The agent authenticates through Cloudflare Access with a **service token** (`CF-Access-Client-Id/Secret` headers; Access mints a JWT whose identity is `common_name`, which the app accepts like an email). `LOCAL_HELPER_KEY` in `x-collected-key` opens exactly one route, the Canvas cookie drop-off; a service token can read, make the CLI's edits and run the file sync, but not import/export, credentials, settings, layout, OAuth, or delete (DECISIONS 043).
 
 ## The `collected` CLI
 
