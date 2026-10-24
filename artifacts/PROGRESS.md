@@ -1,6 +1,49 @@
 # Progress
 
-Last updated: 2026-09-24. Deploys now run from GitHub Actions on push to `main` (DECISIONS 035); the deploy key and repo secrets still have to be set by hand once (SETUP.md Phase 2 step 9). The unused `applications` table is dropped (migration 0004). September's $0.24 GCP charge was egress from uncompressed API polling; responses are now gzipped + ETagged (DECISIONS 036); watch the October bill. Status as of 2026-09-09: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Shipped to the box 2026-09-09 (image built on the Mac, main at 1df90e7): course pane, applications tracker, inline files, grades, course dates, schedule editor, the new UI, and the Progress / Clock / Exams / Announcements widgets; migrations 0002 and 0003 applied on boot. Next: connect the sources on prod, the backup cron, then two weeks of real use.
+Last updated: 2026-10-24 (roadmap added; security review done, DECISIONS 043). Previously 2026-09-24: Deploys now run from GitHub Actions on push to `main` (DECISIONS 035); the deploy key and repo secrets still have to be set by hand once (SETUP.md Phase 2 step 9). The unused `applications` table is dropped (migration 0004). September's $0.24 GCP charge was egress from uncompressed API polling; responses are now gzipped + ETagged (DECISIONS 036); watch the October bill. Status as of 2026-09-09: M1–M8 done, M9 in progress: the e2-micro is up with the tunnel and Access in front, the first deploy's I/O problem is fixed (DECISIONS 024/025). Shipped to the box 2026-09-09 (image built on the Mac, main at 1df90e7): course pane, applications tracker, inline files, grades, course dates, schedule editor, the new UI, and the Progress / Clock / Exams / Announcements widgets; migrations 0002 and 0003 applied on boot. Next: connect the sources on prod, the backup cron, then two weeks of real use.
+
+## Roadmap (2026-10-24)
+
+Where this is going after v1, in the order the pieces depend on each other. Set on 2026-10-22; kept here so nothing drops out of sight. Phase 1 is done; the rest is the plan, not a commitment to dates.
+
+**The pieces today.** Server + web in one container on the box, for everyone. The `collected` CLI and file sync (`agent/`) on the laptop, for anyone who wants files locally or agent access. The Canvas cookie helper (`local/canvas_cookie.py`) on the laptop, needed because UMD disabled Canvas API tokens. The vault skills (`/ingest`, `/canvas`, auto-ingest) in the notes vault: optional, and the notes agent's project, not this one.
+
+**Two directions, one prerequisite.** Open source means someone runs the compose file without Cloudflare; hosted means we run it for other people. Both need the same three things first: in-app sign-in and sessions (Google first) so nothing depends on Cloudflare Access, per-user API tokens for the CLI replacing the Access service token, and onboarding from Canvas enrollments instead of `seed-config.json`. Open source comes first: it needs those three plus cleanup. Hosted also needs tenant isolation, a box that can carry several users' ingesters, and taking responsibility for other people's Canvas sessions. An invite-only beta for friends on the other server is the sensible middle step once isolation exists.
+
+### Phase 1 — Security review and end-to-end tests
+- [x] Full security review, seven surfaces, every finding verified (`SECURITY-REVIEW.md`, 2026-10-23).
+- [x] Tier 1 and 2 fixes landed (DECISIONS 043, commit 4f22fca): fail-closed ingest, scoped credentials, outbound URL policy, CSRF and headers, agent containment, hardened deploy, pre-migration snapshots, dependency bumps.
+- [ ] Manual steps the fixes created (SETUP.md steps 9 and 10): deploy secrets, `production` environment, branch protection, Dependabot alerts, backup cron on the box, the Access cookie's SameSite check in Zero Trust.
+- [ ] Proper end-to-end tests: a seeded server over the fixture clients, the web app driven in a browser (first-run, connect a source, a course pane, a widget edit, export/import), the CLI against that server, and a file-sync run into a temp folder. Runs in `ci.yml`.
+
+### Phase 2 — The shared prerequisite (sign-in, tokens, onboarding)
+- [ ] In-app sign-in and sessions, Google OAuth for identity first; Cloudflare Access becomes optional in front rather than the login.
+- [ ] Per-user API tokens for the CLI (`collected login`), replacing the Access service token; the service-token path stays until the CLI has migrated.
+- [ ] Onboarding from Canvas enrollments: first run offers the courses it sees instead of reading `seed-config.json`; the seed file becomes an example.
+- [ ] The laptop side collapses to one thing: `collected login`, `collected connect canvas` (reads the Chrome cookie in the CLI, retiring `local/canvas_cookie.py`), `collected files link …`, `collected install-launchd`.
+- [ ] A `collected` skill file in the repo for AI agents: commands, output shapes, what is safe to allowlist. The vault skills stay separate, possibly shipped as an optional starter.
+
+### Phase 3 — Open-source release
+- [ ] Scrub the repo: `seed-config.json` becomes `seed-config.example.json`; fixtures lose real course ids, instructor names and the owner's calendar name; `artifacts/previous.txt` goes; the owner's domain, instance, zone and username leave compose, SETUP, REFERENCE, PROGRESS, DESIGN, the workflow's pinned host key, and the UMD Canvas URL stops being a default anywhere (list in `SECURITY-REVIEW.md`, Tier 4).
+- [ ] LICENSE (MIT unless decided otherwise), SECURITY.md, a CONTRIBUTING note that `main` deploys the maintainer's instance.
+- [ ] README with screenshots from the demo fixtures; a landing page; a first-run flow in the web UI.
+- [x] CI running typecheck, tests and `pnpm audit` on pull requests (`ci.yml`).
+- [x] Secrets scan of the whole git history (clean, 2026-10-23; repeat right before flipping to public).
+- [ ] Self-host path in SETUP.md that works without Cloudflare (needs Phase 2's sign-in).
+- [ ] Flip the repo to public.
+
+### Phase 4 — Hosted, invite-only first
+- [ ] The parked multi-user plan (memory and `Later` below): `user_id` on every user-owned table with composite keys, isolation tests, per-user ingest mutex and rate limits, Postgres, app/worker split, webhooks for Todoist and Google Calendar.
+- [ ] Hosted-only hardening from the review's Tier 3: resolver-level outbound URL checks or an allow-list of LMS hosts, relative paths in the agent's reports, per-user OAuth state.
+- [ ] Capacity: the e2-micro cannot carry several users' ingesters; the other server or OCI.
+- [ ] Decide whether "hosted" means invited friends or anyone who shows up; the second needs all of the above before the first invite, the first can start after isolation.
+
+### Moving hosting (whenever)
+Roughly half an hour, because the tunnel is the identity, not the box: on the new box install Docker and `cloudflared` with the same tunnel token, copy `data/` (database, key file, backups), recreate `.env`, `compose up`; remove the connector on the old box. Cloudflare needs nothing. In GitHub change the `DEPLOY_HOST` and `DEPLOY_USER` secrets, put the deploy public key in the new box's `authorized_keys`, replace the pinned host key in `deploy.yml`; an ARM box needs `--platform linux/arm64` on the build. The laptop needs nothing. Still to answer: the other server's OS, CPU architecture, RAM and location, to decide whether it is a better home than the e2-micro.
+
+### Open decisions
+- License: MIT is the default unless there is a reason to prefer Apache-2.0.
+- Hosted audience: invited friends or the public.
 
 ## Milestones
 
