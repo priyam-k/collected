@@ -1,7 +1,7 @@
 // Vocabulary shared by server and web. Keep in sync with artifacts/DESIGN.md.
 
 /** Sources with an ingester and a row in `sources`. */
-export const INGESTED_SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'todoist', 'jobs'] as const;
+export const INGESTED_SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'jobs'] as const;
 export type IngestedSourceId = (typeof INGESTED_SOURCE_IDS)[number];
 /** Every value `items.source` can take. `manual` is you: exam dates, cancelled sessions, notes. */
 export const SOURCE_IDS = [...INGESTED_SOURCE_IDS, 'manual'] as const;
@@ -12,6 +12,7 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   canvas_ical: 'Canvas (iCal fallback)',
   gradescope: 'Gradescope',
   gcal: 'Google Calendar',
+  gcal_ical: 'Google Calendar (iCal)',
   todoist: 'Todoist',
   jobs: 'Job feed',
   manual: 'Manual',

@@ -1,0 +1,27 @@
+# Caddy in front of collected. Copy to /etc/caddy/Caddyfile, change the domain, `systemctl reload caddy`.
+# Caddy obtains and renews the certificate on its own; ports 80 and 443 must reach this machine.
+collected.example.com {
+	encode zstd gzip
+
+	# The compose file publishes the app on loopback only; nothing else can reach it without this proxy.
+	reverse_proxy 127.0.0.1:3000 {
+		# Lets the app see the original scheme and host for OAuth redirect URIs built from PUBLIC_URL.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	# The config import is the largest request body; everything else is small JSON.
+	request_body {
+		max_size 20MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/collected.log
+	}
+}
