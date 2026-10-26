@@ -3,6 +3,7 @@ packages:
   - server
   - web
   - agent
+  - e2e
 
 # pnpm 12 blocks postinstall scripts unless allowed here.
 allowBuilds:

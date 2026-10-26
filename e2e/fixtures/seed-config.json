@@ -1,0 +1,73 @@
+{
+  "term": "2026-fall",
+  "courses": [
+    {
+      "code": "CMSC422",
+      "section": "0101",
+      "name": "Introduction to Machine Learning",
+      "role": "student",
+      "submits_via": "both",
+      "gradescope_course_id": null,
+      "canvas_course_id": null,
+      "links": [{ "label": "Piazza", "url": "https://piazza.com/class/cmsc422" }],
+      "schedule": {
+        "lecture": [
+          { "day": "mon", "start": "14:00", "end": "15:15", "location": "IRB 0324" },
+          { "day": "wed", "start": "14:00", "end": "15:15", "location": "IRB 0324" }
+        ]
+      }
+    },
+    {
+      "code": "MATH423",
+      "section": "0301",
+      "role": "student",
+      "submits_via": "both",
+      "gradescope_course_id": null,
+      "canvas_course_id": null,
+      "links": [],
+      "schedule": {}
+    },
+    {
+      "code": "STAT410",
+      "section": "0601",
+      "role": "student",
+      "submits_via": "both",
+      "gradescope_course_id": null,
+      "canvas_course_id": null,
+      "links": [],
+      "schedule": {}
+    },
+    {
+      "code": "CMSC330",
+      "section": "0103",
+      "role": "ta",
+      "submits_via": "gradescope",
+      "gradescope_course_id": null,
+      "canvas_course_id": null,
+      "links": [],
+      "schedule": {
+        "discussion": [{ "day": "fri", "start": "11:00", "end": "11:50" }],
+        "office_hours": []
+      }
+    }
+  ],
+  "todoist": {
+    "project_name": "School",
+    "common_label": "homework",
+    "push_sync_enabled": false
+  },
+  "jobs": {
+    "sources": [],
+    "filter": {
+      "require_active": true,
+      "require_visible": true,
+      "categories_include": ["Software"],
+      "terms_include": ["Summer 2027"],
+      "title_include": "software|engineer",
+      "title_exclude": "hardware",
+      "locations_include": "United States",
+      "locations_exclude": "Canada",
+      "sponsorship": "ignore"
+    }
+  }
+}
