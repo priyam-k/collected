@@ -28,7 +28,7 @@ test.describe('layout', () => {
     expect(layouts.lg?.find((l) => l.i === 'clock')).toMatchObject({ w: 2, h: 3 });
 
     await page.getByRole('button', { name: 'Edit layout' }).click();
-    await widget(page, 'Clock').getByRole('button', { name: 'Hide widget' }).click();
+    await widget(page, 'Clock').getByRole('button', { name: /^(Hide widget|Remove Clock from the dashboard)$/ }).click(); // eye icon, or the × corner control on the design branch
     await expect(widget(page, 'Clock')).toHaveCount(0);
     await page.getByRole('button', { name: 'Done' }).click();
 
