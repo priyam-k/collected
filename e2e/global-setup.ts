@@ -74,7 +74,7 @@ export default async function globalSetup(): Promise<void> {
     run(PNPM, ['--filter', 'web', 'exec', 'vite', 'build'], { cwd: ROOT, env, what: 'vite build' });
   }
   console.log('[e2e] building agent/dist');
-  run(PNPM, ['--filter', '@collected/agent', 'build'], { cwd: ROOT, env, what: 'agent build' });
+  run(PNPM, ['--filter', 'collected-cli', 'build'], { cwd: ROOT, env, what: 'agent build' });
   if (!existsSync(AGENT_CLI)) throw new Error(`agent build produced no ${AGENT_CLI}`);
 
   for (const source of ['canvas', 'gradescope', 'gcal', 'todoist']) {
