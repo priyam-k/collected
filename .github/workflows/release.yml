@@ -36,7 +36,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
-      - run: pnpm -r test
+      - run: pnpm test
 
       # The tag must name the version in agent/package.json, so a stale tag cannot publish the wrong build.
       - name: Check tag matches package version
