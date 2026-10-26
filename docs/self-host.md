@@ -37,7 +37,7 @@ Open `.env`. Most lines can stay as they are; these are the ones that decide whe
 | `TZ` | The timezone the dashboard thinks in (`America/New_York`, `Europe/Berlin`…). Day boundaries, "due today", and all-day events use it. |
 | `AUTH_DISABLED` | Leave `false`. Compose pins it to `false` regardless of `.env`, so a development file copied onto the box cannot switch the login wall off. |
 
-**Sign-in.** The intended flow is Google sign-in: set the two `GOOGLE_*` variables, register the sign-in redirect URI from step 6, and the first person to sign in becomes the owner. Cloudflare Access in front of the app is optional and documented in step 5; if you use it, the app can also verify Access's JWT (`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`). The sign-in work is landing in parallel with this document; if your checkout predates it, the server requires the two `CF_ACCESS_*` variables whenever `AUTH_DISABLED=false`, which means Cloudflare Access is the login wall until then.
+**Sign-in.** The intended flow is Google sign-in: set the two `GOOGLE_*` variables, register the sign-in redirect URI from step 6, and the first person to sign in becomes the owner. Cloudflare Access in front of the app is optional and documented in step 5; if you use it, the app can also verify Access's JWT (`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`). Who may sign in: `ALLOWED_EMAILS` (comma-separated) when set; otherwise only the owner.
 
 The rest of `.env.example` is commented inline. `LOCAL_HELPER_KEY` is only for the optional Mac cookie helper; `SEED_CONFIG_PATH` points at an optional first-boot course list.
 
@@ -79,7 +79,7 @@ If the machine cannot accept inbound connections (home network, campus wifi, a f
 
 Set `PUBLIC_URL=https://<that hostname>` in `.env` and restart (`docker compose up -d`).
 
-**Access** (optional login wall in front of the app): Zero Trust → Access → Applications → Add → Self-hosted, the same hostname, a policy that allows your email. Open the application's Overview and copy the Application Audience (AUD) tag into `.env` as `CF_ACCESS_AUD`; your team domain (`<team>.cloudflareaccess.com`) goes in `CF_ACCESS_TEAM_DOMAIN`. With both set, the app verifies Access's signed JWT on every API request, so even a mistake in the tunnel configuration cannot expose the API. Service tokens for the CLI are created under Access → Service Auth and attached to the application with a Service Auth policy.
+**Access** (optional login wall in front of the app): Zero Trust → Access → Applications → Add → Self-hosted, the same hostname, a policy that allows your email. Open the application's Overview and copy the Application Audience (AUD) tag into `.env` as `CF_ACCESS_AUD`; your team domain (`<team>.cloudflareaccess.com`) goes in `CF_ACCESS_TEAM_DOMAIN`. With both set, the app verifies Access's signed JWT on every API request, so even a mistake in the tunnel configuration cannot expose the API. The CLI does not need a service token any more: `collected login` mints an API token in Settings → Account, which the app checks before Access does.
 
 ## 6. Google OAuth client
 
