@@ -42,6 +42,12 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 ### Moving hosting (whenever)
 Roughly half an hour, because the tunnel is the identity, not the box: on the new box install Docker and `cloudflared` with the same tunnel token, copy `data/` (database, key file, backups), recreate `.env`, `compose up`; remove the connector on the old box. Cloudflare needs nothing. In GitHub change the `DEPLOY_HOST` and `DEPLOY_USER` secrets, put the deploy public key in the new box's `authorized_keys`, replace the pinned host key in `deploy.yml`; an ARM box needs `--platform linux/arm64` on the build. The laptop needs nothing. Still to answer: the other server's OS, CPU architecture, RAM and location, to decide whether it is a better home than the e2-micro.
 
+### Branches awaiting review (2026-10-26)
+- `signin` — Google sign-in, sessions, CLI tokens, onboarding from enrollments, the agent skill file (DECISIONS 044, 045). Merge after a look at the Account page and one sign-in on prod with Access still in front.
+- `ux-polish` — the UX pass (`docs/ux-pass-2026-10-26.md`), on top of `signin`.
+- `caustic-design` — the Caustic design-system experiment (`docs/caustic-pass-2026-10-26.md`, before/after in `docs/screenshots/caustic/`), on top of `ux-polish`. Decide the accent and whether to keep it.
+All three pass typecheck, unit tests and the e2e suite.
+
 ### Open decisions
 - License: MIT is the default unless there is a reason to prefer Apache-2.0.
 - Hosted audience: invited friends or the public.
