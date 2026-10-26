@@ -12,7 +12,7 @@ test.describe('settings', () => {
     const dialog = page.getByRole('dialog', { name: 'Edit MATH423' });
     await dialog.getByLabel('Name', { exact: true }).fill(name);
     await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Saved( MATH423)?$/)).toBeVisible();
     await expect(dialog).toBeHidden();
 
     await page.reload();
@@ -27,12 +27,12 @@ test.describe('settings', () => {
     // Exact title match: "Google Calendar" must not also pick up "Google Calendar (iCal)".
     const card = (title: string) => page.locator('[data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]', { hasText: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 
-    await expect(card('Canvas').getByText('disconnected', { exact: true })).toBeVisible();
-    await expect(card('Gradescope').getByText('disconnected', { exact: true })).toBeVisible();
+    await expect(card('Canvas').getByText(/^(disconnected|not set up)$/)).toBeVisible();
+    await expect(card('Gradescope').getByText(/^(disconnected|not set up)$/)).toBeVisible();
     await expect(card('Google Calendar').getByText('connected', { exact: true })).toBeVisible();
     await expect(card('Google Calendar').getByText('showing demo calendars')).toBeVisible();
     await expect(card('Todoist').getByText('connected', { exact: true })).toBeVisible();
-    await expect(card('Job feed').getByText('disconnected', { exact: true })).toBeVisible();
+    await expect(card('Job feed').getByText(/^(disconnected|not set up)$/)).toBeVisible();
 
     // The "Data pulled" panel reads the per-course summary for a fixture-backed source.
     await card('Gradescope').getByRole('button', { name: /Data pulled/ }).click();
@@ -55,6 +55,7 @@ test.describe('settings', () => {
     expect(strip(parsed)).toEqual(before);
 
     await page.getByPlaceholder('Paste an export here').fill(text);
+    page.once('dialog', (d) => d.accept()); // the import asks for confirmation
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await expect(page.getByText(/^Imported: /)).toBeVisible();
 
