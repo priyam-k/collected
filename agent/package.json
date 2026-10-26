@@ -7,12 +7,12 @@
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<you>/collected.git",
+    "url": "git+https://github.com/priyam-k/collected.git",
     "directory": "agent"
   },
-  "homepage": "https://github.com/<you>/collected/tree/main/agent#readme",
+  "homepage": "https://github.com/priyam-k/collected/tree/main/agent#readme",
   "bugs": {
-    "url": "https://github.com/<you>/collected/issues"
+    "url": "https://github.com/priyam-k/collected/issues"
   },
   "keywords": [
     "collected",

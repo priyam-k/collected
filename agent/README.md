@@ -1,6 +1,6 @@
 # collected-cli
 
-The command-line client for [collected](https://github.com/<you>/collected), the self-hosted student dashboard. It talks to your own collected server: read what is due, make small edits, browse Canvas read-only, and keep course files synced into folders on this machine.
+The command-line client for [collected](https://github.com/priyam-k/collected), the self-hosted student dashboard. It talks to your own collected server: read what is due, make small edits, browse Canvas read-only, and keep course files synced into folders on this machine.
 
 The dashboard reads are the same data the web app shows (assignments, agenda, grades, announcements, dates, sources, the jobs tracker). The file sync is laptop-only by design: the server knows the *names* of your target folders, this machine knows the paths, and the server never sees file bytes.
 
@@ -101,4 +101,4 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## License
 
-AGPL-3.0-only. Source: https://github.com/<you>/collected (the `agent/` workspace).
+AGPL-3.0-only. Source: https://github.com/priyam-k/collected (the `agent/` workspace).
