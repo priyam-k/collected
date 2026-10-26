@@ -24,7 +24,8 @@ test.describe('settings', () => {
   test('sources: every integration shows its status', async ({ page }) => {
     await page.goto('/settings/sources');
     await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
-    const card = (title: string) => page.locator('[data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]', { hasText: title }) });
+    // Exact title match: "Google Calendar" must not also pick up "Google Calendar (iCal)".
+    const card = (title: string) => page.locator('[data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]', { hasText: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 
     await expect(card('Canvas').getByText('disconnected', { exact: true })).toBeVisible();
     await expect(card('Gradescope').getByText('disconnected', { exact: true })).toBeVisible();
@@ -36,7 +37,7 @@ test.describe('settings', () => {
     // The "Data pulled" panel reads the per-course summary for a fixture-backed source.
     await card('Gradescope').getByRole('button', { name: /Data pulled/ }).click();
     await expect(card('Gradescope').getByRole('cell', { name: 'CMSC422' })).toBeVisible();
-    await expect(card('Gradescope').getByRole('cell', { name: '1373147' })).toBeVisible();
+    await expect(card('Gradescope').getByRole('cell', { name: '3001002' })).toBeVisible();
   });
 
   test('export then import round-trips without changing anything', async ({ page, request }) => {

@@ -18,7 +18,7 @@ test.describe('dashboard', () => {
     await expect(todo.getByText('HW01: Warm up')).toBeVisible();
 
     const sources = widget(page, 'Sources');
-    await expect(sources.getByRole('link', { name: 'Google Calendar' })).toBeVisible();
+    await expect(sources.getByRole('link', { name: 'Google Calendar', exact: true })).toBeVisible();
     await expect(sources.getByRole('link', { name: 'Todoist' })).toBeVisible();
 
     // The jobs feed was never synced: the frame explains instead of failing.
