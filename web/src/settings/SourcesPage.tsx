@@ -42,6 +42,9 @@ export function SourcesPage() {
       <SourceCard source={by.gcal} description="OAuth connect with read and write access. Needs GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env (artifacts/SETUP.md, Phase 1).">
         <GoogleForm source={by.gcal} />
       </SourceCard>
+      <SourceCard source={by.gcal_ical} description="Read-only, no Google Cloud project needed: one calendar's secret iCal address, refreshed every 30 minutes.">
+        <GcalIcalForm source={by.gcal_ical} />
+      </SourceCard>
       <SourceCard source={by.todoist} description="API token from Todoist → Settings → Integrations → Developer.">
         <TokenForm source={by.todoist} field="token" label="API token" />
       </SourceCard>
@@ -240,6 +243,37 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
         </div>
       </form>
     </div>
+  );
+}
+
+function GcalIcalForm({ source }: { source: Source }) {
+  const s = useSave('gcal_ical');
+  const [url, setUrl] = useState('');
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        s.save({ url: url.trim() }, () => setUrl(''));
+      }}
+    >
+      <Field
+        label="Secret address in iCal format"
+        hint="Google Calendar on the web → Settings (gear) → the calendar under Settings for my calendars → Integrate calendar → Secret address in iCal format. Anyone with this URL can read the calendar; it is stored encrypted. Events show up as read-only."
+      >
+        <Input type="password" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" placeholder="https://calendar.google.com/calendar/ical/…/private-…/basic.ics" />
+      </Field>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={!url.trim() || s.pending}>
+          {source.hasConfig ? 'Replace address' : 'Save address'}
+        </Button>
+        {source.hasConfig && (
+          <Button type="button" variant="ghost" onClick={s.clear}>
+            Clear
+          </Button>
+        )}
+      </div>
+    </form>
   );
 }
 
