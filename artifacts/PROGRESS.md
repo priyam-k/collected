@@ -17,11 +17,11 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 - [x] End-to-end tests (`e2e/`, 2026-10-26): Playwright over a fixture-seeded server, 23 specs covering the dashboard, course pane, overrides, dates, settings, export/import, layout, the CLI and the file-sync manifest/report; `pnpm e2e`, and the `e2e` job in `ci.yml`. Not covered: file bytes (need a live Canvas), Todoist writes (need a token), OAuth.
 
 ### Phase 2 — The shared prerequisite (sign-in, tokens, onboarding)
-- [ ] In-app sign-in and sessions, Google OAuth for identity first; Cloudflare Access becomes optional in front rather than the login.
-- [ ] Per-user API tokens for the CLI (`collected login`), replacing the Access service token; the service-token path stays until the CLI has migrated.
-- [ ] Onboarding from Canvas enrollments: first run offers the courses it sees instead of reading `seed-config.json`; the seed file becomes an example.
-- [ ] The laptop side collapses to one thing: `collected login`, `collected connect canvas` (reads the Chrome cookie in the CLI, retiring `local/canvas_cookie.py`), `collected files link …`, `collected install-launchd`.
-- [ ] A `collected` skill file in the repo for AI agents: commands, output shapes, what is safe to allowlist. The vault skills stay separate, possibly shipped as an optional starter.
+- [x] In-app sign-in and sessions (DECISIONS 044, 2026-10-26): Google identity, `users`/`sessions` tables, `collected_session` cookie; Access optional and still honoured when configured.
+- [x] Per-user API tokens for the CLI: `collected login`, Settings → Account, `token:<name>` identity scoped like a service token. Behind Access the CLI still carries the service token to pass the edge.
+- [x] Onboarding from Canvas enrollments (DECISIONS 045): `GET/POST /api/onboarding/canvas`, Import from Canvas in Settings → Courses, first-run card on an empty dashboard; `seed-config.json` is an example.
+- [x] The laptop side is one thing: `collected login`, `collected connect canvas` (Chrome/Brave/Edge/Arc/Firefox cookie read in Node; `local/` deleted), `collected files link …`, `collected install-launchd`.
+- [x] `skills/collected/SKILL.md` for AI agents: reads, Canvas browsing, writes that need confirmation, file-sync rules, how to read the output.
 
 ### Phase 3 — Open-source release
 - [x] Scrub the repo (2026-10-26): `seed-config.json` is a generic example (still loaded on first boot); fixtures use fictional course ids, instructor names and calendar names; `artifacts/previous.txt` is gone; the owner's domain, instance, zone, username and GitHub path are placeholders in SETUP, REFERENCE, PROGRESS, DESIGN, `.env.example` and the agent config comment; the workflow's host key comes from the `DEPLOY_HOST_KEY` secret and the deploy job is gated by the `DEPLOY_REPO` variable (both to set, SETUP.md step 9); the Canvas URL is entered when connecting, with no default anywhere. `local/` still names the old domain until `collected connect canvas` retires it.
