@@ -1,0 +1,44 @@
+# Nightly off-box copy of the newest database dump. The box's own cron (scripts/backup.sh at 04:10) writes
+# backups/collected-<date>.db.gz on the same disk as the database; this fetches it to GitHub as a workflow artifact
+# so a lost disk is not a lost history. The encryption key is never copied: without it a dump is unreadable.
+#
+# Needs the same secrets as deploy.yml: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY.
+name: backup
+
+on:
+  schedule:
+    - cron: '40 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    if: github.repository == 'priyam-k/collected'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HOST: ${{ secrets.DEPLOY_HOST }}
+      USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - name: SSH setup
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "$HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBP7zLof6+vKOiihD5XFuXK2nvJFw5BbjgxwAUCUcNyD" > ~/.ssh/known_hosts
+          printf 'Host box\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' "$HOST" "$USER" > ~/.ssh/config
+      - name: Fetch newest dump
+        run: |
+          latest=$(ssh box 'ls -t /srv/collected/backups/collected-*.db.gz 2>/dev/null | head -1')
+          test -n "$latest" || { echo "no dump on the box yet" >&2; exit 1; }
+          mkdir -p out && scp "box:$latest" out/
+          ls -la out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: collected-db-${{ github.run_id }}
+          path: out/*.db.gz
+          retention-days: 30
+          if-no-files-found: error

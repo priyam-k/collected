@@ -28,10 +28,13 @@ umask 077
 mkdir -p "$BACKUP_DIR"
 rm -f "$out" "$out.gz"
 
-if command -v sqlite3 >/dev/null 2>&1; then
-  sqlite3 "$DB" ".backup '$out'"
+# The database is 0600 and owned by the container's user, which is usually not the cron user, so sqlite3 on the
+# host only works when the file is readable (and its -shm writable). Otherwise go through the container.
+if command -v sqlite3 >/dev/null 2>&1 && [ -r "$DB" ] && sqlite3 "$DB" ".backup '$out'" 2>/dev/null; then
+  :
 else
-  # No sqlite3 on the box. The container has node and @libsql/client; its root filesystem is read-only except
+  rm -f "$out"
+  # The container has node and @libsql/client; its root filesystem is read-only except
   # /tmp (tmpfs) and /data, so VACUUM INTO a temp file there and stream it back over exec's stdout.
   (cd "$COMPOSE_DIR" && docker compose exec -T app node -e '
     const { createClient } = require("@libsql/client");
