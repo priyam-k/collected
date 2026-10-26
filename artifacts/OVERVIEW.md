@@ -94,7 +94,7 @@ Two shape notes: `POST /api/sources/sync` returns 202 immediately and the browse
 
 ## Auth and secrets
 
-There is no login code. Cloudflare Access sits in front of the tunnel, checks your email, and attaches a signed JWT; the server middleware verifies it against Cloudflare's JWKS on every `/api` request. `AUTH_DISABLED=true` in dev. Two routes bypass it: `/api/health` (Docker's healthcheck runs inside the container with no JWT) and the Canvas cookie drop-off (authenticates with a shared `LOCAL_HELPER_KEY` from the Mac script).
+There is no login code. Cloudflare Access sits in front of the tunnel, checks your email, and attaches a signed JWT; the server middleware verifies it against Cloudflare's JWKS on every `/api` request. `AUTH_DISABLED=true` in dev. Two routes bypass it: `/api/health` (Docker's healthcheck runs inside the container with no JWT) and the Canvas cookie drop-off (authenticates with a shared `LOCAL_HELPER_KEY` from `collected connect canvas`).
 
 Credentials are AES-256-GCM encrypted into `sources.config_enc`. The key is `data/.secret_key`, created on first boot and living beside the database in the same volume, because a recreated `.env` once lost the key and every credential with it (DECISIONS 022). A key mismatch is a visible `needs_auth` state, not a silent disconnect.
 
