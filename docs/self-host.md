@@ -79,7 +79,7 @@ If the machine cannot accept inbound connections (home network, campus wifi, a f
 
 Set `PUBLIC_URL=https://<that hostname>` in `.env` and restart (`docker compose up -d`).
 
-**Access** (optional login wall in front of the app): Zero Trust → Access → Applications → Add → Self-hosted, the same hostname, a policy that allows your email. Open the application's Overview and copy the Application Audience (AUD) tag into `.env` as `CF_ACCESS_AUD`; your team domain (`<team>.cloudflareaccess.com`) goes in `CF_ACCESS_TEAM_DOMAIN`. With both set, the app verifies Access's signed JWT on every API request, so even a mistake in the tunnel configuration cannot expose the API. The CLI does not need a service token any more: `collected login` mints an API token in Settings → Account, which the app checks before Access does.
+**Access** (optional login wall in front of the app): Zero Trust → Access → Applications → Add → Self-hosted, the same hostname, a policy that allows your email. Open the application's Overview and copy the Application Audience (AUD) tag into `.env` as `CF_ACCESS_AUD`; your team domain (`<team>.cloudflareaccess.com`) goes in `CF_ACCESS_TEAM_DOMAIN`. With both set, the app verifies Access's signed JWT on every API request, so even a mistake in the tunnel configuration cannot expose the API. The CLI identifies itself to the app with an API token from `collected login` (Settings → Account). With Access in front, the CLI additionally needs an Access service token to get past the edge: create one under Access → Service Auth, attach it with a Service Auth policy, and store it with `collected auth service-token <id>`.
 
 ## 6. Google OAuth client
 
