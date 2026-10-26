@@ -35,7 +35,7 @@ export class MockCalendarApi implements CalendarApi {
 }
 
 export const demoCalendars: GCalendar[] = [
-  { id: 'primary@example.com', summary: 'Priyam', primary: true, backgroundColor: '#4285f4', accessRole: 'owner' },
+  { id: 'primary@example.com', summary: 'Personal', primary: true, backgroundColor: '#4285f4', accessRole: 'owner' },
   { id: 'clubs@group.calendar.google.com', summary: 'Clubs', primary: false, backgroundColor: '#0b8043', accessRole: 'reader' },
 ];
 

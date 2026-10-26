@@ -6,11 +6,11 @@ describe('gradescope parsers', () => {
   it('parses the account page into courses with role and term', () => {
     const courses = parseAccount(loadGsFixture('account.html'));
     expect(courses.map((c) => [c.id, c.shortname, c.term, c.role])).toEqual([
-      ['1369005', 'CMSC 330', 'Fall 2026', 'ta'],
-      ['1373147', 'CMSC 422', 'Fall 2026', 'student'],
-      ['1387050', 'MATH423', 'Fall 2026', 'student'],
-      ['1290001', 'CMSC330', 'Spring 2026', 'student'],
-      ['1290002', 'CMSC351', 'Spring 2026', 'student'],
+      ['3001001', 'CMSC 330', 'Fall 2026', 'ta'],
+      ['3001002', 'CMSC 422', 'Fall 2026', 'student'],
+      ['3001003', 'MATH423', 'Fall 2026', 'student'],
+      ['3001004', 'CMSC330', 'Spring 2026', 'student'],
+      ['3001005', 'CMSC351', 'Spring 2026', 'student'],
     ]);
     expect(courses[1]!.name).toBe('Introduction to Machine Learning');
   });
@@ -28,7 +28,7 @@ describe('gradescope parsers', () => {
     expect(rows[0]!.releaseAt).toBe('2026-09-02T19:30:00.000Z');
     expect(rows[1]!.score).toBe(95);
     expect(rows[1]!.points).toBe(100);
-    expect(rows[1]!.url).toBe('/courses/1373147/assignments/8499810/submissions/312000001');
+    expect(rows[1]!.url).toBe('/courses/3001002/assignments/8499810/submissions/312000001');
     expect(rows[0]!.url).toBeNull();
   });
 

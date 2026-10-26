@@ -3,7 +3,7 @@ VERSION:2.0
 PRODID:icalendar-ruby
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
-X-WR-CALNAME:Priyam Kabra Calendar (Canvas)
+X-WR-CALNAME:Student Calendar (Canvas)
 BEGIN:VEVENT
 DTSTAMP:20260901T144344Z
 UID:event-assignment-7775093
@@ -12,8 +12,8 @@ CLASS:PUBLIC
 DESCRIPTION:This homework is a warm up exercise.
 SEQUENCE:0
 SUMMARY:HW01: Warm up [CMSC422-0101: Introduction to Machine Learning-Fall
-  2026 nayeem]
-URL:https://umd.instructure.com/courses/1408462/assignments/7775093
+  2026 rivera]
+URL:https://umd.instructure.com/courses/2001001/assignments/7775093
 END:VEVENT
 BEGIN:VEVENT
 DTSTAMP:20260903T174536Z
@@ -22,8 +22,8 @@ DTSTART:20260909T035959Z
 CLASS:PUBLIC
 SEQUENCE:0
 SUMMARY:Read Plato's Meno [LING260-0101: Meaning through Language: Why are
-  we so good at it?-Fall 2026 oagha]
-URL:https://umd.instructure.com/courses/1412264/assignments/7781449
+  we so good at it?-Fall 2026 lindqvist]
+URL:https://umd.instructure.com/courses/2001006/assignments/7781449
 END:VEVENT
 BEGIN:VEVENT
 DTSTAMP:20260902T100000Z
@@ -31,11 +31,11 @@ UID:event-calendar-event-9001
 DTSTART:20261001T220000Z
 DTEND:20261001T233000Z
 CLASS:PUBLIC
-LOCATION:IRB 0318
+LOCATION:Hall B 101
 SEQUENCE:0
 SUMMARY:Midterm review session [CMSC422-0101: Introduction to Machine Learn
- ing-Fall 2026 nayeem]
-URL:https://umd.instructure.com/calendar?event_id=9001&include_contexts=course_1408462
+ ing-Fall 2026 rivera]
+URL:https://umd.instructure.com/calendar?event_id=9001&include_contexts=course_2001001
 END:VEVENT
 BEGIN:VEVENT
 DTSTAMP:20260902T100000Z

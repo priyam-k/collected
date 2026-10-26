@@ -100,7 +100,7 @@ export interface CanvasAnnouncement {
   html_url?: string;
   posted_at?: string | null;
   created_at?: string;
-  context_code?: string; // course_1408462
+  context_code?: string; // course_2001001
 }
 
 export interface CanvasModule {

@@ -17,11 +17,11 @@ const INSTRUCTURE_HOST = /(?:^|\.)instructure\.com$/i;
 const CANVAS_HOST = /^canvas\.[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i;
 
 /**
- * Origin of the Canvas instance, taken from any stored Canvas URL; falls back to UMD's. Hosts are anchored, so
+ * Origin of the Canvas instance, taken from any stored Canvas URL; null when no URL names one. Hosts are anchored, so
  * `evil-instructure.com` or `notcanvas.example` never pass, and an instructure.com origin anywhere in the list
  * beats a `canvas.`-prefixed one (upstream URLs are instructor data; the course header links here).
  */
-export function canvasOrigin(urls: (string | null | undefined)[]): string {
+export function canvasOrigin(urls: (string | null | undefined)[]): string | null {
   let selfHosted: string | null = null;
   for (const u of urls) {
     if (!u) continue;
@@ -34,7 +34,7 @@ export function canvasOrigin(urls: (string | null | undefined)[]): string {
       /* ignore */
     }
   }
-  return selfHosted ?? 'https://umd.instructure.com';
+  return selfHosted;
 }
 
 export type PreviewKind = 'pdf' | 'image' | null;

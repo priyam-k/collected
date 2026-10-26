@@ -2,7 +2,7 @@
 
 Full read of the codebase at commit `ad39cc6` by seven parallel reviewers (auth, API input, secrets, ingesters, web, laptop agent, infra), each finding re-verified by hand before it was kept. Line numbers are as of that commit.
 
-**Status (same day):** Tiers 1 and 2 are fixed in the working tree (DECISIONS 043), plus the code-side parts of Tier 3 (proxy path normalisation, same-origin pagination, outbound URL policy). Not done, by design: Tier 3's per-user model (the parked multi-user plan), Tier 4's license, fixture scrubbing and `previous.txt` (owner decisions), and the dashboard checks at the end. Manual steps the fixes created are listed in SETUP.md step 9 and 10 (secrets `DEPLOY_HOST`/`DEPLOY_USER`, the `production` environment, branch protection, Dependabot alerts, the backup cron).
+**Status (same day):** Tiers 1 and 2 are fixed in the working tree (DECISIONS 043), plus the code-side parts of Tier 3 (proxy path normalisation, same-origin pagination, outbound URL policy). Not done, by design: Tier 3's per-user model (the parked multi-user plan) and the dashboard checks at the end. Tier 4 (license, fixture scrubbing, `previous.txt`, owner identifiers in docs and workflows, the Canvas base URL default) was done 2026-10-26 for the open-source release. Manual steps the fixes created are listed in SETUP.md step 9 and 10 (secrets `DEPLOY_HOST`/`DEPLOY_USER`, the `production` environment, branch protection, Dependabot alerts, the backup cron).
 
 Threat model used: today the app is single-user behind Cloudflare Access on a GCP e2-micro. Each finding says when it matters: **now**, **self-host** (someone runs the compose file without Cloudflare), **hosted** (we run it for other people, so the server is a third party to the laptop and users are third parties to each other), **public** (the repo itself goes public).
 
@@ -148,7 +148,7 @@ Every route reads and writes global rows; there is no tenant column. This is the
 - No `LICENSE`. Add MIT or Apache-2.0, plus `SECURITY.md` and a note that `main` auto-deploys the maintainer's box.
 - Delete `artifacts/previous.txt` (a pasted private chat transcript).
 - `artifacts/seed-config.json` is the owner's real schedule and line 95 states citizenship and sponsorship status; ship `seed-config.example.json`.
-- Fixtures carry real UMD Canvas course ids, instructor surnames, office-hour rooms, "Priyam Kabra Calendar (Canvas)" (`feed.ics:6`), real Gradescope course ids, `'Priyam'` in `gcal/mock-api.ts:38`.
+- Fixtures carry real UMD Canvas course ids, instructor surnames, office-hour rooms, the owner's name in the iCal calendar name (`feed.ics:6`) and in the demo Google calendar list (`gcal/mock-api.ts:38`), and real Gradescope course ids.
 - Owner domain, instance name, zone, username, SSH host key and GitHub path appear in `docker-compose.yml:15`, `.env.example:17`, `deploy.yml:65`, `SETUP.md`, `REFERENCE.md`, `PROGRESS.md`, `DESIGN.md:5,29`, `local/README.md`, `canvas_cookie.py:5,66`, `agent/src/config.ts:10`.
 - `.claude/` is not gitignored. `web/package.json` lists `react-resizable`, unused. `pnpm-workspace.yaml` still excludes `jose@6.2.12` from the release-age guard. Dockerfile does not copy `agent/package.json` into the deps stage.
 - History: git author email on all commits; otherwise clean (no `.env`, `.db`, keys or token-shaped strings ever committed; largest blob is the lockfile). Rewriting history is not worth it; a fresh repo is the alternative if the identifiers above matter.

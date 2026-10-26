@@ -36,13 +36,13 @@ export function fixtureGradescopeClient(opts: FixtureOptions = {}): GradescopeCl
     if (p === '/login') return html(loadGsFixture('login.html'), 'https://www.gradescope.com/login');
     if (!loggedIn) return html(loadGsFixture('login.html'), 'https://www.gradescope.com/login');
     if (p === '/account') return html(loadGsFixture('account.html'), url);
-    if (p === '/courses/1373147') return html(loadGsFixture('student-course.html'), url);
-    if (p === '/courses/1387050')
-      return html(loadGsFixture('student-course.html').replace(/1373147/g, '1387050').replace(/CMSC 422/g, 'MATH423').replace(/84998/g, '85998').replace(/HW02: Decision Trees/, 'Homework 1'), url);
-    if (p === '/courses/1369005/assignments') return html(loadGsFixture('instructor-assignments.html'), url);
+    if (p === '/courses/3001002') return html(loadGsFixture('student-course.html'), url);
+    if (p === '/courses/3001003')
+      return html(loadGsFixture('student-course.html').replace(/3001002/g, '3001003').replace(/CMSC 422/g, 'MATH423').replace(/84998/g, '85998').replace(/HW02: Decision Trees/, 'Homework 1'), url);
+    if (p === '/courses/3001001/assignments') return html(loadGsFixture('instructor-assignments.html'), url);
     return html('<html><body>not found</body></html>', url, 404);
   };
-  const client = new GradescopeClient({ email: 'x@umd.edu', password: 'pw' }, new CookieJar(), pino({ level: 'silent' }), fakeFetch) as GradescopeClient & { calls: string[] };
+  const client = new GradescopeClient({ email: 'x@example.edu', password: 'pw' }, new CookieJar(), pino({ level: 'silent' }), fakeFetch) as GradescopeClient & { calls: string[] };
   client.calls = calls;
   return client;
 }

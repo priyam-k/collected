@@ -7,9 +7,9 @@ describe('canvasOrigin', () => {
     expect(canvasOrigin(['https://canvas.school.edu/courses/2'])).toBe('https://canvas.school.edu');
     expect(canvasOrigin(['https://instructure.com/x'])).toBe('https://instructure.com');
   });
-  it('ignores look-alike and non-https hosts and falls back', () => {
+  it('ignores look-alike and non-https hosts and yields null', () => {
     for (const u of ['https://evil-instructure.com/', 'https://notcanvas.example/', 'https://canvas-phish.example/', 'http://umd.instructure.com/', 'https://x.instructure.com.evil/', 'https://canvas/', 'nonsense']) {
-      expect(canvasOrigin([u])).toBe('https://umd.instructure.com');
+      expect(canvasOrigin([u])).toBeNull();
     }
   });
   it('prefers an instructure.com origin over a canvas.* one wherever it sits in the list', () => {
