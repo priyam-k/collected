@@ -100,7 +100,7 @@ try {
       const [what, a, b] = rest;
       if (what === 'service-token' && a) cfg.auth = { cfAccessClientId: a, cfAccessClientSecret: b ?? (await readSecret('service token secret: ')) };
       else if (what === 'helper-key') cfg.auth = { helperKey: a ?? (await readSecret('helper key: ')) };
-      else if (what === 'token') cfg.auth = { token: a ?? (await readSecret('token: ')) };
+      else if (what === 'token') cfg.auth = { ...cfg.auth, token: a ?? (await readSecret('token: ')) }; // keeps the edge credentials
       else if (what === 'model') cfg.model = { ...cfg.model, enabled: true, apiKey: a ?? (await readSecret('TypeSafe API key: ')) };
       else usage();
       saveConfig(cfg);
