@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type {
   ApiToken,
+  CanvasEnrollment,
   Course,
   CourseGrades,
   CourseInput,
@@ -526,5 +527,24 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api<{ ok: true }>('/auth/logout', { method: 'POST', json: {} }),
     onSuccess: () => qc.clear(),
+  });
+}
+
+// --- onboarding ------------------------------------------------------------------------------------------------------
+
+export function useCanvasEnrollments(enabled = true) {
+  return useQuery({ queryKey: ['onboarding', 'canvas'] as const, queryFn: () => api<{ connected: boolean; courses: CanvasEnrollment[] }>('/onboarding/canvas'), enabled, retry: false, staleTime: 60_000 });
+}
+
+export function useImportCanvasCourses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { courses: { canvasCourseId: string; term: string; code: string; section?: string | null; name?: string | null; role: Course['role'] }[] }) =>
+      api<{ created: string[]; skipped: { canvasCourseId: string; reason: string }[] }>('/onboarding/canvas', { method: 'POST', json: body }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: qk.courses });
+      await qc.invalidateQueries({ queryKey: qk.widgets });
+      await qc.invalidateQueries({ queryKey: ['onboarding', 'canvas'] });
+    },
   });
 }

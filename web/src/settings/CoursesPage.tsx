@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Download, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { COURSE_ROLES, SUBMITS_VIA, courseScheduleSchema, type Course, type CourseInput, type CourseLink, type CourseSchedule } from '@collected/shared';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCourseLinks, useCourses, useDeleteCourse, useLinkItems, useSaveCourse } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { safeColor } from '@/lib/color';
+import { ImportCoursesDialog } from './ImportCoursesDialog';
 import { ScheduleEditor } from './ScheduleEditor';
 import { Field, PageTitle } from './ui';
 
@@ -54,6 +55,7 @@ export function CoursesPage() {
   const save = useSaveCourse();
   const del = useDeleteCourse();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const currentTerm = q.data?.[0]?.term ?? '2026-fall';
 
@@ -89,6 +91,9 @@ export function CoursesPage() {
         <Button size="sm" onClick={() => setDraft(blank(currentTerm))}>
           <Plus className="size-4" /> Add course
         </Button>
+          <Button variant="outline" onClick={() => setImporting(true)}>
+            <Download className="size-4" /> Import from Canvas
+          </Button>
       </div>
       {q.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
       {q.data && (
@@ -142,6 +147,7 @@ export function CoursesPage() {
         </div>
       )}
 
+      <ImportCoursesDialog open={importing} onOpenChange={setImporting} />
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="max-h-[90vh] overflow-auto sm:max-w-2xl">
           <DialogHeader>

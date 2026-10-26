@@ -115,10 +115,14 @@ try {
         say('that does not look like a collected token (they start with clt_)');
         process.exit(1);
       }
-      cfg.auth = { token };
-      saveConfig(cfg);
-      const me = await new Api(cfg).get<{ identity: string | null }>('/api/auth/me');
-      say(me.identity ? `signed in as ${me.identity}` : 'saved, but the server did not accept the token');
+      const trial = { ...cfg, auth: { token } };
+      const me = await new Api(trial).get<{ identity: string | null }>('/api/auth/me');
+      if (!me.identity) {
+        say('the server did not accept that token; nothing saved');
+        process.exit(1);
+      }
+      saveConfig(trial);
+      say(`signed in as ${me.identity}`);
       break;
     }
     case 'files-courses': {

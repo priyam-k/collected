@@ -11,7 +11,7 @@ export function courseSlug(term: string, code: string, section?: string | null):
   return [term, code, section].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9-]+/g, '-');
 }
 
-const COURSE_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
+export const COURSE_COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 
 /** Idempotent. Sources rows every boot; everything else only when the courses table is empty. */
 export async function seed(ctx: AppContext): Promise<void> {

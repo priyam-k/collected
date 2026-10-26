@@ -475,6 +475,18 @@ export interface ApiToken {
   lastUsedAt: string | null;
 }
 
+/** One active Canvas enrollment as the onboarding lists it, with the course row it would become. */
+export interface CanvasEnrollment {
+  canvasCourseId: string;
+  name: string;
+  courseCode: string;
+  termName: string | null;
+  role: CourseRole;
+  /** Our course id when this enrollment is already tracked. */
+  trackedAs: string | null;
+  suggested: { term: string; code: string; section: string | null };
+}
+
 export interface HealthResponse {
   ok: true;
   version: string;

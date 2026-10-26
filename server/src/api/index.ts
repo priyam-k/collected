@@ -18,6 +18,7 @@ import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
 import { jobsRoutes } from './jobs.js';
 import { layoutRoutes, widgetRoutes } from './layout.js';
+import { onboardingRoutes } from './onboarding.js';
 import { settingsRoutes } from './settings.js';
 import { sourcesRoutes } from './sources.js';
 import { todoistRoutes } from './todoist.js';
@@ -117,6 +118,7 @@ export function createApi(ctx: AppContext) {
   api.route('/auth', authRoutes(ctx));
   api.route('/sources', sourcesRoutes(ctx));
   api.route('/courses', coursesRoutes(ctx));
+  api.route('/onboarding', onboardingRoutes(ctx));
   api.route('/items', itemsRoutes(ctx));
   api.route('/jobs', jobsRoutes(ctx));
   api.route('/layout', layoutRoutes(ctx));
