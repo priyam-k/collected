@@ -80,6 +80,10 @@ collected help
 
 The server stores only the *names* of your target folders; the paths live in `~/.collected/agent.json` on your machine. Nothing the server says can make the CLI write outside a folder you linked, and a file you edited after it was placed is never overwritten. Details and every command: [`agent/README.md`](agent/README.md).
 
+## For AI agents
+
+`skills/collected/SKILL.md` teaches an agent (Claude Code, or anything that reads a skill file) what the `collected` CLI can do, which commands are safe to run freely and which change things. Copy it into your agent's skills folder (for Claude Code: `~/.claude/skills/collected/SKILL.md`) and the agent can answer "what's due this week" or "add an exam date" through the CLI.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for how to report a vulnerability. The trust model in four lines:
