@@ -176,7 +176,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
   });
 
   /**
-   * Canvas cookie drop-off for local/canvas_cookie.py. Accepts either the Access JWT (normal path) or the
+   * Canvas cookie drop-off for `collected connect canvas`. Accepts either the Access JWT (normal path) or the
    * helper key header, since a script can't do the Access login dance.
    */
   r.post('/canvas/cookie', async (c) => {
