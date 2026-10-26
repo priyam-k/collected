@@ -269,7 +269,7 @@ export type ManualEventInput = z.infer<typeof manualEventInputSchema>;
 // Per-source config bodies (secrets). Stored encrypted; never returned by the API.
 export const sourceConfigSchemas = {
   canvas: z.object({
-    baseUrl: outboundUrlSchema.default('https://umd.instructure.com'),
+    baseUrl: outboundUrlSchema, // the school's Canvas host, e.g. https://canvas.example.edu; no default
     cookieHeader: z.string().optional(), // raw "name=value; name2=value2" pasted from the browser
     cookieJar: z.unknown().optional(), // serialized tough-cookie jar, maintained by the ingester
   }),

@@ -323,7 +323,7 @@ describe('course index and facts', () => {
       { id: 'canvas:assignment:2', title: 'Homework 2', dueAt: '2026-10-15T03:59:00.000Z', points: 20, score: null, status: 'open', effectiveDone: false, source: 'canvas', url: 'https://canvas/a/2', description: null, raw: {}, linkedIds: [] },
       { id: 'canvas:assignment:1', title: 'Homework 1', dueAt: '2026-10-08T03:59:00.000Z', points: 10, score: 9, status: 'graded', effectiveDone: true, source: 'canvas', url: 'https://canvas/a/1', description: 'Problems 1-5 from chapter 2.', raw: { submissionTypes: ['online_upload'] }, linkedIds: ['gradescope:assignment:5'] },
     ] as unknown as EffectiveItem[];
-    api.announcements = [{ id: 'canvas:announcement:1', title: 'Room change', startsAt: '2026-09-28T14:00:00.000Z', url: 'https://canvas/n/1', description: 'We meet in IRB 0318 on Thursday.' }] as unknown as EffectiveItem[];
+    api.announcements = [{ id: 'canvas:announcement:1', title: 'Room change', startsAt: '2026-09-28T14:00:00.000Z', url: 'https://canvas/n/1', description: 'We meet in Hall B 101 on Thursday.' }] as unknown as EffectiveItem[];
     api.content = [{ kind: 'syllabus', title: 'Syllabus', url: 'https://canvas/syllabus', raw: { text: 'Grading: 50% homework, 50% exams.' } }];
     const c = cfg({ courses: { [COURSE]: { root: school, index: '_data/canvas.md', facts: '_data' } } });
     await runSync(c, { api });
@@ -339,7 +339,7 @@ describe('course index and facts', () => {
     expect(asg).toContain('| 2026-10-08T03:59:00.000Z | 10 | graded | 9 / 10 | canvas (+linked) | online_upload | [open](https://canvas/a/1) |');
     expect(asg).toContain('### Homework 1');
     expect(asg).toContain('Problems 1-5 from chapter 2.');
-    expect(read('_data', 'announcements.md')).toContain('We meet in IRB 0318 on Thursday.');
+    expect(read('_data', 'announcements.md')).toContain('We meet in Hall B 101 on Thursday.');
     expect(read('_data', 'syllabus.md')).toContain('Grading: 50% homework, 50% exams.');
 
     const before = ['assignments.md', 'canvas.md'].map((n) => statSync(path.join(school, '_data', n)).mtimeMs);

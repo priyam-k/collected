@@ -218,7 +218,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   const color = safeColor(course.color) ?? 'var(--indigo)';
   const origin = canvasOrigin([...assignments.map((a) => a.url), syllabus?.url, ...files.map((f) => f.url)]);
   const links: CourseLink[] = [
-    ...(course.canvasCourseId ? [{ label: 'Canvas', url: `${origin}/courses/${course.canvasCourseId}` }] : []),
+    ...(course.canvasCourseId && origin ? [{ label: 'Canvas', url: `${origin}/courses/${course.canvasCourseId}` }] : []),
     ...(course.gradescopeCourseId ? [{ label: 'Gradescope', url: `https://www.gradescope.com/courses/${course.gradescopeCourseId}` }] : []),
     ...(syllabus?.url ? [{ label: 'Syllabus', url: syllabus.url }] : []),
     ...course.links,

@@ -190,11 +190,13 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   const canvas = useSave('canvas');
   const icalSave = useSave('canvas_ical');
   const [cookie, setCookie] = useState('');
-  const [baseUrl, setBaseUrl] = useState('https://umd.instructure.com');
+  // No default host: every school has its own Canvas address, so the user types it when connecting.
+  const [baseUrl, setBaseUrl] = useState('');
+  const baseUrlOk = /^https:\/\/[^\s/]+/.test(baseUrl.trim());
   const [icalUrl, setIcalUrl] = useState('');
   const submitCookie = (e: FormEvent) => {
     e.preventDefault();
-    canvas.save({ baseUrl, cookieHeader: cookie.trim() }, () => setCookie(''));
+    canvas.save({ baseUrl: baseUrl.trim(), cookieHeader: cookie.trim() }, () => setCookie(''));
   };
   const submitIcal = (e: FormEvent) => {
     e.preventDefault();
@@ -203,8 +205,8 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <form onSubmit={submitCookie} className="space-y-3">
-        <Field label="Canvas URL">
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas.">
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://umd.instructure.com" required />
         </Field>
         <Field
           label="Session cookie"
@@ -218,7 +220,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
           <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" />
         </Field>
         <div className="flex gap-2">
-          <Button type="submit" disabled={!cookie.trim() || canvas.pending}>
+          <Button type="submit" disabled={!baseUrlOk || !cookie.trim() || canvas.pending}>
             {source.hasConfig ? 'Replace cookie' : 'Save cookie'}
           </Button>
           {source.hasConfig && (

@@ -185,8 +185,10 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     if (!user) return c.json({ error: 'unauthorized' }, 401);
     const body = await parseBody(c, z.object({ cookieHeader: z.string().min(10), baseUrl: outboundUrlSchema.optional() }));
     const existing = (await getSourceConfig<{ baseUrl?: string }>(ctx, 'canvas')) ?? {};
+    const baseUrl = body.baseUrl ?? existing.baseUrl;
+    if (!baseUrl) bad('Canvas URL is not set: include baseUrl, or save it once in Settings → Sources', 422);
     await setSourceConfig(ctx, 'canvas', {
-      baseUrl: body.baseUrl ?? existing.baseUrl ?? 'https://umd.instructure.com',
+      baseUrl,
       cookieHeader: body.cookieHeader,
       cookieJar: undefined,
     });

@@ -1,0 +1,50 @@
+# Publishes the CLI (`agent/`, npm package `collected-cli`) when a tag `cli-v<version>` is pushed.
+#
+# Needs, on the repo:
+#   secret NPM_TOKEN   an npm granular access token, publish-only, limited to the package `collected-cli`
+#                      (npmjs.com → Access Tokens → Generate New Token → Granular; packages and scopes: only
+#                      collected-cli, permissions: read and write; no org or user permissions). Rotate it when it expires.
+#
+# The publish is signed with provenance (`id-token: write` + `--provenance`), so npm shows the exact workflow run and
+# commit the tarball came from. Nothing here deploys anything; `deploy.yml` owns the server.
+# Every action is pinned to a commit (same SHAs as ci.yml); Dependabot proposes bumps.
+name: release
+
+on:
+  push:
+    tags: ['cli-v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+
+      # The tag must name the version in agent/package.json, so a stale tag cannot publish the wrong build.
+      - name: Check tag matches package version
+        run: |
+          want="cli-v$(node -p "require('./agent/package.json').version")"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "tag $GITHUB_REF_NAME does not match $want"; exit 1; }
+
+      - run: pnpm --filter collected-cli build
+      - run: pnpm --filter collected-cli publish --no-git-checks --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

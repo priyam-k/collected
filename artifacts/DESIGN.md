@@ -2,7 +2,7 @@
 
 Personal dashboard that pulls every source a student juggles into one place, links each item back to where it came from, and keeps "is it done" trustworthy.
 
-Single user (Priyam). Built selfishly. Generalize later, if ever.
+Single user per instance. Built for one person first; generalize later, if ever.
 
 ## Goals
 
@@ -26,7 +26,7 @@ One long-running Node process, one SQLite file:
 
 Frontend: **Vite + React + TypeScript** SPA. Tailwind + shadcn/ui. TanStack Query polls the API per widget.
 
-Exposure: **Cloudflare Tunnel** from the host to `collected.priyamkabra.com`, with **Cloudflare Access** in front (email allowlist; Google login and/or one-time PIN). The app verifies the Access JWT on every request. Nothing of the app runs on Cloudflare. Cloudflare is DNS, tunnel, and login wall only. `priyamkabra.com` stays on GitHub Pages, untouched.
+Exposure: **Cloudflare Tunnel** from the host to `collected.example.com`, with **Cloudflare Access** in front (email allowlist; Google login and/or one-time PIN). The app verifies the Access JWT on every request. Nothing of the app runs on Cloudflare. Cloudflare is DNS, tunnel, and login wall only.
 
 Host: Ubuntu VPS running Docker Compose (`app` + `cloudflared`). The same compose runs on any always-on box, including a home machine later.
 

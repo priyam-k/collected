@@ -2,79 +2,36 @@
   "term": "2026-fall",
   "courses": [
     {
-      "code": "LING260",
+      "code": "CS101",
       "section": "0101",
+      "name": "Introduction to Programming",
       "role": "student",
       "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    },
-    {
-      "code": "ENME480",
-      "section": "0102",
-      "role": "student",
-      "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    },
-    {
-      "code": "MATH423",
-      "section": "0301",
-      "role": "student",
-      "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    },
-    {
-      "code": "STAT410",
-      "section": "0601",
-      "role": "student",
-      "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    },
-    {
-      "code": "CMSC422",
-      "section": "0101",
-      "role": "student",
-      "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    },
-    {
-      "code": "CMSC330",
-      "section": "0103",
-      "role": "ta",
-      "submits_via": "gradescope",
       "gradescope_course_id": null,
       "canvas_course_id": null,
       "links": [],
       "schedule": {
-        "discussion": [
-          {
-            "day": "fri",
-            "start": "11:00",
-            "end": "11:50"
-          }
-        ],
-        "office_hours": []
+        "lecture": [
+          { "day": "mon", "start": "10:00", "end": "10:50" },
+          { "day": "wed", "start": "10:00", "end": "10:50" }
+        ]
       }
+    },
+    {
+      "code": "MATH201",
+      "section": "0201",
+      "name": "Linear Algebra",
+      "role": "student",
+      "submits_via": "canvas",
+      "gradescope_course_id": null,
+      "canvas_course_id": null,
+      "links": [],
+      "schedule": {}
     }
   ],
   "todoist": {
     "project_name": "School",
     "common_label": "homework",
-    "course_label": "lowercase course code, e.g. cmsc422",
     "push_sync_enabled": false
   },
   "jobs": {
@@ -87,22 +44,13 @@
     "filter": {
       "require_active": true,
       "require_visible": true,
-      "categories_include": [
-        "Software",
-        "Software Engineering",
-        "AI/ML/Data",
-        "Data Science, AI & Machine Learning"
-      ],
-      "terms_include": [
-        "Summer 2027"
-      ],
-      "title_include": "software|\\bswe\\b|\\bsde\\b|developer|robotic|machine learning|\\bml\\b|\\bai\\b|backend|back-end|frontend|front-end|full[- ]stack|platform|infrastructure|systems|embedded software|firmware|autonomy|perception|computer vision|data engineer|research (engineer|scientist)|engineer(ing)? intern",
-      "title_exclude": "hardware|electrical|mechanical|\\bfpga\\b|\\basic\\b|analog|\\brf\\b|\\bpcb\\b|marketing|sales|business|finance|accounting|product manag|program manag|\\bux\\b|ui/ux|designer|recruit|\\bhr\\b|legal|supply chain|civil|manufactur|technician|quality assurance|reservoir|petroleum|chemical engineer|geolog|structural engineer|environmental engineer|drilling|process engineer|industrial engineer|test engineer intern|field engineer",
+      "categories_include": ["Software", "Software Engineering", "AI/ML/Data"],
+      "terms_include": ["Summer 2027"],
+      "title_include": "software|\\bswe\\b|\\bsde\\b|developer|robotic|machine learning|\\bml\\b|\\bai\\b|backend|back-end|frontend|front-end|full[- ]stack|data engineer|engineer(ing)? intern",
+      "title_exclude": "hardware|electrical|mechanical|marketing|sales|finance|accounting|product manag|recruit|legal",
       "locations_include": ", [A-Z]{2}$|United States|\\bUSA?\\b|Remote in USA|Remote - US",
-      "locations_exclude": "Canada|United Kingdom|\\bUK\\b|India|Europe|Germany|Ireland|Singapore|Australia",
-      "sponsorship": "ignore",
-      "note": "US citizen, no sponsorship needed. Intern roles only in v1. Tune after the first week of real data."
-    },
-    "profile_blurb_for_v2_scorer": "TODO: 3-4 sentences on what roles/companies/tech you actually want, for the Haiku scorer."
+      "locations_exclude": "Canada|United Kingdom|\\bUK\\b|India|Europe",
+      "sponsorship": "ignore"
+    }
   }
 }
