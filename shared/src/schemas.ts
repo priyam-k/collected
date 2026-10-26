@@ -276,6 +276,8 @@ export const sourceConfigSchemas = {
   canvas_ical: z.object({ url: outboundUrlSchema }),
   gradescope: z.object({ email: z.string().email(), password: z.string().min(1) }),
   gcal: z.object({ refreshToken: z.string().min(1) }),
+  /** The "Secret address in iCal format" of one Google calendar; read-only, no OAuth client needed. */
+  gcal_ical: z.object({ url: outboundUrlSchema }),
   todoist: z.object({ token: z.string().min(1) }),
   jobs: z.object({ sources: z.array(z.object({ id: z.string().regex(/^(?!manual$)[a-z0-9][a-z0-9_-]{0,39}$/, 'lowercase id; "manual" is reserved'), url: outboundUrlSchema })).max(20).default([]) }),
 } as const;
