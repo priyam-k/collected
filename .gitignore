@@ -11,6 +11,5 @@ backups/
 .DS_Store
 .pnpm-store/
 coverage/
-local/.venv/
 __pycache__/
 .claude/

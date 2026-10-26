@@ -3,6 +3,7 @@ import { Writable } from 'node:stream';
 import { parseArgs } from 'node:util';
 import { Api } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
+import { connectCanvas } from './connect.js';
 import { configPath, defaultConfig, loadConfig, saveConfig, targetDir } from './config.js';
 import { assertSecureUrl } from './guard.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
@@ -24,7 +25,9 @@ function usage(): never {
     files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
     sync [--dry-run] [--course X] [--no-model]    run the file sync now
     status                                    last file sync and what has been placed
-    install-launchd [--interval 30] | uninstall-launchd`);
+    install-launchd [--interval 30] | uninstall-launchd
+    connect canvas [--browser X] [--domain host] [--dry-run]
+                                              read the Canvas session cookie from your browser and send it to the server`);
   process.exit(cmd ? 1 : 0);
 }
 
@@ -100,6 +103,12 @@ try {
       saveConfig(cfg);
       say('saved');
       if ((what === 'service-token' && b) || (what !== 'service-token' && a)) console.error('note: a secret on the command line lands in shell history; next time leave it off and type it at the prompt');
+      break;
+    }
+    case 'connect': {
+      if (rest[0] !== 'canvas') usage();
+      const { values } = parseArgs({ args: rest.slice(1), options: { browser: { type: 'string' }, domain: { type: 'string' }, 'dry-run': { type: 'boolean' } } });
+      await connectCanvas(loadConfig(), { browser: values.browser, domain: values.domain, dryRun: values['dry-run'], log: say });
       break;
     }
     case 'files-courses': {

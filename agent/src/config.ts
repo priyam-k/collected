@@ -31,6 +31,8 @@ export interface AgentConfig {
   courses: Record<string, { root?: string; targets?: Record<string, string>; index?: string; facts?: string }>;
   /** Never download a file larger than this (a lecture video in a synced folder). Default 100. */
   maxFileMb?: number;
+  /** Canvas host `collected connect canvas` reads the session cookie for. Default umd.instructure.com. */
+  canvasHost?: string;
   /** Shell command run once after a sync that placed files. Env: COLLECTED_PLACED (newline-separated paths), COLLECTED_COURSES. */
   onPlace?: string;
   model: ModelConfig;

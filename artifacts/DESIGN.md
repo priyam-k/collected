@@ -30,10 +30,10 @@ Exposure: **Cloudflare Tunnel** from the host to `collected.priyamkabra.com`, wi
 
 Host: Ubuntu VPS running Docker Compose (`app` + `cloudflared`). The same compose runs on any always-on box, including a home machine later.
 
-Mac-side helpers in `local/`: read the Canvas session cookie from Chrome and post it to the app. Later, the resume pipeline.
+Mac-side: `collected connect canvas` (the `agent` CLI) reads the Canvas session cookie from a local browser and posts it to the app. Later, the resume pipeline.
 
 ```
-Chrome cookie ──(local helper)────────────────┐
+Browser cookie ─(collected connect canvas)─────┐
                                               ▼
 Canvas REST (session cookie) ─┐        ┌──────────────┐        ┌──────────┐
 Canvas iCal (fallback) ───────┤        │  ingesters   │        │          │
@@ -71,8 +71,7 @@ collected/
       settings/     sources, courses, todoist, jobs, layout
       lib/          api client, query hooks
   shared/           types shared by server and web
-  agent/            laptop agent: downloads course files into local folders (CLI + launchd)
-  local/            mac helpers (canvas cookie), later resume pipeline
+  agent/            laptop agent + CLI: course files → folders, dashboard reads/edits, `connect canvas` (launchd)
   docker-compose.yml
   Dockerfile
   .env.example
@@ -208,6 +207,7 @@ The dashboard from a terminal, for a person or for an agent working in another f
 - **Look**: `courses`, `course <c>`, `assignments [--course --days --all]`, `agenda [--days]`, `todo`, `grades [c]`, `announcements`, `dates`, `sources`, `jobs`.
 - **Change**: `task add "<text>"` (Todoist quick add) and `task done`, `done <item> [--undo]` (a dashboard-only override), `link add|rm`, `schedule set|rm` (`"mon,wed 14:00-14:50 @ CHE 2110"`), `notes set|clear`, `date add|rm` (exams, quizzes, finals, cancelled or virtual sessions), `jobs set <id> <state>`, `resync [source|all]`.
 - **Canvas, read-only**: `canvas ls <c> [modules|files|pages|assignments|announcements]`, `canvas show <c> syllabus | page <slug> | assignment <id> | announcement <id>` (the full body as text, the rubric, and the ids of files it links), `canvas get "<api path>" [--all]`, and `pull <file-id> --to <folder>`.
+- **Connect**: `connect canvas [--browser chrome|brave|edge|arc|chromium|firefox] [--domain host] [--dry-run]` reads the Canvas session cookie (`canvas_session` / `_normandy_session` / `_legacy_normandy_session`) out of the local browser's cookie store — decrypting Chromium's Keychain-encrypted store in `agent/src/browser-cookies.ts` with no external dependency (`node:sqlite`, `node:crypto`) — and posts it to `POST /api/sources/canvas/cookie`, which stores it and runs a Canvas sync. Only the session cookies leave the machine; values are never printed. Replaces the old Python `local/canvas_cookie.py`.
 - **File sync**: `sync`, `status`, `files courses|link|unlink`, `install-launchd`.
 
 A `<course>` is its code, the digits, or the id. A course edit reads the course, changes one field, sends only that field (DECISIONS 041), and prints what it was and what it is now. The Canvas commands go through `GET /api/canvas/raw?path=/api/v1/…[&all=1]`: one GET with the stored session, JSON passed through, path restricted to the Canvas API on the configured host, a denied resource reported as missing without touching the source's status. No Canvas credential exists on the laptop, and nothing in the CLI can write to Canvas or Gradescope.
@@ -271,7 +271,7 @@ GET  /api/sources
 PUT  /api/sources/:id/config           (secrets encrypted at rest)
 POST /api/sources/sync                 (start every enabled source; 202, runs continue in background)
 POST /api/sources/:id/sync             (run now)
-POST /api/sources/canvas/cookie        (from local helper)
+POST /api/sources/canvas/cookie        (from `collected connect canvas`)
 
 GET  /api/google/start  GET /api/google/callback
 POST /api/calendar/events              (write-through to GCal)

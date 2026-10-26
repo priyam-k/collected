@@ -79,6 +79,11 @@ export class Api implements SyncApi {
     return this.json<T>(p, { method, ...(body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) });
   }
 
+  /** Hand the Canvas session cookie to the server; it stores it and runs a Canvas sync. See `connect.ts`. */
+  postCanvasCookie(body: { cookieHeader: string; baseUrl?: string }): Promise<{ ok: boolean; outcome: unknown }> {
+    return this.send('POST', '/api/sources/canvas/cookie', body);
+  }
+
   getManifest(): Promise<FileSyncManifest> {
     return this.json<FileSyncManifest>('/api/file-sync/manifest');
   }

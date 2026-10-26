@@ -20,7 +20,7 @@ pnpm 12 blocks install scripts by default; `pnpm-workspace.yaml` allow-lists `es
 
 - **Todoist**: rename the "Homework" project to **School** (project ids survive renames, so timing doesn't matter). Grab the API token: Todoist → Settings → Integrations → Developer → API token. Keep it for Phase 1.
 - **Gradescope**: confirm you can log in at `https://www.gradescope.com/login` with email + password (not the school SSO button). If not, set one via account settings or the forgot-password flow.
-- **Chrome**: keep Canvas logged in; the local helper reads that cookie.
+- **Browser**: keep Canvas logged in in Chrome (or Brave/Edge/Arc/Chromium/Firefox); `collected connect canvas` reads that cookie.
 
 ## Phase 1 — during development, as each ingester lands
 
@@ -30,14 +30,17 @@ All of these are entered in the app's Settings page (or `.env` for the Google cl
 Paste the API token into Settings → Sources → Todoist.
 
 ### Canvas
-Either run the local helper, which reads the cookie from Chrome and posts it to the running app (it creates `local/.venv` and installs its one dependency the first time; expect a Keychain prompt):
+Build the `collected` CLI once (`pnpm --filter agent build`, then `collected init http://localhost:3000` and `collected auth helper-key <LOCAL_HELPER_KEY>`; see "Laptop agent" below). Then let it read the cookie from your browser and post it to the running app:
 
 ```sh
-pnpm canvas-cookie                    # expects the dev server on :3000
-pnpm canvas-cookie -- --dry-run       # just list what it found
+collected connect canvas              # reads the default browser, posts to the server in agent.json
+collected connect canvas --dry-run    # just list which browser/profile and cookie names were found
+collected connect canvas --browser arc   # chrome | brave | edge | arc | chromium | firefox
 ```
 
-or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `canvas_session` (older Canvas instances call it `_normandy_session`; either works) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
+It reads the session cookie out of the browser's own cookie store (decrypting Chromium's Keychain-encrypted store). **macOS will ask for your Keychain password — click "Allow", not "Always Allow".** Only the session cookies are sent, over the https (or localhost) server URL.
+
+Or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `canvas_session` (older Canvas instances call it `_normandy_session`; either works) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
 
 ### Gradescope
 Email + password into Settings → Sources → Gradescope. Then in Settings → Courses, set each course's Gradescope course id (the number in the course URL) and `submits_via`.
@@ -195,7 +198,7 @@ The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings 
 
 ## Phase 3 — after deploy
 
-- Paste the Canvas cookie into prod: `pnpm canvas-cookie --target https://collected.priyamkabra.com`. Scripts need the Access **service token** from the "Laptop agent" section below (the helper reads `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` from the environment or `.env`); without it Access answers with its login page, whatever headers the script sends (DECISIONS 038).
+- Paste the Canvas cookie into prod: point the CLI at prod (`collected init https://collected.priyamkabra.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas`. Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
 - Enter Gradescope credentials and Todoist token in prod settings.
 - Fill in Gradescope course ids and `submits_via` per course.
 - Enable the Todoist push sync once the homework section looks right for a day.
@@ -227,6 +230,6 @@ Your files are safe: the agent records what it placed and never overwrites, move
 
 ## Where the Mac still matters
 
-- The Canvas cookie helper reads Chrome on the Mac. Run it when the Sources widget says Canvas needs auth (should be rare if the ingester keeps polling).
+- `collected connect canvas` reads the browser cookie on the Mac. Run it when the Sources widget says Canvas needs auth (should be rare if the ingester keeps polling).
 - The file-sync agent runs under launchd and needs the Mac awake to pull new files; the dashboard itself does not.
 - Later: the resume pipeline (Claude Code + resume skill) runs on the Mac via launchd, pulls matched jobs from the API, posts results back. Neither needs the Mac awake for the dashboard itself to work.

@@ -61,7 +61,7 @@ Three parts, one process. The **web app** runs in your browser. The **server** i
 - `server/drizzle/` — The migration SQL files and their journal.
 - `web/src/` — dashboard/ (grid, frame, header), widgets/ (one folder each), panes/ (drawer contents), settings/, lib/ (api client, query hooks, theme).
 - `artifacts/` — DESIGN.md, DECISIONS.md, PROGRESS.md, SETUP.md, seed-config.json. Docs only.
-- `local/` — canvas_cookie.py, the Mac helper that reads the Canvas cookie out of Chrome.
+- The Canvas cookie is read by the `collected connect canvas` CLI command (`agent/src/browser-cookies.ts` + `connect.ts`), which decrypts the browser cookie store on the Mac and posts the session cookie to the server.
 
 ## Conventions the code relies on
 
