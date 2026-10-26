@@ -14,7 +14,7 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 - [x] Full security review, seven surfaces, every finding verified (`SECURITY-REVIEW.md`, 2026-10-23).
 - [x] Tier 1 and 2 fixes landed (DECISIONS 043, commit 4f22fca): fail-closed ingest, scoped credentials, outbound URL policy, CSRF and headers, agent containment, hardened deploy, pre-migration snapshots, dependency bumps.
 - [ ] Manual steps the fixes created (SETUP.md steps 9 and 10): deploy secrets, `production` environment, branch protection, Dependabot alerts, backup cron on the box, the Access cookie's SameSite check in Zero Trust.
-- [ ] Proper end-to-end tests: a seeded server over the fixture clients, the web app driven in a browser (first-run, connect a source, a course pane, a widget edit, export/import), the CLI against that server, and a file-sync run into a temp folder. Runs in `ci.yml`.
+- [x] End-to-end tests (`e2e/`, 2026-10-26): Playwright over a fixture-seeded server, 23 specs covering the dashboard, course pane, overrides, dates, settings, export/import, layout, the CLI and the file-sync manifest/report; `pnpm e2e`, and the `e2e` job in `ci.yml`. Not covered: file bytes (need a live Canvas), Todoist writes (need a token), OAuth.
 
 ### Phase 2 — The shared prerequisite (sign-in, tokens, onboarding)
 - [ ] In-app sign-in and sessions, Google OAuth for identity first; Cloudflare Access becomes optional in front rather than the login.
