@@ -6,7 +6,7 @@ import { gcalIngester } from '../ingest/gcal/ingest.js';
 import { runIngester } from '../ingest/runner.js';
 import { NotConfiguredError } from '../ingest/types.js';
 import type { AppContext } from '../context.js';
-import { mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
+import { getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
 import { sources } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
@@ -52,7 +52,12 @@ export function googleRoutes(ctx: AppContext) {
       const api = GoogleCalendarApi.fromRefreshToken(ctx.env, refreshToken);
       const calendars = await api.listCalendars();
       const primary = calendars.find((k) => k.primary)?.id;
-      await mergeSourceMeta(ctx, 'gcal', { calendars, selectedCalendars: primary ? [primary] : [], defaultCalendarId: primary ?? null, syncTokens: {} });
+      // A reconnect (expired refresh token) keeps the user's calendar selection; only a first connect starts from primary.
+      const previous = ((await getSourceRow(ctx, 'gcal')).meta as { selectedCalendars?: string[]; defaultCalendarId?: string | null }) ?? {};
+      const stillThere = (previous.selectedCalendars ?? []).filter((id) => calendars.some((k) => k.id === id));
+      const selectedCalendars = stillThere.length ? stillThere : primary ? [primary] : [];
+      const defaultCalendarId = previous.defaultCalendarId && calendars.some((k) => k.id === previous.defaultCalendarId) ? previous.defaultCalendarId : (primary ?? null);
+      await mergeSourceMeta(ctx, 'gcal', { calendars, selectedCalendars, defaultCalendarId, syncTokens: {} });
       await ctx.db.update(sources).set({ enabled: true }).where(eq(sources.id, 'gcal'));
       await setSourceStatus(ctx, 'gcal', 'connected', { lastError: null });
       ctx.log.info({ calendars: calendars.length }, 'google calendar connected');

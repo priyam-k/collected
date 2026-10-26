@@ -220,6 +220,48 @@ export const settings = sqliteTable('settings', {
   updatedAt: text('updated_at').notNull().$defaultFn(nowIso).$onUpdateFn(nowIso),
 });
 
+/** People who may sign in. Single-user today: the first Google sign-in claims the instance (DESIGN "Sign-in"). */
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  name: text('name'),
+  picture: text('picture'),
+  lastLoginAt: text('last_login_at'),
+  ...timestamps,
+});
+
+/** Browser sessions: the cookie holds the id, nothing else; rows are the source of truth and can be revoked. */
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    userAgent: text('user_agent'),
+    lastSeenAt: text('last_seen_at').notNull().$defaultFn(nowIso),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: text('created_at').notNull().$defaultFn(nowIso),
+  },
+  (t) => [index('sessions_user_idx').on(t.userId)],
+);
+
+/** Long-lived tokens for the CLI (`collected login`). Only the SHA-256 is stored; the plaintext is shown once. */
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    prefix: text('prefix').notNull(),
+    lastUsedAt: text('last_used_at'),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull().$defaultFn(nowIso),
+  },
+  (t) => [index('api_tokens_user_idx').on(t.userId)],
+);
+export type UserRow = typeof users.$inferSelect;
+export type ApiTokenRow = typeof apiTokens.$inferSelect;
+
 export type SourceRow = typeof sources.$inferSelect;
 export type CourseRow = typeof courses.$inferSelect;
 export type ItemRow = typeof items.$inferSelect;

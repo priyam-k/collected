@@ -44,6 +44,7 @@ export class Api implements SyncApi {
       h['CF-Access-Client-Secret'] = a.cfAccessClientSecret;
     }
     if (a.helperKey) h['x-collected-key'] = a.helperKey;
+    if (a.token) h.Authorization = `Bearer ${a.token}`;
     return h;
   }
 

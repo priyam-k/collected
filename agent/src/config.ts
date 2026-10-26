@@ -16,6 +16,8 @@ export interface AgentConfig {
     cfAccessClientSecret?: string;
     /** LOCAL_HELPER_KEY (local dev, or an Access bypass). */
     helperKey?: string;
+    /** An API token from `collected login` (Settings → Account). Preferred over the service token. */
+    token?: string;
   };
   /** Name this machine reports; defaults to the hostname. */
   device: string;

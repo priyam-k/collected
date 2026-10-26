@@ -3,9 +3,10 @@ import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { compress } from 'hono/compress';
 import { etag } from 'hono/etag';
-import { accessAuth, type AuthVariables } from '../auth/cloudflare-access.js';
+import { accessAuth, verifyAccess, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { MB } from '../lib/http.js';
+import { authRoutes } from './auth.js';
 import { calendarRoutes } from './calendar.js';
 import { canvasRoutes } from './canvas.js';
 import { coursesRoutes } from './courses.js';
@@ -30,10 +31,12 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * or the import/export of the whole database, so a leaked `~/.collected/agent.json` is not a full takeover.
  */
 export function identityAllows(user: string, method: string, path: string): boolean {
-  if (user === 'dev' || !user.startsWith('service:') && user !== 'helper') return true;
+  const machine = user.startsWith('service:') || user.startsWith('token:');
+  if (user === 'dev' || (!machine && user !== 'helper')) return true;
   if (user === 'helper') return path === '/api/sources/canvas/cookie' && method === 'POST';
   const p = path.replace(/\/+$/, '');
   if (p === '/api/import' || p === '/api/export' || p === '/api/demo') return false;
+  if (p.startsWith('/api/auth/tokens') || p === '/api/auth/logout-all') return false;
   if (p.startsWith('/api/google') || p.startsWith('/api/layout') || p.startsWith('/api/widgets')) return false;
   if (p === '/api/sources/canvas/cookie') return false;
   if (MUTATING.has(method)) {
@@ -61,13 +64,19 @@ export function createApi(ctx: AppContext) {
   // Two paths skip Access: the Canvas cookie drop-off authenticates itself (helper key or Access), and the health
   // probe is what Docker's HEALTHCHECK calls from inside the container with no JWT. Externally both still sit
   // behind the Access login wall on the hostname. Everything else needs Access.
-  const guard = accessAuth(ctx.env);
+  const guard = accessAuth(ctx);
   api.use('*', async (c, next) => {
     const open =
       (c.req.path === '/api/sources/canvas/cookie' && c.req.method === 'POST') ||
-      (c.req.path === '/api/health' && c.req.method === 'GET');
+      (c.req.path === '/api/health' && c.req.method === 'GET') ||
+      (c.req.method === 'GET' && (c.req.path === '/api/auth/google/start' || c.req.path === '/api/auth/google/callback'));
     if (open) {
       c.set('user', null);
+      return next();
+    }
+    // /me answers for everyone: it is how the web app learns whether to show the sign-in page.
+    if (c.req.path === '/api/auth/me' && c.req.method === 'GET') {
+      c.set('user', await verifyAccess(ctx, c));
       return next();
     }
     return guard(c, next);
@@ -105,6 +114,7 @@ export function createApi(ctx: AppContext) {
   api.use('*', etag());
 
   api.route('/health', healthRoutes(ctx));
+  api.route('/auth', authRoutes(ctx));
   api.route('/sources', sourcesRoutes(ctx));
   api.route('/courses', coursesRoutes(ctx));
   api.route('/items', itemsRoutes(ctx));

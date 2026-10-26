@@ -181,7 +181,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
    */
   r.post('/canvas/cookie', async (c) => {
     const viaHelper = helperKeyMatches(ctx.env, c.req.header('x-collected-key'));
-    const user = viaHelper ? 'helper' : await verifyAccess(ctx.env, c);
+    const user = viaHelper ? 'helper' : await verifyAccess(ctx, c);
     if (!user) return c.json({ error: 'unauthorized' }, 401);
     const body = await parseBody(c, z.object({ cookieHeader: z.string().min(10), baseUrl: outboundUrlSchema.optional() }));
     const existing = (await getSourceConfig<{ baseUrl?: string }>(ctx, 'canvas')) ?? {};

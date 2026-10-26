@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { z } from 'zod';
 
-export function bad(message: string, status: 400 | 404 | 409 | 422 = 400): never {
+export function bad(message: string, status: 400 | 403 | 404 | 409 | 422 = 400): never {
   throw new HTTPException(status, { message, res: new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json' } }) });
 }
 

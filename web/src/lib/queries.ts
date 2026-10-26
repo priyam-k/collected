@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type {
+  ApiToken,
   Course,
   CourseGrades,
   CourseInput,
@@ -8,6 +9,7 @@ import type {
   FileSyncManifestCourse,
   ManualEventInput,
   ManualJobInput,
+  Me,
   EffectiveItem,
   HealthResponse,
   ItemKind,
@@ -22,6 +24,8 @@ import { api } from './api';
 
 export const qk = {
   health: ['health'] as const,
+  me: ['me'] as const,
+  tokens: ['auth', 'tokens'] as const,
   sources: ['sources'] as const,
   courses: ['courses'] as const,
   layout: ['layout'] as const,
@@ -484,5 +488,43 @@ export function useDeleteJob() {
   return useMutation({
     mutationFn: (id: string) => api<{ ok: true }>(`/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSettled: () => inv(['jobs']),
+  });
+}
+
+// --- sign-in ---------------------------------------------------------------------------------------------------------
+
+/** Who the browser is, from the server's point of view. Answers for signed-out visitors too (user: null). */
+export function useMe() {
+  return useQuery({ queryKey: qk.me, queryFn: () => api<Me>('/auth/me'), staleTime: 60_000, retry: 1 });
+}
+
+/** A person is signed in (or auth is off for local development). Machine identities do not count. */
+export const isSignedIn = (me: Me | undefined): boolean => !!me && (me.authDisabled || !!me.user);
+
+export function useTokens() {
+  return useQuery({ queryKey: qk.tokens, queryFn: () => api<ApiToken[]>('/auth/tokens'), retry: false });
+}
+
+export function useCreateToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api<ApiToken & { token: string }>('/auth/tokens', { method: 'POST', json: { name } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.tokens }),
+  });
+}
+
+export function useRevokeToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<{ ok: true }>(`/auth/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.tokens }),
+  });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>('/auth/logout', { method: 'POST', json: {} }),
+    onSuccess: () => qc.clear(),
   });
 }

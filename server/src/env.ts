@@ -22,6 +22,11 @@ const envSchema = z.object({
   AUTH_DISABLED_ACKNOWLEDGED: bool.default(false),
   CF_ACCESS_TEAM_DOMAIN: z.string().optional(),
   CF_ACCESS_AUD: z.string().optional(),
+  /** Who may sign in with Google, comma-separated. Unset: the first person to sign in claims the instance. */
+  ALLOWED_EMAILS: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean) : undefined)),
   LOCAL_HELPER_KEY: z
     .string()
     .optional()
@@ -60,11 +65,14 @@ export function loadEnv(): Env {
   if (env.AUTH_DISABLED && env.NODE_ENV === 'production' && !env.AUTH_DISABLED_ACKNOWLEDGED) {
     throw new Error('AUTH_DISABLED=true in production makes every credential in the database readable by anyone who reaches the port. Set AUTH_DISABLED_ACKNOWLEDGED=true only if nothing but you can reach it.');
   }
-  if (!env.AUTH_DISABLED && (!env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD)) {
+  const hasAccess = !!(env.CF_ACCESS_TEAM_DOMAIN && env.CF_ACCESS_AUD);
+  const hasGoogle = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  if (!env.AUTH_DISABLED && !hasAccess && !hasGoogle) {
     throw new Error(
-      'AUTH_DISABLED=false requires CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD (Cloudflare Access). For local development set AUTH_DISABLED=true in .env.',
+      'AUTH_DISABLED=false needs a way to sign in: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (Google sign-in), or CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD (Cloudflare Access in front). For local development set AUTH_DISABLED=true in .env.',
     );
   }
+  if ((env.CF_ACCESS_TEAM_DOMAIN ? 1 : 0) + (env.CF_ACCESS_AUD ? 1 : 0) === 1) throw new Error('CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD go together');
   // Relative DATA_DIR / WEB_DIST are anchored at the repo root, not the cwd, so `pnpm dev` and `node dist/index.js` agree.
   const dataDir = path.resolve(rootDir, env.DATA_DIR);
   const { SECRET_KEY: fromEnv, ...rest } = env;

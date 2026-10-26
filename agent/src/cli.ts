@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
+import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { Api } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
@@ -20,6 +21,7 @@ function usage(): never {
     init <server-url>                         write ${configPath()} (device name, cache dir, model on); https, or http://localhost
     auth service-token <id> [secret] | auth helper-key [key] | auth model [typesafe-api-key]
                                               leave the secret off to be prompted for it (or pipe it in): it then stays out of shell history
+    login                                     sign in: opens Settings → Account on the server, then paste the token here
     files courses                             what the server wants synced and where it lands here
     files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
     sync [--dry-run] [--course X] [--no-model]    run the file sync now
@@ -95,11 +97,28 @@ try {
       const [what, a, b] = rest;
       if (what === 'service-token' && a) cfg.auth = { cfAccessClientId: a, cfAccessClientSecret: b ?? (await readSecret('service token secret: ')) };
       else if (what === 'helper-key') cfg.auth = { helperKey: a ?? (await readSecret('helper key: ')) };
+      else if (what === 'token') cfg.auth = { token: a ?? (await readSecret('token: ')) };
       else if (what === 'model') cfg.model = { ...cfg.model, enabled: true, apiKey: a ?? (await readSecret('TypeSafe API key: ')) };
       else usage();
       saveConfig(cfg);
       say('saved');
       if ((what === 'service-token' && b) || (what !== 'service-token' && a)) console.error('note: a secret on the command line lands in shell history; next time leave it off and type it at the prompt');
+      break;
+    }
+    case 'login': {
+      const cfg = loadConfig();
+      const url = `${cfg.server.replace(/\/$/, '')}/settings/account?cli=1&device=${encodeURIComponent(cfg.device)}`;
+      say(`Sign in and create a token for this machine:\n  ${url}`);
+      if (process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
+      const token = await readSecret('paste the token: ');
+      if (!token.startsWith('clt_')) {
+        say('that does not look like a collected token (they start with clt_)');
+        process.exit(1);
+      }
+      cfg.auth = { token };
+      saveConfig(cfg);
+      const me = await new Api(cfg).get<{ identity: string | null }>('/api/auth/me');
+      say(me.identity ? `signed in as ${me.identity}` : 'saved, but the server did not accept the token');
       break;
     }
     case 'files-courses': {
