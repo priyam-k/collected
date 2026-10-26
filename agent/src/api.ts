@@ -65,7 +65,8 @@ export class Api implements SyncApi {
       } catch {
         /* keep text */
       }
-      throw new ApiError(`${p}: ${res.status} ${msg}`, res.status);
+      const hint = res.status === 401 ? ' (not signed in: run `collected login`, or `collected auth helper-key` for a local server)' : '';
+      throw new ApiError(`${p}: ${res.status} ${msg}${hint}`, res.status);
     }
     return JSON.parse(text) as T;
   }
