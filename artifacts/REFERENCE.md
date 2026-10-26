@@ -6,7 +6,7 @@ _Reference · written 2026-09-09, updated 2026-09-12_
 
 Everything the server stores, every request the browser makes, how the six data sources are read, and how the whole thing gets onto a box behind Cloudflare. Written so someone with limited code access could rebuild the backend and keep the app working.
 
-Repo: priyam-k/collected · Server: Node 24, Hono, Drizzle, SQLite · Web: Vite, React 19, TanStack Query · Live: collected.priyamkabra.com
+Repo: <you>/collected · Server: Node 24, Hono, Drizzle, SQLite · Web: Vite, React 19, TanStack Query · Live: collected.example.com
 
 ## What this app is
 
@@ -812,7 +812,7 @@ A Google Cloud e2-micro in us-east1, the Always Free tier: a quarter of a shared
 
 ### Cloudflare Tunnel and Access
 
-Nothing on the box listens on a public port. A `cloudflared` systemd service, installed with a tunnel token from the Cloudflare dashboard, keeps outbound QUIC connections open to Cloudflare's edge. The tunnel's public hostname rule maps `collected.priyamkabra.com` to `http://localhost:3000`, and Cloudflare created the DNS record. In front of that, an Access application for the hostname with a policy allowing one email; login is a one-time PIN or Google. A request flows browser → Cloudflare (TLS terminates, Access checks the session, attaches the JWT) → tunnel → cloudflared → localhost:3000 → the server, which verifies the JWT. The connector proves the box is yours with the token; Access proves the visitor is you.
+Nothing on the box listens on a public port. A `cloudflared` systemd service, installed with a tunnel token from the Cloudflare dashboard, keeps outbound QUIC connections open to Cloudflare's edge. The tunnel's public hostname rule maps `collected.example.com` to `http://localhost:3000`, and Cloudflare created the DNS record. In front of that, an Access application for the hostname with a policy allowing one email; login is a one-time PIN or Google. A request flows browser → Cloudflare (TLS terminates, Access checks the session, attaches the JWT) → tunnel → cloudflared → localhost:3000 → the server, which verifies the JWT. The connector proves the box is yours with the token; Access proves the visitor is you.
 
 ### Deploying a change
 
@@ -825,11 +825,11 @@ The same steps by hand, if Actions is unavailable:
 pnpm -r typecheck
 docker build --platform linux/amd64 -t collected:latest .
 docker save collected:latest | gzip -1 > /tmp/collected.tar.gz        # ~110 MB
-gcloud compute scp /tmp/collected.tar.gz collected-instance-2:/tmp/ --zone us-east1-c
-gcloud compute ssh collected-instance-2 --zone us-east1-c --command \
+gcloud compute scp /tmp/collected.tar.gz <instance>:/tmp/ --zone <zone>
+gcloud compute ssh <instance> --zone <zone> --command \
   'cd /srv/collected && git pull --ff-only && gunzip -c /tmp/collected.tar.gz | docker load && docker compose up -d'
 # verify after a couple of minutes
-gcloud compute ssh collected-instance-2 --zone us-east1-c --command 'cd /srv/collected && docker compose ps && docker compose logs --tail 20 app'
+gcloud compute ssh <instance> --zone <zone> --command 'cd /srv/collected && docker compose ps && docker compose logs --tail 20 app'
 ```
 
 The git pull only matters when the compose file, env example, or seed config changed; the code runs from the image. Migrations apply when the container starts; boot logs `migrations applied` with the tags it ran, or nothing when the schema is current. Right after a restart the box is busy for about two minutes (image load, six boot-time syncs, often a scheduled Canvas sync) and the container can show unhealthy because the 5-second probe times out; it recovers on its own and Docker doesn't restart on unhealthy. Rollback is checking out the previous commit and repeating from the build.

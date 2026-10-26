@@ -24,9 +24,10 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 - [ ] A `collected` skill file in the repo for AI agents: commands, output shapes, what is safe to allowlist. The vault skills stay separate, possibly shipped as an optional starter.
 
 ### Phase 3 — Open-source release
-- [ ] Scrub the repo: `seed-config.json` becomes `seed-config.example.json`; fixtures lose real course ids, instructor names and the owner's calendar name; `artifacts/previous.txt` goes; the owner's domain, instance, zone and username leave compose, SETUP, REFERENCE, PROGRESS, DESIGN, the workflow's pinned host key, and the UMD Canvas URL stops being a default anywhere (list in `SECURITY-REVIEW.md`, Tier 4).
-- [ ] LICENSE (MIT unless decided otherwise), SECURITY.md, a CONTRIBUTING note that `main` deploys the maintainer's instance.
-- [ ] README with screenshots from the demo fixtures; a landing page; a first-run flow in the web UI.
+- [x] Scrub the repo (2026-10-26): `seed-config.json` is a generic example (still loaded on first boot); fixtures use fictional course ids, instructor names and calendar names; `artifacts/previous.txt` is gone; the owner's domain, instance, zone, username and GitHub path are placeholders in SETUP, REFERENCE, PROGRESS, DESIGN, `.env.example` and the agent config comment; the workflow's host key comes from the `DEPLOY_HOST_KEY` secret and the deploy job is gated by the `DEPLOY_REPO` variable (both to set, SETUP.md step 9); the Canvas URL is entered when connecting, with no default anywhere. `local/` still names the old domain until `collected connect canvas` retires it.
+- [x] LICENSE (AGPL-3.0-only), SECURITY.md, CODE_OF_CONDUCT.md, CONTRIBUTING.md with the DCO sign-off and the note that `main` deploys the maintainer's instance (2026-10-26).
+- [x] README with screenshots from the demo fixtures (`docs/screenshots/`, 2026-10-26). `agent/` is `collected-cli` on npm: `release.yml` publishes on a `cli-v*` tag (`docs/releasing.md`; needs the `NPM_TOKEN` secret).
+- [ ] A landing page; a first-run flow in the web UI.
 - [x] CI running typecheck, tests and `pnpm audit` on pull requests (`ci.yml`).
 - [x] Secrets scan of the whole git history (clean, 2026-10-23; repeat right before flipping to public).
 - [ ] Self-host path in SETUP.md that works without Cloudflare (needs Phase 2's sign-in).
@@ -57,7 +58,7 @@ Roughly half an hour, because the tunnel is the identity, not the box: on the ne
 - [x] **M7 — Jobs.** Simplify listings.json poller, deterministic filter from seed-config, jobs widget (tape + list), star/hide/applied state.
 - [x] **M8 — Polish.** Mobile stack layout, PWA manifest, visibility-aware polling, empty/error states on every widget, keyboard shortcut for edit mode.
 - [ ] **M9 — Deploy.** VPS, tunnel, Access, backups. Prod connect of all sources.
-  - [x] Google Cloud e2-micro (`collected-instance-2`, `us-east1-c`), Docker, repo cloned with a deploy key, Cloudflare Tunnel + Access, `collected.priyamkabra.com` resolves (2026-09-07).
+  - [x] Google Cloud e2-micro (`<instance>`, `<zone>`), Docker, repo cloned with a deploy key, Cloudflare Tunnel + Access, `collected.example.com` resolves (2026-09-07).
   - [x] First-deploy fixes (2026-09-07): jobs sync batched and diffed, health probe unauthenticated, Node heap capped, web/server build stages split, image built on the Mac and shipped as a tarball. Container healthy, cloudflared quiet, public URL answering in ~100 ms.
   - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
   - [x] Ops Agent on the box is inactive and disabled (checked 2026-09-24).
@@ -138,7 +139,7 @@ Parked 2026-09-24 while the multi-user question is worked out (see the discussio
 
 ## Environment notes
 
-- Prod box: e2-micro, 1 GB RAM + 2 GB swap, 30 GB standard disk (~45 write IOPS). `gcloud compute ssh collected-instance-2 --zone us-east1-c`. Everything lives in `/srv/collected`; `data/` is owned by uid 1000 (see SETUP.md step 6).
+- Prod box: e2-micro, 1 GB RAM + 2 GB swap, 30 GB standard disk (~45 write IOPS). `gcloud compute ssh <instance> --zone <zone>`. Everything lives in `/srv/collected`; `data/` is owned by uid 1000 (see SETUP.md step 6).
 - Docker Desktop on the Mac intermittently hangs on registry pulls. When it works, `docker build -t collected:dev . && docker run --rm -p 127.0.0.1:3100:3000 -e AUTH_DISABLED=true -v collected-data:/data collected:dev` boots the production image: verified 2026-09-06 (health, SPA, API, manifest, key file in the volume, non-root user, survives restart).
 - The encryption key now lives in `data/.secret_key` (auto-created) instead of only in `.env`, after a recreated `.env` lost the original key. Credentials entered before that change (Gradescope, Todoist) must be re-entered once; the Sources page says so per source.
 

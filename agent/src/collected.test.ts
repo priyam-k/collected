@@ -5,12 +5,12 @@ import { isCollectedCommand, resolveCourse, runCollected } from './collected.js'
 import { describeSchedule, htmlToText, linkedFiles, parseMeetings, table } from './format.js';
 
 const course = (over: Partial<Course>): Course => ({
-  id: '2026-fall-enme480-0102', term: '2026-fall', code: 'ENME480', section: '0102', name: 'Intro to Robotics', role: 'student', canvasCourseId: '1408755', gradescopeCourseId: null, submitsVia: 'both', color: '#16a34a',
+  id: '2026-fall-enme480-0102', term: '2026-fall', code: 'ENME480', section: '0102', name: 'Intro to Robotics', role: 'student', canvasCourseId: '2001008', gradescopeCourseId: null, submitsVia: 'both', color: '#16a34a',
   links: [{ label: 'Website', url: 'https://enme480.github.io/' }],
   schedule: { lecture: [{ day: 'mon', start: '14:00', end: '14:50', location: 'CHE 2110' }, { day: 'wed', start: '14:00', end: '14:50', location: 'CHE 2110' }] },
   notes: null, archived: false, grading: null, fileSync: null, createdAt: '', updatedAt: '', ...over,
 });
-const COURSES = [course({}), course({ id: '2026-fall-cmsc422-0101', code: 'CMSC422', canvasCourseId: '1408462', links: [], schedule: {} }), course({ id: '2026-fall-cmsc330-0103', code: 'CMSC330', role: 'ta', links: [], schedule: {} })];
+const COURSES = [course({}), course({ id: '2026-fall-cmsc422-0101', code: 'CMSC422', canvasCourseId: '2001001', links: [], schedule: {} }), course({ id: '2026-fall-cmsc330-0103', code: 'CMSC330', role: 'ta', links: [], schedule: {} })];
 
 /** Records every request; answers GETs from a table of path prefixes. */
 function fakeApi(gets: Record<string, unknown> = {}) {
@@ -103,15 +103,15 @@ describe('commands', () => {
 
   it('reads Canvas through the proxy with the path encoded, and shows full text, rubric and linked files', async () => {
     const f = fakeApi({
-      '/api/canvas/raw': { name: 'Homework 2', description: '<p>Do it. <a href="/courses/1408755/files/91124380/download">spec.pdf</a></p>', due_at: '2026-10-06T03:59:00Z', lock_at: null, points_possible: 20, submission_types: ['online_upload'], html_url: 'https://umd.instructure.com/courses/1408755/assignments/7795797', rubric: [{ description: 'Correctness', points: 15, ratings: [{ description: 'Full', points: 15 }, { description: 'None', points: 0 }] }] },
+      '/api/canvas/raw': { name: 'Homework 2', description: '<p>Do it. <a href="/courses/2001008/files/91124380/download">spec.pdf</a></p>', due_at: '2026-10-06T03:59:00Z', lock_at: null, points_possible: 20, submission_types: ['online_upload'], html_url: 'https://umd.instructure.com/courses/2001008/assignments/7795797', rubric: [{ description: 'Correctness', points: 15, ratings: [{ description: 'Full', points: 15 }, { description: 'None', points: 0 }] }] },
     });
     const out = await runCollected(f.api, 'canvas', ['show', 'enme480', 'assignment', '7795797']);
-    expect(f.calls.at(-1)!.path).toBe(`/api/canvas/raw?path=${encodeURIComponent('/api/v1/courses/1408755/assignments/7795797')}`);
+    expect(f.calls.at(-1)!.path).toBe(`/api/canvas/raw?path=${encodeURIComponent('/api/v1/courses/2001008/assignments/7795797')}`);
     expect(out).toContain('Homework 2');
     expect(out).toContain('20 pts · online_upload');
     expect(out).toContain('15 pts  Correctness');
     expect(out).toContain('91124380  spec.pdf');
     await runCollected(f.api, 'canvas', ['ls', 'enme480', 'pages']).catch(() => undefined);
-    expect(f.calls.at(-1)!.path).toBe(`/api/canvas/raw?path=${encodeURIComponent('/api/v1/courses/1408755/pages')}&all=1`);
+    expect(f.calls.at(-1)!.path).toBe(`/api/canvas/raw?path=${encodeURIComponent('/api/v1/courses/2001008/pages')}&all=1`);
   });
 });

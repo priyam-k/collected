@@ -2,7 +2,7 @@
 # backups/collected-<date>.db.gz on the same disk as the database; this fetches it to GitHub as a workflow artifact
 # so a lost disk is not a lost history. The encryption key is never copied: without it a dump is unreadable.
 #
-# Needs the same secrets as deploy.yml: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY.
+# Needs the same secrets and variable as deploy.yml: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_HOST_KEY, DEPLOY_REPO.
 name: backup
 
 on:
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   fetch:
-    if: github.repository == 'priyam-k/collected'
+    if: github.repository == vars.DEPLOY_REPO
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -25,10 +25,12 @@ jobs:
       - name: SSH setup
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          echo "$HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBP7zLof6+vKOiihD5XFuXK2nvJFw5BbjgxwAUCUcNyD" > ~/.ssh/known_hosts
+          test -n "$HOST_KEY" || { echo "secret DEPLOY_HOST_KEY is not set (ssh-keyscan -t ed25519 <host>)" >&2; exit 1; }
+          echo "$HOST $HOST_KEY" > ~/.ssh/known_hosts
           printf 'Host box\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' "$HOST" "$USER" > ~/.ssh/config
       - name: Fetch newest dump
         run: |

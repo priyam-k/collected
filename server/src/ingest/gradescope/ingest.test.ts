@@ -33,7 +33,7 @@ describe('syncGradescope', () => {
     expect(counts.logins).toBe(0);
 
     const c330 = await ctx.db.query.courses.findFirst({ where: eq(courses.id, '2026-fall-cmsc330-0103') });
-    expect(c330?.gradescopeCourseId).toBe('1369005');
+    expect(c330?.gradescopeCourseId).toBe('3001001');
 
     const rows = await ctx.db.select().from(items).where(eq(items.source, 'gradescope'));
     const byExt = Object.fromEntries(rows.map((r) => [r.externalId, r]));
@@ -41,7 +41,7 @@ describe('syncGradescope', () => {
     expect(byExt['assignment:8499810']!.status).toBe('graded');
     expect(byExt['assignment:8499820']!.status).toBe('late');
     expect(byExt['assignment:8499830']!.status).toBe('missing'); // past due, no submission
-    expect(byExt['assignment:8499802']!.url).toBe('https://www.gradescope.com/courses/1373147');
+    expect(byExt['assignment:8499802']!.url).toBe('https://www.gradescope.com/courses/3001002');
     // TA rows informational
     expect(byExt['assignment:8502840']!.status).toBe('open');
     expect((byExt['assignment:8502840']!.raw as { ta: boolean }).ta).toBe(true);

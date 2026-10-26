@@ -24,7 +24,7 @@ describe('syncCanvas over fixtures', () => {
     expect(counts.autoFilled).toBe(3);
 
     const c422 = await ctx.db.query.courses.findFirst({ where: eq(courses.id, '2026-fall-cmsc422-0101') });
-    expect(c422?.canvasCourseId).toBe('1408462');
+    expect(c422?.canvasCourseId).toBe('2001001');
 
     const rows = await ctx.db.select().from(items).where(eq(items.source, 'canvas'));
     const byExt = Object.fromEntries(rows.map((r) => [r.externalId, r]));
@@ -86,7 +86,7 @@ describe('syncCanvas over fixtures', () => {
     // Canvas answers 502 for one course's assignments (or the run was cut off): that course is left alone, the rest still reconcile.
     const flaky = fixtureCanvasClient();
     const real = flaky.getAll.bind(flaky);
-    flaky.getAll = ((path: string, ...rest: unknown[]) => (path.includes('/courses/1408462/assignments') ? Promise.reject(new Error('Canvas 502 for assignments')) : (real as (...a: unknown[]) => Promise<unknown[]>)(path, ...rest))) as typeof flaky.getAll;
+    flaky.getAll = ((path: string, ...rest: unknown[]) => (path.includes('/courses/2001001/assignments') ? Promise.reject(new Error('Canvas 502 for assignments')) : (real as (...a: unknown[]) => Promise<unknown[]>)(path, ...rest))) as typeof flaky.getAll;
     const counts = await syncCanvas(ctx, flaky);
     expect(counts.coursesFailed).toBe(1);
     const after = await ctx.db.select().from(items).where(and(eq(items.source, 'canvas'), eq(items.kind, 'assignment'), isNull(items.deletedAt)));

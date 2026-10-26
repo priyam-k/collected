@@ -53,7 +53,8 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
 5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs (the app builds the URI from `PUBLIC_URL`, which is the Vite server in dev):
    - `http://localhost:5173/api/google/callback`
    - `http://localhost:3000/api/google/callback`
-   - `https://collected.priyamkabra.com/api/google/callback`
+   - `https://collected.example.com/api/google/callback`
+   and the same three with `/api/auth/google/callback` (sign-in; identity only, no Calendar scopes). The consent screen's publishing status must be **In production**: in Testing, Google expires refresh tokens after seven days, which silently disconnects the calendar.
 6. Copy client id + secret into `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 7. Restart `pnpm dev` so the server picks up the new `.env`. In the app: Settings → Sources → Google Calendar → Connect. Click through the "unverified app" warning (Advanced → Go to collected). Pick which calendars to show and which one new events go to.
 
@@ -116,20 +117,20 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
      IdentitiesOnly yes
    EOF
    chmod 600 ~/.ssh/config
-   git clone git@github.com:priyam-k/collected.git /srv/collected
+   git clone git@github.com:<you>/collected.git /srv/collected
    ```
    (Clones straight into `/srv/collected`, which already exists and is owned by you — don't `mkdir` it again first.) Future updates are just `git pull` on the box. `gh auth login` is the alternative if the box will need broader GitHub access later, but it authenticates your whole account rather than one repo, so it's more than this single-purpose VM needs.
 
    Without GitHub at all: `rsync -az --exclude node_modules --exclude data --exclude .env ./ collected-vm:/srv/collected/` from the Mac — no key setup, but no real git history on the box either, and every future update means re-running it by hand.
-6. `cd /srv/collected && cp .env.example .env` and set `PUBLIC_URL=https://collected.priyamkabra.com` (required: `docker compose` refuses to start without it), `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty. `AUTH_DISABLED` is pinned to `false` in `docker-compose.yml` and cannot be switched on from `.env` in a container; the container also runs with a read-only root filesystem, no capabilities and `no-new-privileges` (only `/data` and `/tmp` are writable).
+6. `cd /srv/collected && cp .env.example .env` and set `PUBLIC_URL=https://collected.example.com` (required: `docker compose` refuses to start without it), `GOOGLE_CLIENT_ID/SECRET`, `TZ`; the Cloudflare values come from the next section. Leave `SECRET_KEY` empty. `AUTH_DISABLED` is pinned to `false` in `docker-compose.yml` and cannot be switched on from `.env` in a container; the container also runs with a read-only root filesystem, no capabilities and `no-new-privileges` (only `/data` and `/tmp` are writable).
    Then create the data directory owned by the container's user: `mkdir -p data && sudo chown 1000:1000 data`. The image runs as `node` (uid 1000) and the bind mount in `docker-compose.yml` replaces the ownership baked into the image; skip this and the app crash-loops with `EACCES: permission denied, open '/data/.secret_key'`. (On Ubuntu images uid 1000 is the `ubuntu` account, which is why the files show up as owned by `ubuntu`.)
 7. Build the image on the Mac and ship it. The box cannot build it: `tsc` plus Vite need ~500 MB and on 1 GB with a 0.25-vCPU share the build sat in `tsc` for 15 minutes, swapped the box into the ground, and took SSH down with it (2026-09-07). From the repo on the Mac:
    ```sh
    pnpm -r typecheck                                   # the image build skips tsc on purpose; check here
    docker build --platform linux/amd64 -t collected:latest .
    docker save collected:latest | gzip -1 > /tmp/collected.tar.gz   # ~110 MB
-   gcloud compute scp /tmp/collected.tar.gz collected-instance-2:/tmp/ --zone us-east1-c
-   gcloud compute ssh collected-instance-2 --zone us-east1-c --command \
+   gcloud compute scp /tmp/collected.tar.gz <instance>:/tmp/ --zone <zone>
+   gcloud compute ssh <instance> --zone <zone> --command \
      'gunzip -c /tmp/collected.tar.gz | docker load && cd /srv/collected && docker compose up -d'
    ```
    Upload takes under a minute. `docker-compose.yml` names the image `collected:latest`, so `up -d` (no `--build`) uses the loaded one. If Docker Desktop's registry hang bites, the base image `node:24-bookworm-slim` is already cached locally for amd64 after the first successful build.
@@ -139,19 +140,23 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
    # a keypair only Actions uses
    ssh-keygen -t ed25519 -C github-actions-deploy -f ~/.ssh/gha_deploy -N ""
    # public half into the instance's ssh-keys metadata; the guest agent installs it. Don't edit authorized_keys by hand on GCP: the agent rewrites it.
-   cur=$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(metadata.items.filter(key:ssh-keys).extract(value).flatten())')
-   printf '%s\n%s\n' "$cur" "priyamkabra:$(cat ~/.ssh/gha_deploy.pub)" > /tmp/ssh-keys.txt
-   gcloud compute instances add-metadata collected-instance-2 --zone us-east1-c --metadata-from-file ssh-keys=/tmp/ssh-keys.txt
+   cur=$(gcloud compute instances describe <instance> --zone <zone> --format='value(metadata.items.filter(key:ssh-keys).extract(value).flatten())')
+   printf '%s\n%s\n' "$cur" "<user>:$(cat ~/.ssh/gha_deploy.pub)" > /tmp/ssh-keys.txt
+   gcloud compute instances add-metadata <instance> --zone <zone> --metadata-from-file ssh-keys=/tmp/ssh-keys.txt
    # what the workflow reads
    gh secret set DEPLOY_SSH_KEY < ~/.ssh/gha_deploy
-   gh secret set DEPLOY_HOST --body "$(gcloud compute instances describe collected-instance-2 --zone us-east1-c --format='value(networkInterfaces[0].accessConfigs[0].natIP)')"
-   gh secret set DEPLOY_USER --body priyamkabra
+   gh secret set DEPLOY_HOST --body "$(gcloud compute instances describe <instance> --zone <zone> --format='value(networkInterfaces[0].accessConfigs[0].natIP)')"
+   gh secret set DEPLOY_USER --body <user>
+   # the box's SSH host key, pinned by the workflow so nothing can impersonate the box
+   gh secret set DEPLOY_HOST_KEY --body "$(ssh-keyscan -t ed25519 <ip> 2>/dev/null)"
+   # the one repository allowed to run the deploy job; forks build but never deploy
+   gh variable set DEPLOY_REPO --body <you>/collected
    # these used to be repository *variables*; secrets are masked in the (public, once the repo is) workflow logs
    gh variable delete DEPLOY_HOST && gh variable delete DEPLOY_USER
    ```
    Then two things in the GitHub UI, once: **Settings → Environments → New environment** `production`, add yourself as a required reviewer (the `deploy` job waits for a click; the `build` job runs unattended and has no secrets), and **Settings → Branches → Add rule** for `main` (require a pull request, require the `ci` check). Anyone who can push to `main` deploys to the box, so `main` should not take direct pushes. Pull requests and other branches run `.github/workflows/ci.yml` (typecheck, tests, `pnpm audit`) with no secrets.
 
-   The box's host key is pinned in the workflow; if the box is ever rebuilt, replace it with the output of `ssh-keyscan -t ed25519 <ip>`. The external IP is ephemeral (no reserved address): stopping and starting the instance changes it, so update `DEPLOY_HOST` then, or reserve the current one with `gcloud compute addresses create collected-ip --addresses <ip> --region us-east1` (check GCP's current static-IPv4 pricing first; it is no longer free).
+   The box's host key is pinned through the `DEPLOY_HOST_KEY` secret; if the box is ever rebuilt, set it again from the output of `ssh-keyscan -t ed25519 <ip>`. The external IP is ephemeral (no reserved address): stopping and starting the instance changes it, so update `DEPLOY_HOST` then, or reserve the current one with `gcloud compute addresses create collected-ip --addresses <ip> --region us-east1` (check GCP's current static-IPv4 pricing first; it is no longer free).
 
    What the deploy does on the box (`scripts/deploy.sh`): runs `scripts/backup.sh`, loads the new image as `collected:candidate`, tags the running `collected:latest` as `collected:prev`, promotes the candidate to `latest`, `docker compose up -d`, waits up to three minutes for `/api/health`. If that fails it tags `prev` back to `latest`, restarts, and the workflow fails with `ROLLED BACK` in the log. A rollback does not undo a schema migration: the app writes `data/backups/pre-<migration>-<timestamp>.db` (the three newest are kept) before applying anything, and the `migrations applied` log line names it; see "Restore" in step 10. Manual rollback is the same two commands: `docker tag collected:prev collected:latest && docker compose up -d`. Step 7 by hand still works as a fallback (tag the image `collected:candidate` and run `sh scripts/deploy.sh /tmp/collected.tar.gz`). Never `--build` on the box.
 10. Backups. `scripts/backup.sh` writes a consistent copy of the database to `/srv/collected/backups/collected-YYYY-MM-DD.db.gz` (via `sqlite3 .backup`, or `VACUUM INTO` through the app container when `sqlite3` is not installed, which it is not on the box), copies `data/.secret_key` to `backups/secret_key` the first time, and deletes dumps older than 14 days. The deploy runs it before every restart; cron runs it nightly. On the box, `crontab -e`:
@@ -165,7 +170,7 @@ Same Google Cloud project as the OAuth client is fine; the free tier is per bill
 
 ### How the tunnel works
 
-Normally exposing a server means an open port, a public IP, and DNS pointing at it. Cloudflare Tunnel inverts that: `cloudflared` on the box opens a few **outbound** connections to Cloudflare's nearest data centers and keeps them alive. Your DNS record for `collected.priyamkabra.com` points at the tunnel, not at any IP. A browser request lands on Cloudflare's edge, TLS terminates there, Cloudflare Access checks the login, and the request travels down the already-open connection to `cloudflared`, which forwards it to `http://localhost:3000` on the box. The box never accepts an inbound connection, so it works behind NAT, dorm wifi, campus firewalls, or a friend's home router with no port forwarding, no static IP, and no certificates to manage. The connector proves it is yours with the tunnel token; Access adds the "only Priyam" layer and signs a JWT the app verifies on every request.
+Normally exposing a server means an open port, a public IP, and DNS pointing at it. Cloudflare Tunnel inverts that: `cloudflared` on the box opens a few **outbound** connections to Cloudflare's nearest data centers and keeps them alive. Your DNS record for `collected.example.com` points at the tunnel, not at any IP. A browser request lands on Cloudflare's edge, TLS terminates there, Cloudflare Access checks the login, and the request travels down the already-open connection to `cloudflared`, which forwards it to `http://localhost:3000` on the box. The box never accepts an inbound connection, so it works behind NAT, dorm wifi, campus firewalls, or a friend's home router with no port forwarding, no static IP, and no certificates to manage. The connector proves it is yours with the tunnel token; Access adds the "only you" layer and signs a JWT the app verifies on every request.
 
 **On a friend's box**: nothing on their network changes. They give you a user account with Docker access; you run the container and `cloudflared service install <your token>` there. The tunnel, hostname, and login policy all live in your Cloudflare account; `cloudflared` only forwards to the one local port you configured, so nothing else on their machine is reachable through it, and their IP never appears anywhere. If they already run `cloudflared` for their own domain, a second connector with your token runs alongside it. The trust question is the other direction: whoever has root on that box can read the `data/` volume (your Canvas cookie, tokens, key file).
 
@@ -179,7 +184,7 @@ Normally exposing a server means an open port, a public IP, and DNS pointing at 
    /srv/backups/
    ```
    Run **one** `cloudflared` on the host as a systemd service (`cloudflared service install <token>`), not one per project. It routes every hostname to a local port. Each project's compose stays independent.
-4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.priyamkabra.com`, the Cloudflare and Google values from below; leave `SECRET_KEY` empty so the key is created inside the `/data` volume), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
+4. `git clone` into `/srv/collected`, copy `.env.example` → `.env`, fill it (`AUTH_DISABLED=false`, `PUBLIC_URL=https://collected.example.com`, the Cloudflare and Google values from below; leave `SECRET_KEY` empty so the key is created inside the `/data` volume), then `docker compose up -d --build`. The image builds on the VPS itself; if you ever build on the Mac for an x86 VPS, add `--platform linux/amd64`.
 5. Host cron: nightly `cd /srv/collected && BACKUP_DIR=/srv/backups sh scripts/backup.sh` (see the GCP section, step 10, for what it does and how to restore). Enable Hetzner weekly snapshots if you want a second copy.
 
 Alternative if you'd rather not run a box: Fly.io with a 1 GB volume. Same Dockerfile, `fly launch`, and cloudflared runs as a second process. Slightly more magic, slightly less flexible for hosting other projects.
@@ -188,17 +193,23 @@ If you claim the GitHub Student Developer Pack, DigitalOcean credit makes a 2 GB
 
 ### Cloudflare
 1. `https://one.dash.cloudflare.com` → Networks → Tunnels → Create a tunnel → Cloudflared → name `vps`. Copy the install command / token. Run it on the VPS (step 3 above).
-2. In the tunnel → Public Hostname → Add: subdomain `collected`, domain `priyamkabra.com`, service `http://localhost:3000`. Cloudflare creates the DNS record. Repeat per project later.
-3. Access → Applications → Add an application → Self-hosted. Name `collected`, domain `collected.priyamkabra.com`, session duration 1 month. Policy: name `me`, action Allow, include Emails = your email. Save.
+2. In the tunnel → Public Hostname → Add: subdomain `collected`, domain `example.com`, service `http://localhost:3000`. Cloudflare creates the DNS record. Repeat per project later.
+3. Access → Applications → Add an application → Self-hosted. Name `collected`, domain `collected.example.com`, session duration 1 month. Policy: name `me`, action Allow, include Emails = your email. Save.
 4. Open the application → Overview → copy the **Application Audience (AUD) Tag** into `.env` as `CF_ACCESS_AUD`. Your team domain (`<team>.cloudflareaccess.com`) goes in `CF_ACCESS_TEAM_DOMAIN`. Restart the app.
 5. Login methods: one-time PIN to your email works with zero setup and is the fallback. To add Google: Settings → Authentication → Login methods → Add → Google. It needs an OAuth client; reuse the `collected` client from Phase 1 and add `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback` as another redirect URI. Then in the Access application, enable Google as an allowed identity provider.
 
 ### Google (prod)
 The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings → Sources → Google Calendar → Connect on the prod site once. The refresh token is stored in the prod DB, separate from local.
 
+## Sign-in (DECISIONS 044)
+
+The app signs people in itself with Google (identity only). With `GOOGLE_CLIENT_ID/SECRET` set and the `/api/auth/google/callback` redirect URI registered, the first person to sign in becomes the owner; nobody else can sign in unless `ALLOWED_EMAILS` lists them. Cloudflare Access (Phase 2) is optional on top: when `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` are set, the app also accepts Access's JWT, so an Access-fronted deployment keeps working unchanged. `AUTH_DISABLED=false` needs at least one of the two.
+
+The CLI signs in with a token: `collected login` opens Settings → Account, you create a token for the machine and paste it back. Behind Access the CLI still needs the service token to pass the edge (`collected auth service-token <id>`); the API token is what identifies it to the app, and it can do what the CLI needs and nothing destructive (no export, no credentials, no settings, no deletes). Revoke a lost machine's token in Settings → Account.
+
 ## Phase 3 — after deploy
 
-- Paste the Canvas cookie into prod: point the CLI at prod (`collected init https://collected.priyamkabra.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas`. Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
+- Paste the Canvas cookie into prod: point the CLI at prod (`collected init https://collected.example.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas`. Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
 - Enter Gradescope credentials and Todoist token in prod settings.
 - Fill in Gradescope course ids and `submits_via` per course.
 - Enable the Todoist push sync once the homework section looks right for a day.
@@ -213,7 +224,7 @@ The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings 
    pnpm install && pnpm --filter agent build
    alias collected="node $PWD/agent/dist/cli.js"                # put in ~/.zshrc; `collected help` lists every command
    alias collected-agent=collected
-   collected-agent init https://collected.priyamkabra.com
+   collected-agent init https://collected.example.com
    collected-agent auth service-token <client-id> <client-secret>
    ```
    Config lands in `~/.collected/agent.json` (mode 600). For a local server: `init http://localhost:3000` and `auth helper-key <LOCAL_HELPER_KEY>` (or nothing at all with `AUTH_DISABLED=true`).

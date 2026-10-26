@@ -2,6 +2,7 @@
   "name": "collected",
   "private": true,
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "engines": {
     "node": ">=22.12"
@@ -15,7 +16,7 @@
     "sync": "pnpm --filter server sync",
     "cli": "pnpm --filter server cli",
     "db:generate": "pnpm --filter server db:generate",
-    "agent": "pnpm --filter agent dev"
+    "agent": "pnpm --filter collected-cli dev"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

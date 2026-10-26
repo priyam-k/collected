@@ -12,6 +12,10 @@
 #   secret DEPLOY_HOST     the box's public IP (a secret so it is masked in logs, which are public once the repo is)
 #   secret DEPLOY_USER     the login user on the box (member of the docker group)
 #   secret DEPLOY_SSH_KEY  private half of a keypair whose public half is in the instance's ssh-keys metadata
+#   variable DEPLOY_REPO   "<you>/collected": the one repository allowed to run the deploy job (forks skip it)
+#   secret DEPLOY_HOST_KEY the box's SSH host key line, so nothing can impersonate it. Get it with:
+#                          ssh-keyscan -t ed25519 <host> 2>/dev/null   (one line: "<host> ssh-ed25519 AAAA...")
+#                          and set it again whenever the box is rebuilt.
 name: deploy
 
 on:
@@ -68,7 +72,9 @@ jobs:
 
   deploy:
     needs: build
-    if: github.repository == 'priyam-k/collected'
+    # Only the repository that owns the box deploys: set the repository variable DEPLOY_REPO to "<you>/collected"
+    # (Settings → Secrets and variables → Actions → Variables). A fork without it builds but never deploys.
+    if: github.repository == vars.DEPLOY_REPO
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -84,11 +90,13 @@ jobs:
       - name: SSH setup
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          # The box's host key, pinned so nothing can impersonate it. If the box is rebuilt: ssh-keyscan -t ed25519 <host>
-          echo "$HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBP7zLof6+vKOiihD5XFuXK2nvJFw5BbjgxwAUCUcNyD" > ~/.ssh/known_hosts
+          # The box's host key, pinned so nothing can impersonate it (secret DEPLOY_HOST_KEY, see the header).
+          [ -n "$HOST_KEY" ] || { echo "DEPLOY_HOST_KEY is not set: ssh-keyscan -t ed25519 <host>"; exit 1; }
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
           printf 'Host box\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' "$HOST" "$USER" > ~/.ssh/config
 
       - name: Upload image

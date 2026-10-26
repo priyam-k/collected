@@ -8,7 +8,7 @@ import { isInside } from './place.js';
  * target names; this file says where each one is on this machine.
  */
 export interface AgentConfig {
-  /** Where collected runs, e.g. https://collected.priyamkabra.com or http://localhost:3000 */
+  /** Where collected runs, e.g. https://collected.example.com or http://localhost:3000 */
   server: string;
   auth: {
     /** Cloudflare Access service token (prod). */

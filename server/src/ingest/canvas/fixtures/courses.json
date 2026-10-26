@@ -1,7 +1,7 @@
 [
   {
-    "id": 1408462,
-    "name": "CMSC422-0101: Introduction to Machine Learning-Fall 2026 nayeem",
+    "id": 2001001,
+    "name": "CMSC422-0101: Introduction to Machine Learning-Fall 2026 rivera",
     "course_code": "CMSC422",
     "workflow_state": "available",
     "enrollment_term_id": 4801,
@@ -33,8 +33,8 @@
     "apply_assignment_group_weights": true
   },
   {
-    "id": 1408293,
-    "name": "CMSC330-0101,0102,0103,0104,0105,0106,0107,0108: Organization of Programming Languages-Fall 2026 anwar",
+    "id": 2001002,
+    "name": "CMSC330-0101,0102,0103,0104,0105,0106,0107,0108: Organization of Programming Languages-Fall 2026 okafor",
     "course_code": "CMSC330",
     "sis_course_id": "202608-CMSC330-1VGM4WM",
     "workflow_state": "available",
@@ -69,7 +69,7 @@
     "default_view": "wiki"
   },
   {
-    "id": 1398424,
+    "id": 2001003,
     "name": "CMSC330 Spring 2026",
     "course_code": "CMSC330",
     "workflow_state": "available",
@@ -97,7 +97,7 @@
     "default_view": "modules"
   },
   {
-    "id": 1410485,
+    "id": 2001004,
     "name": "Math423 Linear Optimization",
     "course_code": "MATH423",
     "workflow_state": "available",
@@ -125,7 +125,7 @@
     "default_view": "modules"
   },
   {
-    "id": 1413849,
+    "id": 2001005,
     "name": "Computer Science Undergraduate Advising 2026-2027",
     "course_code": "CS Ugrad Adv 26-27",
     "workflow_state": "available",

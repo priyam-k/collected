@@ -1,16 +1,41 @@
 {
-  "name": "@collected/agent",
+  "name": "collected-cli",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
-  "description": "Laptop agent: downloads Canvas course files from collected into local folders, sorted by rules and a System 1 decision model (Jev).",
+  "description": "Command-line client for collected, the self-hosted student dashboard: read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<you>/collected.git",
+    "directory": "agent"
+  },
+  "homepage": "https://github.com/<you>/collected/tree/main/agent#readme",
+  "bugs": {
+    "url": "https://github.com/<you>/collected/issues"
+  },
+  "keywords": [
+    "collected",
+    "canvas",
+    "gradescope",
+    "student",
+    "cli"
+  ],
   "bin": {
     "collected": "./dist/cli.js",
     "collected-agent": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsup",
