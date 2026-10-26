@@ -96,9 +96,12 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           # The box's host key, pinned so nothing can impersonate it (secret DEPLOY_HOST_KEY, see the header).
           [ -n "$HOST_KEY" ] || { echo "DEPLOY_HOST_KEY is not set: ssh-keyscan -t ed25519 <host>"; exit 1; }
-          # Accept the full ssh-keyscan line or just "ssh-ed25519 AAAA..." (known_hosts needs the host in front).
-          case "$HOST_KEY" in "$HOST "*) line="$HOST_KEY" ;; *) line="$HOST $HOST_KEY" ;; esac
-          printf '%s\n' "$line" > ~/.ssh/known_hosts
+          # Accept the full ssh-keyscan line or just "ssh-ed25519 AAAA...": keep the last two fields (type, key) and
+          # pin them to HOST, so stray whitespace, a hostname that differs from HOST, or a copied comment cannot break it.
+          set -- $HOST_KEY; while [ $# -gt 2 ]; do shift; done
+          printf '%s %s %s\n' "$HOST" "$1" "$2" > ~/.ssh/known_hosts
+          ssh-keygen -F "$HOST" -f ~/.ssh/known_hosts >/dev/null || { echo "known_hosts has no entry for the host"; exit 1; }
+          echo "pinned host key fingerprint:"; ssh-keygen -lf ~/.ssh/known_hosts
           printf 'Host box\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' "$HOST" "$USER" > ~/.ssh/config
 
       - name: Upload image
