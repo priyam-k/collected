@@ -118,7 +118,9 @@ try {
         say('that does not look like a collected token (they start with clt_)');
         process.exit(1);
       }
-      const trial = { ...cfg, auth: { token } };
+      // Keep the edge credentials (Access service token or helper key): the Bearer token identifies the person to the app,
+      // the service token still gets the request past Cloudflare Access.
+      const trial = { ...cfg, auth: { ...cfg.auth, token } };
       const me = await new Api(trial).get<{ identity: string | null }>('/api/auth/me');
       if (!me.identity) {
         say('the server did not accept that token; nothing saved');

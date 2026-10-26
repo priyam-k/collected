@@ -55,7 +55,7 @@ export function AccountPage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle sub={me.data?.authDisabled ? 'Authentication is off (AUTH_DISABLED); this is local development.' : 'Signed in with Google.'}>Account</PageTitle>
+      <PageTitle sub={me.data?.authDisabled ? 'Authentication is off (AUTH_DISABLED); this is local development.' : me.data?.signIn.access && !me.data.user?.picture ? 'Signed in through Cloudflare Access.' : 'Signed in with Google.'}>Account</PageTitle>
 
       {user && (
         <div className="flex items-center gap-3 rounded-xl border border-line2 bg-card p-3">
@@ -63,12 +63,26 @@ export function AccountPage() {
           <div className="min-w-0">
             <div className="truncate font-medium">{user.name ?? user.email}</div>
             <div className="truncate text-[13px] text-sub">{user.email}</div>
+            {!user.picture && me.data?.signIn.google && !me.data.authDisabled && (
+              <a href="/api/auth/google/start?next=%2Fsettings%2Faccount" className="text-[13px] text-indigo hover:underline">
+                Add your Google name and photo
+              </a>
+            )}
           </div>
           {!me.data?.authDisabled && (
             <Button
               variant="outline"
               className="ml-auto"
-              onClick={() => logout.mutate(undefined, { onSuccess: () => navigate('/signin', { replace: true }), onError: (e) => toast.error(e.message) })}
+              onClick={() =>
+                logout.mutate(undefined, {
+                  onSuccess: () => {
+                    // Behind Cloudflare Access the Access cookie would sign the person straight back in; leave that too.
+                    if (me.data?.signIn.access) window.location.assign('/cdn-cgi/access/logout');
+                    else navigate('/signin', { replace: true });
+                  },
+                  onError: (e) => toast.error(e.message),
+                })
+              }
             >
               Sign out
             </Button>
