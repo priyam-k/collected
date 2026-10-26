@@ -19,7 +19,7 @@ function usage(): never {
   File sync (course files → folders on this machine)
 
     init <server-url>                         write ${configPath()} (device name, cache dir, model on); https, or http://localhost
-    auth service-token <id> [secret] | auth helper-key [key] | auth model [typesafe-api-key]
+    auth service-token <id> [secret] | auth helper-key [key] | auth token [token] | auth model [typesafe-api-key]
                                               leave the secret off to be prompted for it (or pipe it in): it then stays out of shell history
     login                                     sign in: opens Settings → Account on the server, then paste the token here
     files courses                             what the server wants synced and where it lands here

@@ -199,6 +199,8 @@ Course files land in folders on the laptop automatically, so local tools (Claude
 
 **On demand.** `collected-agent pull <canvas-file-id> --to <folder>` fetches one file whatever the rules say, with the same dedupe and atomic write, and the sync keeps it afterwards.
 
+**Sign-in (DECISIONS 044).** The app has its own login: Google for identity only (`openid email profile`), a `users` row per person, a `sessions` row per browser (the cookie `collected_session` carries the id, HttpOnly, SameSite=Lax, 30-day sliding expiry), and `api_tokens` for the CLI (`collected login`: the server mints `clt_…`, stores its SHA-256, shows the plaintext once; sent as `Authorization: Bearer`; identity `token:<name>`, scoped exactly like an Access service token). Who may sign in: `ALLOWED_EMAILS` when set, otherwise the first person to sign in claims the instance (`auth.owner` setting) and everyone else is refused. Cloudflare Access is optional: when `CF_ACCESS_*` are set its JWT is accepted too, so the current deployment keeps working with Access in front; a self-host without Cloudflare needs only the Google client. Calendar access stays a separate consent with its own callback. Identity resolution order: `AUTH_DISABLED` → dev; helper key; bearer token; session cookie; Access JWT.
+
 **Auth.** The agent authenticates through Cloudflare Access with a **service token** (`CF-Access-Client-Id/Secret` headers; Access mints a JWT whose identity is `common_name`, which the app accepts like an email). `LOCAL_HELPER_KEY` in `x-collected-key` opens exactly one route, the Canvas cookie drop-off; a service token can read, make the CLI's edits and run the file sync, but not import/export, credentials, settings, layout, OAuth, or delete (DECISIONS 043).
 
 ## The `collected` CLI
