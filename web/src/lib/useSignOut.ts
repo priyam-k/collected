@@ -41,12 +41,20 @@ export function useSignedOutToast(): void {
   useEffect(() => {
     try {
       if (sessionStorage.getItem(FLAG) == null) return;
-      sessionStorage.removeItem(FLAG);
     } catch {
       return;
     }
-    // A tick later: the Toaster is mounted after App (main.tsx) and only listens once its own effect has run.
-    const t = setTimeout(() => toast.success('Signed out'), 0);
+    // A tick later: the Toaster is mounted after App (main.tsx) and only listens once its own effect has run. The flag
+    // is cleared inside the tick, not before it: StrictMode (development) runs this effect twice, and clearing it
+    // before the first timer is cancelled would leave the second run with nothing to show.
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.removeItem(FLAG);
+      } catch {
+        // storage blocked; the flag was never set then
+      }
+      toast.success('Signed out');
+    }, 0);
     return () => clearTimeout(t);
   }, []);
 }

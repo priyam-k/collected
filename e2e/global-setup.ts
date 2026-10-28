@@ -71,7 +71,9 @@ export default async function globalSetup(): Promise<void> {
 
   if (!existsSync(path.join(WEB_DIST, 'index.html')) || process.env.E2E_REBUILD) {
     console.log('[e2e] building web/dist');
-    run(PNPM, ['--filter', 'web', 'exec', 'vite', 'build'], { cwd: ROOT, env, what: 'vite build' });
+    // A production bundle, like the one the Docker image serves: NODE_ENV=development (set above for the server) would
+    // make Vite ship React's development build, whose StrictMode double effects do not happen in production.
+    run(PNPM, ['--filter', 'web', 'exec', 'vite', 'build'], { cwd: ROOT, env: { ...env, NODE_ENV: 'production' }, what: 'vite build' });
   }
   console.log('[e2e] building agent/dist');
   run(PNPM, ['--filter', 'collected-cli', 'build'], { cwd: ROOT, env, what: 'agent build' });
