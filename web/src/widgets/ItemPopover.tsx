@@ -64,13 +64,17 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
   const manual = item.source === 'manual' ? (item.raw as unknown as ManualEventRaw) : null;
   const desc = item.description ? stripHtml(item.description) : '';
   const canComplete = !item.effectiveDone && !item.informational && (item.kind === 'assignment' || item.kind === 'task');
+  // mutateAsync, not mutate(…, { onSuccess }): marking done refetches the list, which can unmount this row before the
+  // mutation settles, and React Query drops per-call callbacks of an unmounted caller (the toast then never showed).
   const complete = () => {
-    const done = () => {
-      toast.success('Marked done');
-      onClose?.();
-    };
-    if (isTodoApp(item.source)) closeTask.mutate({ source: item.source, externalId: item.externalId }, { onSuccess: done, onError: (e) => toast.error(e.message) });
-    else setOverride.mutate({ id: item.id, done: true }, { onSuccess: done, onError: (e) => toast.error(e.message) });
+    const run = isTodoApp(item.source) ? closeTask.mutateAsync({ source: item.source, externalId: item.externalId }) : setOverride.mutateAsync({ id: item.id, done: true });
+    run.then(
+      () => {
+        toast.success('Marked done');
+        onClose?.();
+      },
+      (e: Error) => toast.error(e.message),
+    );
   };
   return (
     <div className="space-y-2 text-sm">
