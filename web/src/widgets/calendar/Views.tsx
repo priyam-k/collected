@@ -205,10 +205,12 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
                     <div key={i.id} className="absolute inset-x-1" style={{ top: top + 1, height }}>
                       <ItemPopover item={i} side="right" className="h-full">
                         <div
-                          className={cn('h-full overflow-hidden rounded-[10px] px-2 py-[7px] text-left leading-tight transition-[filter] hover:brightness-[1.04]', i.effectiveDone && 'opacity-60')}
+                          className={cn('relative h-full overflow-hidden rounded-[6px] py-[6px] pl-[13px] pr-2 text-left leading-tight transition-[filter] hover:brightness-[1.04]', i.effectiveDone && 'opacity-60')}
                           style={{ background: tint(color, 16), boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color ?? 'var(--ink)'} 22%, transparent)` }}
                           title={`${i.title} · ${timeLabel(i)}`}
                         >
+                          {/* the solid course-colour bar down the left edge */}
+                          <span aria-hidden className="absolute bottom-[4px] left-[4px] top-[4px] w-[3px] rounded-full" style={{ background: color ?? 'var(--ink-muted)' }} />
                           <div className="truncate text-xs font-semibold text-ink">{i.course?.code ?? i.title}</div>
                           {height > 34 && <div className="mt-0.5 truncate text-[11px] text-sub">{i.course ? `${format(s, 'h:mm')} – ${format(e, 'h:mm')}` : timeLabel(i)}</div>}
                           {height > 62 && i.course && <div className="mt-1 truncate text-[11px] text-sub">{i.title.replace(new RegExp(`^${i.course.code}\\s*\\(\\d+\\)\\s*-\\s*`), '')}{loc ? ` · ${loc}` : ''}</div>}
