@@ -13,6 +13,8 @@ export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 /** Operators of a self-hosted copy: change these two lines (see README.md in this folder). */
 export const OPERATOR_EMAIL = 'admin@priyamkabra.com';
 export const GOVERNING_JURISDICTION = 'the State of Maryland, United States';
+/** The sign-in page says hosting is invite-only and points to self-hosting and the waitlist. Set false on your own copy. */
+export const INVITE_ONLY_NOTICE = true;
 
 function ThemeButton() {
   const { theme, resolved, setTheme } = useTheme();

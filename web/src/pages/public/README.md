@@ -20,6 +20,7 @@ import { Landing, Privacy, Terms } from '@/pages/public';
 
 - `OPERATOR_EMAIL` in `PublicLayout.tsx` (the upstream hosted instance uses admin@priyamkabra.com; change it) is the hosted instance's contact address; it appears in the privacy policy, the terms, and the landing page's invite link.
 - `GOVERNING_JURISDICTION` in `PublicLayout.tsx`, used by `Terms.tsx`.
+- `INVITE_ONLY_NOTICE` in `PublicLayout.tsx`: the sign-in page's note that the hosted instance is invite-only, with links to self-hosting and the waitlist. Set it to `false` on your own instance.
 - `GITHUB_URL` in `PublicLayout.tsx` if the repository moves.
 - The product screenshot: the landing page loads `/docs/screenshots/dashboard.png`. Vite serves `web/public/` at the web root, so put the image at `web/public/docs/screenshots/dashboard.png` (a copy or symlink of `docs/screenshots/dashboard.png`). Until it exists the slot renders a placeholder grid rather than a broken image.
 - The "Last updated" dates are `PRIVACY_UPDATED` and `TERMS_UPDATED`; move them when the text changes.
