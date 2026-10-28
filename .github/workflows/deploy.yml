@@ -59,6 +59,10 @@ jobs:
           tags: collected:candidate
           # Write the image to a tarball instead of pushing to a registry.
           outputs: type=docker,dest=/tmp/collected.tar
+          # The running build reports this commit (/api/system/version) and the update check compares it with main.
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILT_AT=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
           # Layer cache in GitHub's cache store: unchanged stages (pnpm install, the web build) are reused next run.
           cache-from: type=gha
           cache-to: type=gha,mode=max
