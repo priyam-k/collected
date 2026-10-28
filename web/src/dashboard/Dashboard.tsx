@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { format } from 'date-fns';
-import { Check, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
+import { Check, CircleArrowUp, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, type Layouts, type Source } from '@collected/shared';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { useGlass, useLiquid } from '@/lib/liquid';
@@ -18,6 +19,7 @@ import { AddTray } from './AddTray';
 import { COLS, findFreeSlot, withConstraints } from './defaults';
 import { useEditMode } from './EditMode';
 import { Grid } from './Grid';
+import { UpdatePanel, buildLine, useUpdateState } from './UpdatePanel';
 import { useDashboardLayout } from './useLayout';
 import type { WidgetPreset } from '@/widgets/types';
 
@@ -140,6 +142,8 @@ export function Dashboard() {
   const [trayOpen, setTrayOpen] = useState(false);
   const summary = useSummary();
   const glass = useGlass<HTMLDivElement>();
+  const update = useUpdateState();
+  const [updateOpen, setUpdateOpen] = useState(false);
   useScrollbarWidth();
   // Scrolled down, the toolbar draws in to sync and the avatar; hovering it or tabbing into it opens it again.
   const scrolledAway = useScrollCollapse(!editMode);
@@ -189,11 +193,12 @@ export function Dashboard() {
   if (summary.broken) parts.push(<span className="font-medium text-caution">{summary.broken} {summary.broken === 1 ? 'source needs' : 'sources need'} attention</span>);
   else if (summary.last) parts.push(`synced ${relative(summary.last)}`);
   const eyebrow = [format(new Date(), 'EEEE'), summary.term].filter(Boolean).join(' · ');
+  const showPill = !editMode && update.nudge;
 
   return (
     <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 pb-28 pl-3 pr-[max(0px,calc(0.75rem-var(--sbw,0px)))] pt-4 sm:pb-10 sm:pl-4 sm:pr-[max(0px,calc(1rem-var(--sbw,0px)))]">
       {/* One row as tall as the toolbar pill beside it: the date, then the eyebrow over the summary. */}
-      <header className="flex h-11 items-center gap-3.5 px-1 sm:pr-[300px]">
+      <header className={cn('flex h-11 items-center gap-3.5 px-1', showPill ? 'sm:pr-[356px] lg:pr-[470px]' : 'sm:pr-[300px]')}>
         <h1 className="shrink-0 text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
           <p className="label !text-[10.5px] !leading-[13px]">{eyebrow}</p>
@@ -204,47 +209,72 @@ export function Dashboard() {
       </header>
 
       {/* Floating toolbar: liquid glass over the board. Top right on wide screens, bottom centre on phones. It is
-          fixed, so swapping its contents for edit mode never moves the board. */}
-      <div
-        ref={glass}
-        role="toolbar"
-        aria-label="Dashboard"
-        onPointerEnter={() => setReaching(true)}
-        onPointerLeave={() => setReaching(false)}
-        onFocus={() => setReaching(true)}
-        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setReaching(false)}
-        className={cn('glass fixed z-40 flex items-center p-1', squishClass) + " max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(calc(1rem-var(--sbw,0px)),calc((100vw-var(--sbw,0px)-1600px)/2+1rem-var(--sbw,0px)))] sm:top-4"}
-      >
-        {editMode ? (
-          <>
-            <span className="hidden pl-3.5 pr-2 text-[13px] text-sub lg:inline">Drag a title to move · Esc to finish</span>
-            <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setTrayOpen(true)}>
-              <Plus className="size-4" /> Add widget
-            </button>
-            <button className="h-9 rounded-full bg-brand px-4 text-[14px] font-[560] text-on-brand transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--brand)_88%,var(--ink))] active:scale-[.98]" onClick={leaveEdit}>
-              Done
-            </button>
-          </>
-        ) : (
-          <>
-            <Fold open={!collapsed}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button className="glass-btn mr-0.5 px-3.5 text-[14px] font-[560]" onClick={() => setEditMode(true)} aria-label="Edit layout">
-                    Edit
+          fixed, so swapping its contents for edit mode never moves the board. The update pill rides in the same row,
+          so it stays flush against the toolbar while the toolbar draws in and spreads out. */}
+      <Popover open={updateOpen && !!update.status} onOpenChange={setUpdateOpen}>
+        <PopoverAnchor asChild>
+          <div className="fixed z-40 flex w-max items-center gap-2 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(calc(1rem-var(--sbw,0px)),calc((100vw-var(--sbw,0px)-1600px)/2+1rem-var(--sbw,0px)))] sm:top-4">
+            {showPill && <UpdatePill matters={update.matters} collapsed={collapsed} />}
+            <div
+              ref={glass}
+              role="toolbar"
+              aria-label="Dashboard"
+              onPointerEnter={() => setReaching(true)}
+              onPointerLeave={() => setReaching(false)}
+              onFocus={() => setReaching(true)}
+              onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setReaching(false)}
+              className={cn('glass flex items-center p-1', squishClass)}
+            >
+              {editMode ? (
+                <>
+                  <span className="hidden pl-3.5 pr-2 text-[13px] text-sub lg:inline">Drag a title to move · Esc to finish</span>
+                  <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setTrayOpen(true)}>
+                    <Plus className="size-4" /> Add widget
                   </button>
-                </TooltipTrigger>
-                <TooltipContent>Rearrange widgets (e)</TooltipContent>
-              </Tooltip>
-            </Fold>
-            <RefreshAll />
-            <Fold open={!collapsed}>
-              <ThemeToggle />
-            </Fold>
-            <ProfileMenu />
-          </>
+                  <button className="h-9 rounded-full bg-brand px-4 text-[14px] font-[560] text-on-brand transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--brand)_88%,var(--ink))] active:scale-[.98]" onClick={leaveEdit}>
+                    Done
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Fold open={!collapsed}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="glass-btn mr-0.5 px-3.5 text-[14px] font-[560]" onClick={() => setEditMode(true)} aria-label="Edit layout">
+                          Edit
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Rearrange widgets (e)</TooltipContent>
+                    </Tooltip>
+                  </Fold>
+                  <RefreshAll />
+                  <Fold open={!collapsed}>
+                    <ThemeToggle />
+                  </Fold>
+                  <ProfileMenu buildLine={buildLine(update.current)} updateDot={update.available ? (update.nudge ? 'on' : 'quiet') : null} onOpenUpdate={() => setUpdateOpen(true)} />
+                </>
+              )}
+            </div>
+          </div>
+        </PopoverAnchor>
+        {update.status && (
+          <PopoverContent
+            align="end"
+            sideOffset={10}
+            collisionPadding={12}
+            aria-label="Update"
+            className="w-[min(25rem,calc(100vw-1.5rem))] max-h-[min(40rem,var(--radix-popover-content-available-height))] overflow-y-auto p-[18px] [scrollbar-width:thin]"
+          >
+            <UpdatePanel
+              status={update.status}
+              onDismiss={() => {
+                update.dismiss();
+                setUpdateOpen(false);
+              }}
+            />
+          </PopoverContent>
         )}
-      </div>
+      </Popover>
 
       {error ? (
         <p className="text-sm text-critical">Error: could not load layout: {error.message}</p>
@@ -277,6 +307,36 @@ export function Dashboard() {
       )}
 
       <AddTray open={trayOpen} onOpenChange={setTrayOpen} instances={instances} courses={coursesQ.data ?? []} onAdd={add} />
+    </div>
+  );
+}
+
+/**
+ * The quiet neighbour of the toolbar: liquid glass, the same height and radius, shown only while upstream main has
+ * commits this build lacks. It draws in to its icon with the toolbar, on the same spring.
+ */
+function UpdatePill({ matters, collapsed }: { matters: boolean; collapsed: boolean }) {
+  const glass = useGlass<HTMLDivElement>();
+  const label = matters ? 'Update available' : 'Minor update';
+  return (
+    <div ref={glass} className="glass flex items-center p-1 duration-500 animate-in fade-in-0 zoom-in-90 motion-reduce:animate-none">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button className="glass-btn gap-0 px-[9px]" aria-label={label}>
+              <span className="relative grid size-[18px] place-items-center">
+                <CircleArrowUp className={cn('size-[18px]', matters ? 'text-brand' : 'text-ink-muted')} strokeWidth={1.8} />
+              </span>
+              <span className="max-lg:hidden">
+                <Fold open={!collapsed}>
+                  <span className={cn('block whitespace-nowrap pl-1.5 pr-1 text-[14px] font-[560]', !matters && 'text-sub')}>{label}</span>
+                </Fold>
+              </span>
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{matters ? 'A newer version of collected is out' : 'Upstream changed, nothing in the app'}</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -354,7 +414,7 @@ function ThemeToggle() {
  * Your Google photo, or your initials on the accent (Settings → Layout). Opens your account, settings, the theme and
  * the accent. Not modal: a modal menu locks page scroll, which hides the scrollbar and nudges the layout.
  */
-function ProfileMenu() {
+function ProfileMenu({ buildLine, updateDot, onOpenUpdate }: { buildLine: string | null; updateDot: 'on' | 'quiet' | null; onOpenUpdate: () => void }) {
   const settings = useSettings();
   const me = useMe();
   const user = me.data?.user ?? null;
@@ -363,6 +423,9 @@ function ProfileMenu() {
   const { theme, setTheme, accent, setAccent } = useTheme();
   const liquid = useLiquid();
   const initials = String(settings.data?.['profile.initials'] ?? '').trim().slice(0, 3).toUpperCase();
+  // Opening the update popover from here waits for the menu to finish closing, or the focus it hands back to the
+  // avatar would count as a click outside the popover and shut it again.
+  const openUpdateAfterClose = useRef(false);
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -374,7 +437,17 @@ function ProfileMenu() {
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={10} className="w-64">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={10}
+        className="w-64"
+        onCloseAutoFocus={(e) => {
+          if (!openUpdateAfterClose.current) return;
+          openUpdateAfterClose.current = false;
+          e.preventDefault();
+          onOpenUpdate();
+        }}
+      >
         {user && (
           <>
             <DropdownMenuItem asChild>
@@ -422,6 +495,19 @@ function ProfileMenu() {
               </button>
             ))}
           </div>
+          {buildLine &&
+            (updateDot ? (
+              <DropdownMenuItem
+                onSelect={() => (openUpdateAfterClose.current = true)}
+                aria-label={`${buildLine}, update available`}
+                className="-mx-1.5 mt-2.5 gap-1.5 rounded-[8px] px-1.5 py-1 font-mono text-[11px] leading-4 text-sub focus:text-ink"
+              >
+                <span className="truncate">{buildLine}</span>
+                <span aria-hidden className={cn('size-[5px] shrink-0 rounded-full', updateDot === 'on' ? 'bg-brand' : 'bg-line-strong')} />
+              </DropdownMenuItem>
+            ) : (
+              <p className="mt-2.5 truncate font-mono text-[11px] leading-4 text-sub">{buildLine}</p>
+            ))}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -19,6 +19,8 @@ import type {
   Layouts,
   Source,
   SourceId,
+  SystemVersion,
+  UpdateStatus,
   WidgetInstance,
 } from '@collected/shared';
 import { api } from './api';
@@ -42,6 +44,8 @@ export const qk = {
   courseGrades: (id: string) => ['grades', id] as const,
   fileSync: (id: string) => ['file-sync', id] as const,
   fileSyncDevices: ['file-sync', 'devices'] as const,
+  systemVersion: ['system', 'version'] as const,
+  updateStatus: ['system', 'update'] as const,
 };
 
 /** Widgets poll on this cadence while the tab is visible. */
@@ -546,5 +550,24 @@ export function useImportCanvasCourses() {
       await qc.invalidateQueries({ queryKey: qk.widgets });
       await qc.invalidateQueries({ queryKey: ['onboarding', 'canvas'] });
     },
+  });
+}
+
+/** The running build. Fixed for the life of the process, so it is never refetched. */
+export function useSystemVersion() {
+  return useQuery({ queryKey: qk.systemVersion, queryFn: () => api<SystemVersion>('/system/version'), staleTime: Infinity, retry: false });
+}
+
+/** How far this build is behind upstream main. The server caches the comparison; the page asks again every 10 minutes. */
+export function useUpdateStatus() {
+  return useQuery({ queryKey: qk.updateStatus, queryFn: () => api<UpdateStatus>('/system/update'), staleTime: 10 * 60_000, refetchInterval: 10 * 60_000, refetchIntervalInBackground: false, retry: false });
+}
+
+/** Ask the server to compare with upstream now instead of waiting for its schedule. */
+export function useCheckForUpdates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<UpdateStatus>('/system/update/check', { method: 'POST', json: {} }),
+    onSuccess: (status) => qc.setQueryData(qk.updateStatus, status),
   });
 }

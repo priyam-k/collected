@@ -9,6 +9,7 @@ import { JobsPage } from './JobsPage';
 import { LayoutPage } from './LayoutPage';
 import { DataPage } from './DataPage';
 import { AccountPage } from './AccountPage';
+import { AboutPage } from './AboutPage';
 
 // Absolute paths on purpose: inside a `/settings/*` splat route, a relative `to` resolves against the current
 // URL, so clicking tabs used to build /settings/sources/courses/todoist.
@@ -20,6 +21,7 @@ const NAV = [
   { to: 'layout', label: 'Layout' },
   { to: 'data', label: 'Export / import' },
   { to: 'account', label: 'Account' },
+  { to: 'about', label: 'About' },
 ];
 
 export function SettingsLayout() {
@@ -58,6 +60,7 @@ export function SettingsLayout() {
             <Route path="layout" element={<LayoutPage />} />
             <Route path="data" element={<DataPage />} />
             <Route path="account" element={<AccountPage />} />
+            <Route path="about" element={<AboutPage />} />
           </Routes>
         </div>
       </div>

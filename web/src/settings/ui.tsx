@@ -18,3 +18,16 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
     </label>
   );
 }
+
+/** A titled block on a settings page. */
+export function Section({ title, sub, children }: { title: ReactNode; sub?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-base font-semibold tracking-[-0.01em]">{title}</h3>
+        {sub && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-sub">{sub}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
