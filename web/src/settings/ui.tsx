@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
@@ -29,5 +30,24 @@ export function Section({ title, sub, children }: { title: ReactNode; sub?: Reac
       </div>
       {children}
     </section>
+  );
+}
+
+export type StatusTone = 'ok' | 'warn' | 'bad' | 'off';
+
+/** A small status chip: a dot and a word. `ok` reads positive, `off` is an outline. */
+export function StatusTag({ tone, children, className, title }: { tone: StatusTone; children: ReactNode; className?: string; title?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-[22px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium',
+        tone === 'off' ? 'text-sub shadow-[inset_0_0_0_1px_var(--line-strong)]' : 'bg-well text-ink',
+        className,
+      )}
+      title={title}
+    >
+      <span aria-hidden className={cn('size-1.5 rounded-full', tone === 'ok' && 'bg-positive', tone === 'warn' && 'bg-caution', tone === 'bad' && 'bg-critical', tone === 'off' && 'bg-ink-muted')} />
+      {children}
+    </span>
   );
 }

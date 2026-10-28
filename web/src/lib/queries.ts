@@ -442,7 +442,62 @@ export function useTodoistPush() {
   return useMutation({
     mutationFn: (opts: { dryRun?: boolean; force?: boolean }) =>
       api<{ plan: PushPlan; done?: Record<string, number>; errors?: { error: string }[] }>(`/todoist/push?${opts.dryRun ? 'dryRun=1' : ''}${opts.force ? '&force=1' : ''}`, { method: 'POST' }),
-    onSettled: (_d, _e, v) => (v.dryRun ? Promise.resolve() : inv(['items'], qk.sources, qk.settings)),
+    onSettled: (_d, _e, v) => (v.dryRun ? Promise.resolve() : inv(['items'], qk.sources, qk.settings, ['todo', 'status'])),
+  });
+}
+
+// TODO(shared): move these to @collected/shared once the server branch lands them there.
+export interface TodoAppStatus {
+  connected: boolean;
+  enabled: boolean;
+  pushEnabled: boolean;
+  lastPushAt: string | null;
+}
+export interface TodoStatus {
+  todoist: TodoAppStatus;
+  gtasks: TodoAppStatus;
+  defaultApp: TodoApp | null;
+}
+export interface GtasksPushConfig {
+  enabled: boolean;
+  listName: string;
+  titlePrefix: 'course' | 'none';
+}
+export const GTASKS_PUSH_DEFAULTS: GtasksPushConfig = { enabled: false, listName: 'School', titlePrefix: 'course' };
+export type PushResult = { plan: PushPlan; done?: Record<string, number>; errors?: { error: string }[] };
+
+/** Connection and push state of both to-do apps. Null when the server doesn't have the route yet. */
+export function useTodoStatus() {
+  return useQuery({
+    queryKey: ['todo', 'status'] as const,
+    queryFn: () => api<TodoStatus>('/todo/status').catch(() => null),
+    ...poll,
+  });
+}
+
+/** `gtasks.push`. Null when the route is missing, so the page can fall back to the raw setting. */
+export function useGtasksConfig() {
+  return useQuery({
+    queryKey: ['gtasks', 'config'] as const,
+    queryFn: () => api<GtasksPushConfig>('/gtasks/config').catch(() => null),
+    staleTime: 60_000,
+  });
+}
+
+export function useSaveGtasksConfig() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (cfg: GtasksPushConfig) => api<GtasksPushConfig>('/gtasks/config', { method: 'PUT', json: cfg }),
+    onSettled: () => inv(['gtasks', 'config'], ['todo', 'status'], qk.settings),
+  });
+}
+
+export function useGtasksPush() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (opts: { dryRun?: boolean; force?: boolean }) =>
+      api<PushResult>(`/gtasks/push?${opts.dryRun ? 'dryRun=1' : ''}${opts.force ? '&force=1' : ''}`, { method: 'POST' }),
+    onSettled: (_d, _e, v) => (v.dryRun ? Promise.resolve() : inv(['items'], qk.sources, qk.settings, ['todo', 'status'])),
   });
 }
 

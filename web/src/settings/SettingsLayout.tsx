@@ -4,7 +4,7 @@ import { useLiquid } from '@/lib/liquid';
 import { cn } from '@/lib/utils';
 import { SourcesPage } from './SourcesPage';
 import { CoursesPage } from './CoursesPage';
-import { TodoistPage } from './TodoistPage';
+import { TodoSyncPage } from './TodoSyncPage';
 import { JobsPage } from './JobsPage';
 import { LayoutPage } from './LayoutPage';
 import { DataPage } from './DataPage';
@@ -16,7 +16,7 @@ import { AboutPage } from './AboutPage';
 const NAV = [
   { to: 'sources', label: 'Sources' },
   { to: 'courses', label: 'Courses' },
-  { to: 'todoist', label: 'Todoist sync' },
+  { to: 'todo', label: 'To-do sync' },
   { to: 'jobs', label: 'Jobs' },
   { to: 'layout', label: 'Layout' },
   { to: 'data', label: 'Export / import' },
@@ -55,7 +55,8 @@ export function SettingsLayout() {
             <Route index element={<Navigate to="/settings/sources" replace />} />
             <Route path="sources" element={<SourcesPage />} />
             <Route path="courses" element={<CoursesPage />} />
-            <Route path="todoist" element={<TodoistPage />} />
+            <Route path="todo" element={<TodoSyncPage />} />
+            <Route path="todoist" element={<Navigate to="/settings/todo" replace />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="layout" element={<LayoutPage />} />
             <Route path="data" element={<DataPage />} />
