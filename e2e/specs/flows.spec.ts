@@ -125,6 +125,30 @@ test.describe('flows', () => {
     await expect(cats).toHaveValue('Software, AI/ML');
   });
 
+  test('settings: Escape goes back to the dashboard, unless a dialog or a field has it', async ({ page }) => {
+    await page.goto('/settings/courses');
+    await expect(page.getByRole('heading', { name: 'Courses' })).toBeVisible();
+
+    // An open dialog takes the first Escape and settings stay.
+    await page.getByRole('button', { name: 'Edit CMSC422' }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit CMSC422' });
+    await expect(editor).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(editor).toBeHidden();
+    await expect(page).toHaveURL(/\/settings\/courses$/);
+
+    // So does a field being typed in.
+    await page.goto('/settings/jobs');
+    await page.getByLabel(/^Terms/).focus();
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/\/settings\/jobs$/);
+
+    await page.getByRole('heading', { name: 'Jobs' }).click(); // focus off the field
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
+  });
+
   test('settings: an unknown section falls back to Sources', async ({ page }) => {
     await page.goto('/settings/nonsense');
     await expect(page).toHaveURL(/\/settings\/sources$/);

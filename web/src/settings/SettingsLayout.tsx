@@ -1,4 +1,5 @@
-import { NavLink, Route, Routes, Navigate, Link } from 'react-router';
+import { useEffect } from 'react';
+import { NavLink, Route, Routes, Navigate, Link, useNavigate } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useLiquid } from '@/lib/liquid';
@@ -28,10 +29,25 @@ const NAV = [
 export function SettingsLayout() {
   // NavLink marks the current section with aria-current="page"; the thumb springs to it.
   const liquid = useLiquid<HTMLElement>();
+  const navigate = useNavigate();
+  // Escape closes settings, like the dashboard's own panes. Not while typing, and not when the key belongs to an
+  // open dialog, menu or popover: Radix closes those on the same keydown, but their DOM is still there when it
+  // reaches the window, so the check below sees them.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (document.querySelector('[role=dialog], [role=alertdialog], [role=menu], [role=listbox], [data-radix-popper-content-wrapper]')) return;
+      navigate('/');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate]);
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       <header className="mb-8">
-        <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
+        <Link to="/" title="Back to the dashboard (Esc)" aria-keyshortcuts="Escape" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
           <ArrowLeft className="size-4" strokeWidth={1.7} /> Dashboard
         </Link>
         {/* Logo is inline-flex; a block of its own keeps it off the back link's line. */}
