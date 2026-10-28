@@ -1,6 +1,7 @@
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router';
 import { AsciiOrb } from '@/components/AsciiOrb';
 import { isSignedIn, useMe } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { INVITE_ONLY_NOTICE, OPERATOR_EMAIL } from '@/pages/public/PublicLayout';
 
 const ERRORS: Record<string, string> = {
@@ -35,9 +36,10 @@ export function SignInPage() {
   const next = from && from.startsWith('/') ? from : '/';
   const google = me.data?.signIn.google ?? true;
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 py-10">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
+      {/* The notice sits behind the card like the next card in a stack: its lower part tucks under the card. */}
       {INVITE_ONLY_NOTICE && (
-        <p className="flex w-full max-w-sm gap-2.5 rounded-[18px] bg-brand-soft px-4 py-3 text-[13.5px] leading-relaxed text-brand-ink">
+        <p className="flex w-full max-w-sm gap-2.5 rounded-[22px] bg-brand-soft px-5 pb-11 pt-3.5 text-[13.5px] leading-relaxed text-brand-ink">
           <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-brand" />
           <span>
             Hosted collected is an invite-only beta for now. In the meantime,{' '}
@@ -52,7 +54,7 @@ export function SignInPage() {
           </span>
         </p>
       )}
-      <div className="surface w-full max-w-sm p-7">
+      <div className={cn('surface relative z-10 w-full max-w-sm p-7', INVITE_ONLY_NOTICE && '-mt-7')}>
         <div className="grid h-[132px] place-items-center overflow-hidden rounded-[16px] bg-well">
           <AsciiOrb className="h-[120px] w-[200px]" />
         </div>
