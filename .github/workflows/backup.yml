@@ -30,7 +30,9 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           test -n "$HOST_KEY" || { echo "secret DEPLOY_HOST_KEY is not set (ssh-keyscan -t ed25519 <host>)" >&2; exit 1; }
-          echo "$HOST $HOST_KEY" > ~/.ssh/known_hosts
+          # Same rule as deploy.yml: keep the last two fields (type, key) and pin them to HOST.
+          set -- $HOST_KEY; while [ $# -gt 2 ]; do shift; done
+          printf '%s %s %s\n' "$HOST" "$1" "$2" > ~/.ssh/known_hosts
           printf 'Host box\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n' "$HOST" "$USER" > ~/.ssh/config
       - name: Fetch newest dump
         run: |
