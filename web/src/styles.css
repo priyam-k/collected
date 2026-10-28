@@ -479,6 +479,8 @@
   touch-action: none;
 }
 .widget-resize:hover, .react-grid-item.resizing .widget-resize { opacity: 1; color: var(--brand); }
+/* RGL can keep a handle mounted while resizing is off; the grip belongs to edit mode only. */
+.react-grid-layout:not(.is-editing) .widget-resize { display: none; }
 .react-grid-item.cssTransforms {
   transition-timing-function: var(--ease);
 }

@@ -58,7 +58,7 @@ export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, o
           containerPadding={[0, 0]}
           compactor={verticalCompactor}
           dragConfig={{ enabled: editMode, handle: '.widget-drag-handle', threshold: 3 }}
-          resizeConfig={{ enabled: editMode, handles: ['se'], handleComponent: resizeHandle }}
+          resizeConfig={{ enabled: editMode, handles: editMode ? ['se'] : [], handleComponent: editMode ? resizeHandle : undefined }}
           onLayoutChange={handleLayoutChange}
           onBreakpointChange={(bp) => {
             setBp(bp as Breakpoint);
