@@ -1,6 +1,6 @@
 # collected — backend overview
 
-_The landscape, readable in ten minutes. For every route, column, and raw key, see REFERENCE.md. For why, see DECISIONS.md._
+_The landscape, readable in ten minutes. For why, see DECISIONS.md._
 
 ## The mental model
 
