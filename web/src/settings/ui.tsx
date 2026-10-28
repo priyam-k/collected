@@ -12,7 +12,7 @@ export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactN
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <label className="block space-y-1.5">
+    <label className="block min-w-0 space-y-1.5">
       <span className="text-[13px] font-medium text-sub">{label}</span>
       {children}
       {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}

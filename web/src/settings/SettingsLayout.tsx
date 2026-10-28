@@ -34,7 +34,10 @@ export function SettingsLayout() {
         <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
           <ArrowLeft className="size-4" strokeWidth={1.7} /> Dashboard
         </Link>
-        <Logo size={15} className="mt-7" />
+        {/* Logo is inline-flex; a block of its own keeps it off the back link's line. */}
+        <div className="mt-7 flex">
+          <Logo size={15} />
+        </div>
         <h1 className="mt-1.5 text-[38px] font-[620] leading-[1.05] tracking-[-0.03em] sm:text-[44px]">Settings</h1>
       </header>
       <div className="grid gap-6 md:grid-cols-[12rem_1fr] md:gap-8">
@@ -63,6 +66,8 @@ export function SettingsLayout() {
             <Route path="data" element={<DataPage />} />
             <Route path="account" element={<AccountPage />} />
             <Route path="about" element={<AboutPage />} />
+            {/* A mistyped section would otherwise render an empty card. */}
+            <Route path="*" element={<Navigate to="/settings/sources" replace />} />
           </Routes>
         </div>
       </div>

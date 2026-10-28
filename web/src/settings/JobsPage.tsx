@@ -15,29 +15,48 @@ export function JobsPage() {
   const save = useSaveSetting();
   const inv = useInvalidate();
   const [f, setF] = useState<JobsFilter | null>(null);
+  // The comma lists are edited as raw text and parsed on blur and save. Parsing on every keystroke
+  // ate the comma and the trailing space, so a second entry or "Summer 2027" could not be typed.
+  const [cats, setCats] = useState('');
+  const [terms, setTerms] = useState('');
+  const [recomputing, setRecomputing] = useState(false);
 
   useEffect(() => {
-    if (settings.data && !f) setF(jobsFilterSchema.parse(settings.data['jobs.filter'] ?? {}));
+    if (settings.data && !f) {
+      const parsed = jobsFilterSchema.parse(settings.data['jobs.filter'] ?? {});
+      setF(parsed);
+      setCats(list(parsed.categories_include));
+      setTerms(list(parsed.terms_include));
+    }
   }, [settings.data, f]);
 
   if (!f) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const submit = () => {
+    const value: JobsFilter = { ...f, categories_include: parseList(cats), terms_include: parseList(terms) };
+    setF(value);
+    setCats(list(value.categories_include));
+    setTerms(list(value.terms_include));
     save.mutate(
-      { key: 'jobs.filter', value: f },
+      { key: 'jobs.filter', value },
       {
         onSuccess: async () => {
-          const r = await api<{ total: number; matched: number }>('/jobs/recompute', { method: 'POST' });
-          await inv(['jobs']);
-          toast.success(`Saved. ${r.matched} of ${r.total} stored listings match.`);
+          setRecomputing(true);
+          try {
+            const r = await api<{ total: number; matched: number }>('/jobs/recompute', { method: 'POST' });
+            await inv(['jobs']);
+            toast.success(`Saved. ${r.matched} of ${r.total} stored listings match.`);
+          } catch (e) {
+            toast.error(`Saved, but re-running the filter failed: ${e instanceof Error ? e.message : String(e)}`);
+          } finally {
+            setRecomputing(false);
+          }
         },
         onError: (e) => toast.error(e.message),
       },
     );
   };
-
-  const list = (v: string[]) => v.join(', ');
-  const parseList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
+  const busy = save.isPending || recomputing;
 
   return (
     <div className="space-y-4">
@@ -47,7 +66,7 @@ export function JobsPage() {
           {stats.data.total} stored · {stats.data.active} active · <span className="font-medium text-foreground">{stats.data.matched} match</span> · {stats.data.unseen} unseen
         </p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={f.require_active} onCheckedChange={(v) => setF({ ...f, require_active: v })} /> Only active listings
         </label>
@@ -55,10 +74,10 @@ export function JobsPage() {
           <Switch checked={f.require_visible} onCheckedChange={(v) => setF({ ...f, require_visible: v })} /> Only visible listings
         </label>
         <Field label="Categories (comma-separated, empty = any)" hint="Simplify categories: Software, AI/ML/Data, Hardware, Product, Quant">
-          <Input value={list(f.categories_include)} onChange={(e) => setF({ ...f, categories_include: parseList(e.target.value) })} />
+          <Input value={cats} onChange={(e) => setCats(e.target.value)} onBlur={() => setCats(list(parseList(cats)))} />
         </Field>
         <Field label="Terms (comma-separated, empty = any)" hint="e.g. Summer 2027">
-          <Input value={list(f.terms_include)} onChange={(e) => setF({ ...f, terms_include: parseList(e.target.value) })} />
+          <Input value={terms} onChange={(e) => setTerms(e.target.value)} onBlur={() => setTerms(list(parseList(terms)))} />
         </Field>
         <div className="sm:col-span-2">
           <Field label="Title must match">
@@ -77,7 +96,10 @@ export function JobsPage() {
           <Textarea rows={2} className="font-mono text-xs" value={f.locations_exclude} onChange={(e) => setF({ ...f, locations_exclude: e.target.value })} />
         </Field>
       </div>
-      <Button onClick={submit} disabled={save.isPending}>Save and re-run filter</Button>
+      <Button onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Save and re-run filter'}</Button>
     </div>
   );
 }
+
+const list = (v: string[]) => v.join(', ');
+const parseList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);

@@ -92,7 +92,7 @@ export function AboutPage() {
           <h2 className="text-[30px] leading-none">
             <Wordmark />
           </h2>
-          <p className="mt-2 text-[14.5px] leading-snug text-sub">Canvas, Gradescope, Google Calendar, Todoist and a job feed in one dashboard you host yourself.</p>
+          <p className="mt-2 text-[14.5px] leading-snug text-sub">Canvas, Gradescope, Google Calendar, Todoist, Google Tasks and a job feed in one dashboard you host yourself.</p>
         </div>
       </div>
 
@@ -158,7 +158,7 @@ export function AboutPage() {
             </a>
           </p>
           <p className="max-w-2xl text-[13px] text-sub">
-            Thanks to Canvas, Gradescope, Google Calendar and Todoist, which do the real work. Their names are trademarks of their respective owners; collected is not affiliated with or endorsed by any of them.
+            Thanks to Canvas, Gradescope, Google Calendar, Google Tasks and Todoist, which do the real work. Their names are trademarks of their respective owners; collected is not affiliated with or endorsed by any of them.
           </p>
         </div>
       </Section>

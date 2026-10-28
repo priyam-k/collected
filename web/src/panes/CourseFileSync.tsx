@@ -50,7 +50,7 @@ function ConfigEditor({ course, initial, onDone }: { course: Course; initial: Fi
           <span className="text-xs font-semibold text-sub">Folders</span>
           <Button size="xs" variant="ghost" onClick={() => setCfg({ ...cfg, targets: [...cfg.targets, { name: '', description: '' }] })}><Plus className="size-3" /> Folder</Button>
         </div>
-        <p className="mb-2 text-xs text-ter">A name and one line saying what belongs there. The agent on your laptop maps each name to a real folder (<code className="font-mono">collected-agent link</code>). The description is what the model reads.</p>
+        <p className="mb-2 text-xs text-ter">A name and one line saying what belongs there. The <code className="font-mono">collected</code> command on your laptop maps each name to a real folder (<code className="font-mono">collected files link</code>). The description is what the model reads.</p>
         <div className="space-y-1.5">
           {cfg.targets.map((t, i) => (
             <div key={i} className="grid grid-cols-[7rem_1fr_auto] items-center gap-1.5">
@@ -68,27 +68,33 @@ function ConfigEditor({ course, initial, onDone }: { course: Course; initial: Fi
           <Button size="xs" variant="ghost" onClick={() => setCfg({ ...cfg, rules: [...cfg.rules, { target: names[0] ?? FILE_SYNC_SKIP, folder: '', module: null, name: null, largerThanMb: null, linked: null, flatten: false }] })}><Plus className="size-3" /> Rule</Button>
         </div>
         <p className="mb-2 text-xs text-ter">Checked first, in order. Regexes, case-insensitive; every filled field must match (MB = larger than). Files keep their Canvas subfolders under the target; tick “flat” when the top Canvas folder is the category itself (Lecture Notes → slides). Files no rule matches go to the fallback below.</p>
-        <div className="space-y-1.5">
+        {/* Each rule is two rows: what to match, then the conditions and where it goes. One eight-column row was
+            unusable in a 330-580px pane. The container query widens the match row once the pane has room. */}
+        <div className="@container space-y-1.5">
           {cfg.rules.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_3.25rem_auto_auto_auto_auto] items-center gap-1.5">
-              <Input className="h-7 font-mono text-xs" placeholder="Canvas folder, e.g. ^/Lectures" value={r.folder ?? ''} onChange={(e) => setRule(i, { folder: e.target.value })} />
-              <Input className="h-7 font-mono text-xs" placeholder="module, e.g. ^Week" value={r.module ?? ''} onChange={(e) => setRule(i, { module: e.target.value })} />
-              <Input className="h-7 font-mono text-xs" placeholder="filename, e.g. \.zip$" value={r.name ?? ''} onChange={(e) => setRule(i, { name: e.target.value })} />
-              <Input className="h-7 px-1.5 text-xs" type="number" min={0} step={1} placeholder="MB >" title="Only files larger than this many MB" value={r.largerThanMb ?? ''} onChange={(e) => setRule(i, { largerThanMb: e.target.value === '' ? null : Number(e.target.value) })} />
-              <select className={selectCls} value={r.linked ?? ''} onChange={(e) => setRule(i, { linked: e.target.value || null })} aria-label="Only files linked from" title="Only files that are not in the Files tab and were found through a link">
-                <option value="">any file</option>
-                <option value="^syllabus$">linked in syllabus</option>
-                <option value="^assignment$">linked in an assignment</option>
-                <option value="^announcement$">linked in an announcement</option>
-              </select>
-              <label className="flex items-center gap-1 text-[11px] text-ter" title="Drop the top-level Canvas folder: /Lecture Notes/x.pdf lands directly in the target">
-                <input type="checkbox" checked={!!r.flatten} onChange={(e) => setRule(i, { flatten: e.target.checked })} /> flat
-              </label>
-              <select className={selectCls} value={r.target} onChange={(e) => setRule(i, { target: e.target.value })} aria-label="Rule target">
-                {names.map((n) => <option key={n} value={n}>→ {n}</option>)}
-                <option value={FILE_SYNC_SKIP}>→ skip</option>
-              </select>
-              <Button size="icon-xs" variant="ghost" aria-label="Remove rule" onClick={() => setCfg({ ...cfg, rules: cfg.rules.filter((_, j) => j !== i) })}><Trash2 className="size-3" /></Button>
+            <div key={i} className="space-y-1.5 rounded-xl bg-surface/60 p-1.5">
+              <div className="grid grid-cols-1 gap-1.5 @md:grid-cols-3">
+                <Input className="h-7 font-mono text-xs" aria-label="Canvas folder" placeholder="Canvas folder, e.g. ^/Lectures" value={r.folder ?? ''} onChange={(e) => setRule(i, { folder: e.target.value })} />
+                <Input className="h-7 font-mono text-xs" aria-label="Module" placeholder="module, e.g. ^Week" value={r.module ?? ''} onChange={(e) => setRule(i, { module: e.target.value })} />
+                <Input className="h-7 font-mono text-xs" aria-label="Filename" placeholder="filename, e.g. \.zip$" value={r.name ?? ''} onChange={(e) => setRule(i, { name: e.target.value })} />
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Input className="h-7 w-16 px-1.5 text-xs" type="number" min={0} step={1} placeholder="MB >" aria-label="Larger than (MB)" title="Only files larger than this many MB" value={r.largerThanMb ?? ''} onChange={(e) => setRule(i, { largerThanMb: e.target.value === '' ? null : Number(e.target.value) })} />
+                <select className={selectCls} value={r.linked ?? ''} onChange={(e) => setRule(i, { linked: e.target.value || null })} aria-label="Only files linked from" title="Only files that are not in the Files tab and were found through a link">
+                  <option value="">any file</option>
+                  <option value="^syllabus$">linked in syllabus</option>
+                  <option value="^assignment$">linked in an assignment</option>
+                  <option value="^announcement$">linked in an announcement</option>
+                </select>
+                <label className="flex items-center gap-1 text-[11px] text-ter" title="Drop the top-level Canvas folder: /Lecture Notes/x.pdf lands directly in the target">
+                  <input type="checkbox" checked={!!r.flatten} onChange={(e) => setRule(i, { flatten: e.target.checked })} /> flat
+                </label>
+                <select className={cn(selectCls, 'ml-auto')} value={r.target} onChange={(e) => setRule(i, { target: e.target.value })} aria-label="Rule target">
+                  {names.map((n) => <option key={n} value={n}>→ {n}</option>)}
+                  <option value={FILE_SYNC_SKIP}>→ skip</option>
+                </select>
+                <Button size="icon-xs" variant="ghost" aria-label="Remove rule" onClick={() => setCfg({ ...cfg, rules: cfg.rules.filter((_, j) => j !== i) })}><Trash2 className="size-3" /></Button>
+              </div>
             </div>
           ))}
           {!cfg.rules.length && <p className="text-xs text-ter">No rules yet. Add one, or let the model sort everything and turn its answers into rules from the list below.</p>}
@@ -148,7 +154,16 @@ function DecisionRow({ f, course, config, last }: { f: FileSyncFileView; course:
         </div>
       </div>
       {d?.decidedBy === 'model' && f.folderPath && d.target !== FILE_SYNC_UNSORTED && (
-        <button className="shrink-0 text-[11px] text-brand-ink opacity-0 hover:underline group-hover/row:opacity-100" onClick={makeRule} title={`Always send ${f.folderPath} to ${d.target}`}>make rule</button>
+        // Hover reveals it on a mouse; keyboard focus and touch screens (no hover) always see it.
+        <button
+          type="button"
+          className="shrink-0 text-[11px] text-brand-ink opacity-0 transition-opacity hover:underline focus-visible:opacity-100 disabled:opacity-50 group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
+          onClick={makeRule}
+          disabled={save.isPending}
+          title={`Always send ${f.folderPath} to ${d.target}`}
+        >
+          make rule
+        </button>
       )}
       <select
         className={cn(selectCls, 'shrink-0 font-medium', d ? targetTone(d.target) : 'text-ter', f.manualTarget && 'ring-1 ring-brand/40')}
@@ -220,7 +235,7 @@ export function CourseFileSync({ course }: { course: Course }) {
     <section className="flex flex-col gap-2.5">
       {header}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[13px]">
-        <Switch size="sm" checked={cfg.enabled} onCheckedChange={toggle} aria-label="Sync this course's files" />
+        <Switch size="sm" checked={cfg.enabled} disabled={save.isPending} onCheckedChange={toggle} aria-label="Sync this course's files" />
         <span className={cn('min-w-0 truncate', !cfg.enabled && 'text-ter')}>
           {cfg.enabled ? 'Syncing' : 'Paused'} · {cfg.targets.map((t) => t.name).join(', ')} · {cfg.rules.length} rule{cfg.rules.length === 1 ? '' : 's'} · unmatched: {cfg.fallback === 'model' ? `model ≥ ${cfg.threshold}` : cfg.fallback}
         </span>
@@ -243,7 +258,10 @@ export function CourseFileSync({ course }: { course: Course }) {
             </div>
           ))
         ) : (
-          <span>No laptop has synced this course yet. On the laptop: <code className="font-mono">collected-agent link {course.id} ~/school/{course.code.toLowerCase()}</code> then <code className="font-mono">collected-agent sync --dry-run</code>.</span>
+          <span>
+            No laptop has synced this course yet. On the laptop: <code className="font-mono break-all">collected files link {course.id} ~/school/{course.code.toLowerCase()}</code>, then{' '}
+            <code className="font-mono">collected sync --dry-run</code> to see where files would land, and <code className="font-mono">collected sync</code> to place them.
+          </span>
         )}
       </div>
 

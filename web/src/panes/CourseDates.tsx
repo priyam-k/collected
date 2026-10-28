@@ -19,10 +19,15 @@ const KIND_TONE: Record<CourseEventKind, string> = {
   exam: 'bg-critical',
   final: 'bg-critical',
   quiz: 'bg-caution',
-  cancelled: 'bg-muted-foreground',
+  cancelled: 'bg-ink-muted',
   virtual: 'bg-brand',
-  other: 'bg-positive',
+  // A hollow dot: "other" has no status, so it takes no status colour.
+  other: 'shadow-[inset_0_0_0_1.5px_var(--ink-muted)]',
 };
+/** Row controls show on hover, and always for keyboard focus and on touch screens, which have no hover. */
+const REVEAL = 'opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
+/** Class days: a faint wash of the accent over the day tile. */
+const CLASS_DAY = 'bg-[color-mix(in_srgb,var(--brand)_8%,var(--surface))]';
 const EXAMISH = /\b(exam|midterm|final|quiz|test)\b/i;
 const today = () => format(new Date(), 'yyyy-MM-dd');
 
@@ -85,9 +90,12 @@ function EventForm({ course, draft, onChange, onSaved, onCancel }: { course: Cou
             key={k}
             type="button"
             onClick={() => (k === 'cancelled' || k === 'virtual' ? pickSession(k, sessions[0]) : onChange({ ...draft, kind: k, meetingKind: null }))}
-            className={cn('flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs', draft.kind === k ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}
+            aria-pressed={draft.kind === k}
+            className={cn('chip !h-7 !px-2.5 !text-xs', draft.kind === k && 'chip-on')}
           >
-            <span className={cn('inline-block size-1.5 rounded-full', KIND_TONE[k])} /> {COURSE_EVENT_LABELS[k]}
+            <span className="inline-flex items-center gap-1.5">
+              <span className={cn('inline-block size-1.5 rounded-full', KIND_TONE[k])} /> {COURSE_EVENT_LABELS[k]}
+            </span>
           </button>
         ))}
       </div>
@@ -95,7 +103,7 @@ function EventForm({ course, draft, onChange, onSaved, onCancel }: { course: Cou
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <span className="text-muted-foreground">Which session:</span>
           {sessions.map((s) => (
-            <button key={s.kind + s.meeting.start} type="button" onClick={() => pickSession(draft.kind, s)} className={cn('rounded-md border px-2 py-0.5', draft.meetingKind === s.kind && draft.start === s.meeting.start ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-secondary/60')}>
+            <button key={s.kind + s.meeting.start} type="button" onClick={() => pickSession(draft.kind, s)} aria-pressed={draft.meetingKind === s.kind && draft.start === s.meeting.start} className={cn('chip !h-7 !px-2.5 !text-xs', draft.meetingKind === s.kind && draft.start === s.meeting.start && 'chip-on')}>
               {meetingLabel(s.kind)} {fmtTime(s.meeting.start)}
             </button>
           ))}
@@ -149,6 +157,7 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
   const manualQ = useItems({ kind: ['event'], source: ['manual'], course: course.id, limit: 300, includeDone: true });
   const canvasQ = useItems({ kind: ['event'], source: ['canvas'], course: course.id, limit: 100, includeDone: true });
   const del = useDeleteManualEvent();
+  const recreate = useCreateManualEvent();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState<string>(today());
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -176,12 +185,34 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
   const past = dated.filter((r) => r.date < today());
 
   const startDraft = (d: Partial<Draft> = {}) => setDraft({ ...blankDraft(course.id, selected), ...d });
+  /**
+   * Picking a day never throws away an open form. A new date moves to the picked day; one being edited
+   * keeps its date (moving it is the Date field's job) and only the selection changes.
+   */
+  const pickDay = (key: string) => {
+    setSelected(key);
+    setDraft((d) => (d && !d.externalId ? { ...d, date: key } : d));
+  };
   const editRow = (it: EffectiveItem) => {
     const raw = manualRaw(it)!;
     setSelected(raw.date);
     setDraft({ externalId: it.externalId, courseId: course.id, kind: raw.eventKind, title: it.title, date: raw.date, start: raw.start, end: raw.end, location: raw.location, note: raw.note, meetingKind: raw.meetingKind, allDay: !raw.start });
   };
-  const remove = (it: EffectiveItem) => del.mutate(it.externalId, { onSuccess: () => toast.success('Removed'), onError: (e) => toast.error(e.message) });
+  /** Removes at once with Undo on the toast; everything the date needs to be made again is in the row. */
+  const remove = (it: EffectiveItem) => {
+    const raw = manualRaw(it)!;
+    const body: ManualEventInput = { courseId: course.id, kind: raw.eventKind, title: it.title, date: raw.date, start: raw.start, end: raw.end, location: raw.location, note: raw.note, meetingKind: raw.meetingKind };
+    del.mutate(it.externalId, {
+      onSuccess: () =>
+        toast.success(`Removed ${it.title}`, {
+          action: {
+            label: 'Undo',
+            onClick: () => recreate.mutate(body, { onSuccess: () => toast.success(`Restored ${it.title}`), onError: (e) => toast.error(`Could not restore: ${e.message}`) }),
+          },
+        }),
+      onError: (e) => toast.error(`Could not remove ${it.title}: ${e.message}`),
+    });
+  };
 
   const dotFor = (r: (typeof dated)[number]): string => (r.from === 'manual' ? KIND_TONE[manualRaw(r.item)!.eventKind] : r.from === 'assignment' ? 'bg-critical/70' : 'bg-primary/60');
   const kindOf = (r: (typeof dated)[number]): string => (r.from === 'manual' ? COURSE_EVENT_LABELS[manualRaw(r.item)!.eventKind] : r.from === 'assignment' ? 'Canvas assignment' : 'Canvas event');
@@ -190,7 +221,7 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
     const raw = manualRaw(r.item);
     const when = raw ? (raw.start ? `${fmtTime(raw.start)}${raw.end ? `–${fmtTime(raw.end)}` : ''}` : 'all day') : r.item.allDay ? 'all day' : r.item.startsAt ? format(new Date(r.item.kind === 'event' ? r.item.startsAt : r.item.dueAt!), 'h:mm a') : r.item.dueAt ? `due ${format(new Date(r.item.dueAt), 'h:mm a')}` : '';
     return (
-      <li className="group/row flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-accent/60">
+      <li className="group/row flex items-center gap-2 rounded-lg px-1 py-1 text-sm hover:bg-well/60">
         <span className={cn('inline-block size-2 shrink-0 rounded-full', dotFor(r))} title={kindOf(r)} />
         <span className="w-16 shrink-0 text-xs text-muted-foreground">{friendlyDate(`${r.date}T12:00:00`)}</span>
         <ItemPopover item={r.item} className="min-w-0 flex-1">
@@ -201,12 +232,12 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
           </span>
         </ItemPopover>
         {raw ? (
-          <span className="flex shrink-0 items-center opacity-0 group-hover/row:opacity-100">
-            <Button size="icon-xs" variant="ghost" aria-label="Edit" onClick={() => editRow(r.item)}><Pencil className="size-3" /></Button>
-            <Button size="icon-xs" variant="ghost" aria-label="Remove" className="text-destructive" onClick={() => remove(r.item)}><Trash2 className="size-3" /></Button>
+          <span className={cn('flex shrink-0 items-center', REVEAL)}>
+            <Button size="icon-xs" variant="ghost" aria-label={`Edit ${r.item.title}`} onClick={() => editRow(r.item)}><Pencil className="size-3" /></Button>
+            <Button size="icon-xs" variant="ghost" aria-label={`Remove ${r.item.title}`} className="text-critical hover:text-critical" disabled={del.isPending && del.variables === r.item.externalId} onClick={() => remove(r.item)}><Trash2 className="size-3" /></Button>
           </span>
         ) : (
-          safeHref(r.item.url) && <a href={safeHref(r.item.url)} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100" title="Open in Canvas"><ExternalLink className="size-3" /></a>
+          safeHref(r.item.url) && <a href={safeHref(r.item.url)} target="_blank" rel="noreferrer" className={cn('shrink-0 text-muted-foreground', REVEAL)} title="Open in Canvas" aria-label={`Open ${r.item.title} in Canvas`}><ExternalLink className="size-3" /></a>
         )}
       </li>
     );
@@ -214,23 +245,16 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-line">
-        <div className="flex items-center gap-1 border-b px-2 py-1">
+      <div className="rounded-2xl bg-well/60 p-1.5">
+        <div className="flex items-center gap-1 px-0.5 pb-1">
           <Button size="icon-xs" variant="ghost" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}><ChevronLeft className="size-3.5" /></Button>
           <Button size="icon-xs" variant="ghost" aria-label="Next month" onClick={() => setMonth((m) => addMonths(m, 1))}><ChevronRight className="size-3.5" /></Button>
-          <span className="ml-1 text-sm font-medium">{format(month, 'MMMM yyyy')}</span>
-          <span className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-primary/15 ring-1 ring-primary/30" /> class day</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-critical" /> exam</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-caution" /> quiz</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-muted-foreground" /> cancelled</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-brand" /> virtual</span>
-          </span>
+          <span className="ml-1 text-sm font-[560]">{format(month, 'MMMM yyyy')}</span>
         </div>
-        <div className="grid grid-cols-7 text-center text-[10px] text-muted-foreground">
+        <div className="grid grid-cols-7 text-center text-[10px] text-sub">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={i} className="py-1">{d}</div>)}
         </div>
-        <div className="grid grid-cols-7 gap-px border-t bg-border">
+        <div className="grid grid-cols-7 gap-0.5">
           {days.map((d) => {
             const key = format(d, 'yyyy-MM-dd');
             const inMonth = isSameMonth(d, month);
@@ -241,13 +265,14 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
               <button
                 key={key}
                 type="button"
-                onClick={() => { setSelected(key); setDraft(null); }}
+                onClick={() => pickDay(key)}
+                aria-pressed={key === selected}
                 className={cn(
-                  'flex h-12 flex-col items-start bg-card p-1 text-left text-xs hover:bg-accent/60',
-                  !inMonth && 'text-muted-foreground/50',
-                  isClass && inMonth && !cancelled && 'bg-primary/[0.06]',
-                  isSameDay(d, new Date()) && 'font-semibold text-primary',
-                  key === selected && 'ring-2 ring-inset ring-ring',
+                  'flex h-12 flex-col items-start rounded-lg bg-surface p-1 text-left text-xs transition-colors hover:bg-surface-hover',
+                  !inMonth && 'bg-transparent text-ter/60',
+                  isClass && inMonth && !cancelled && CLASS_DAY,
+                  isSameDay(d, new Date()) && 'font-semibold text-brand-ink',
+                  key === selected && 'shadow-[inset_0_0_0_2px_var(--brand)]',
                 )}
               >
                 <span className={cn('tabular-nums', cancelled && 'line-through decoration-muted-foreground')}>{format(d, 'd')}</span>
@@ -258,13 +283,22 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
             );
           })}
         </div>
+        {/* Under the grid and wrapping: beside the month it pushed the header past a narrow pane. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pt-2 text-[10.5px] text-sub">
+          <span className="inline-flex items-center gap-1"><span className={cn('inline-block size-2.5 rounded-[3px]', CLASS_DAY)} /> class day</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-critical" /> exam</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-caution" /> quiz</span>
+          <span className="inline-flex items-center gap-1"><span className={cn('inline-block size-1.5 rounded-full', KIND_TONE.cancelled)} /> cancelled</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-brand" /> virtual</span>
+          <span className="inline-flex items-center gap-1"><span className={cn('inline-block size-1.5 rounded-full', KIND_TONE.other)} /> other</span>
+        </div>
       </div>
 
       <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
           <h4 className="text-sm font-medium">{friendlyDate(`${selected}T12:00:00`)}, {format(selectedDate, 'MMM d')}</h4>
           {sessions.map((s) => (
-            <span key={s.kind + s.meeting.start} className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            <span key={s.kind + s.meeting.start} className="rounded-full bg-well px-2 py-0.5 text-[11px] text-sub">
               {meetingLabel(s.kind)} {fmtTime(s.meeting.start)}–{fmtTime(s.meeting.end)}
             </span>
           ))}
@@ -284,12 +318,12 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
       </section>
 
       <section className="space-y-1">
-        <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Upcoming · {upcoming.length}</h4>
+        <h4 className="label">Upcoming · {upcoming.length}</h4>
         {upcoming.length ? <ul className="-mx-1">{upcoming.map((r) => <Row key={r.item.id} r={r} />)}</ul> : <p className="px-1 text-xs text-muted-foreground/80">No dates yet. Exams, quizzes, and finals go here; assignments whose title says exam or quiz show up automatically.</p>}
       </section>
       {past.length > 0 && (
         <details className="space-y-1">
-          <summary className="cursor-pointer text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Past · {past.length}</summary>
+          <summary className="label cursor-pointer">Past · {past.length}</summary>
           <ul className="-mx-1 opacity-70">{past.slice().reverse().map((r) => <Row key={r.item.id} r={r} />)}</ul>
         </details>
       )}

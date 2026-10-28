@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, TODO_APPS, resolveTodoApp, todoistPushConfigSchema, type TodoApp, type TodoistPushConfig } from '@collected/shared';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -25,7 +24,8 @@ import {
 import type { GtasksPushConfig, TodoAppStatus } from '@collected/shared';
 import { Field, PageTitle, Section, StatusTag } from './ui';
 
-const OP_VARIANT = { create: 'default', update: 'secondary', close: 'outline', delete: 'destructive' } as const;
+/** A push op as a word in a neutral chip; only delete, the one that removes something, reads critical. */
+const OP_TONE: Record<string, string> = { create: 'text-ink', update: 'text-ink', close: 'text-sub', delete: 'text-critical' };
 
 type AppState = TodoAppStatus & { hasConfig: boolean; known: boolean };
 
@@ -82,7 +82,7 @@ function ConnectedTag({ connected }: { connected: boolean }) {
 function AppsSection({ apps }: { apps: Record<TodoApp, AppState> }) {
   return (
     <Section title="Apps">
-      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+      <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-well/60">
         {TODO_APPS.map((a) => {
           const s = apps[a];
           const facts = [s.enabled ? 'enabled' : 'disabled', ...(s.known ? [s.pushEnabled ? 'push on' : 'push off', s.lastPushAt ? `last push ${relative(s.lastPushAt)}` : 'never pushed'] : [])];
@@ -175,7 +175,7 @@ function AppSection({ app, state, children }: { app: TodoApp; state: AppState; c
 /** The rows a push would apply. */
 export function PushPreview({ plan, appLabel }: { plan: PushPlan; appLabel: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line">
+    <div className="overflow-hidden rounded-2xl bg-well/60">
       {plan.ops.length === 0 ? (
         <p className="p-3 text-sm text-muted-foreground">Nothing to do. {appLabel} already matches.</p>
       ) : (
@@ -183,7 +183,7 @@ export function PushPreview({ plan, appLabel }: { plan: PushPlan; appLabel: stri
           <tbody>
             {plan.ops.map((o) => (
               <tr key={o.itemId + o.op} className="border-b border-line last:border-0">
-                <td className="w-20 px-3 py-1.5 align-top"><Badge variant={OP_VARIANT[o.op]}>{o.op}</Badge></td>
+                <td className="w-20 px-3 py-1.5 align-top"><span className={cn('inline-flex h-5 items-center rounded-full bg-well px-2 text-xs font-[560]', OP_TONE[o.op] ?? 'text-ink')}>{o.op}</span></td>
                 <td className="px-3 py-1.5">
                   {o.title}
                   <span className="block text-xs text-muted-foreground sm:hidden">{o.reason}</span>
@@ -262,7 +262,7 @@ function TodoistSettings({ hasConfig }: { hasConfig: boolean }) {
   };
   const saveSections = () => {
     const list = sectionsText.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-    save.mutate({ key: 'todo.sections', value: list }, { onSuccess: () => toast.success('Sections saved') });
+    save.mutate({ key: 'todo.sections', value: list }, { onSuccess: () => toast.success('Sections saved'), onError: (e) => toast.error(e.message) });
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLiquid } from '@/lib/liquid';
@@ -51,10 +52,18 @@ export function LayoutPage() {
   const widgets = useWidgets();
   const upsert = useUpsertWidget();
   const inv = useInvalidate();
+  const [showing, setShowing] = useState(false);
   const showAll = async () => {
-    for (const w of widgets.data ?? []) if (w.hidden && w.type !== 'class') await upsert.mutateAsync({ id: w.id, hidden: false });
-    await inv(['widgets']);
-    toast.success('Core widgets shown');
+    setShowing(true);
+    try {
+      for (const w of widgets.data ?? []) if (w.hidden && w.type !== 'class') await upsert.mutateAsync({ id: w.id, hidden: false });
+      await inv(['widgets']);
+      toast.success('Core widgets shown');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setShowing(false);
+    }
   };
   const settings = useSettings();
   const saveSetting = useSaveSetting();
@@ -66,15 +75,29 @@ export function LayoutPage() {
       <Appearance />
       <h3 className="label !mb-4">Board</h3>
       <div className="max-w-xs">
-        <Field label="Header initials" hint="Shown in the avatar at the top right of the dashboard.">
+        <Field label="Header initials" hint="Shown in the avatar at the top right of the dashboard when there is no Google photo.">
           <Input value={initials} maxLength={3} placeholder="PK" onChange={(e) => setInitials(e.target.value)} onBlur={() => saveSetting.mutate({ key: 'profile.initials', value: initials.trim() }, { onError: (e) => toast.error(e.message) })} />
         </Field>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => reset.mutate(undefined, { onSuccess: () => toast.success('Layout reset to defaults') })}>
-          Reset positions
-        </Button>
-        <Button variant="outline" onClick={showAll}>Show all core widgets</Button>
+        <ConfirmDialog
+          trigger={(open) => (
+            <Button variant="outline" onClick={open} disabled={reset.isPending}>
+              Reset positions
+            </Button>
+          )}
+          title="Reset widget positions?"
+          description="Every widget goes back to its default place and size on desktop, tablet and phone. Hidden widgets stay hidden."
+          confirmLabel="Reset"
+          destructive
+          onConfirm={() =>
+            reset.mutateAsync(undefined, {
+              onSuccess: () => toast.success('Layout reset to defaults'),
+              onError: (e) => toast.error(`Reset failed: ${e.message}`),
+            })
+          }
+        />
+        <Button variant="outline" onClick={showAll} disabled={showing}>{showing ? 'Showing…' : 'Show all core widgets'}</Button>
       </div>
       <p className="text-xs text-muted-foreground">
         Tip: press <kbd className="rounded-md bg-well px-1.5 py-px text-[12px] font-semibold">e</kbd> on the dashboard to enter edit mode.

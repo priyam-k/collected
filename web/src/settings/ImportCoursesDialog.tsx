@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useCanvasEnrollments, useImportCanvasCourses } from '@/lib/queries';
+import { ROLE_LABEL } from './labels';
 
 /** Pick courses from Canvas enrollments instead of typing them; term and code are editable before import. */
 export function ImportCoursesDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -43,7 +44,8 @@ export function ImportCoursesDialog({ open, onOpenChange }: { open: boolean; onO
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      {/* sm: prefix on purpose: a bare max-w-2xl replaces the base phone width (edge to edge) and loses to sm:max-w-lg. */}
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import from Canvas</DialogTitle>
           <DialogDescription>Your active enrollments. Untick what you do not want; fix the term or code if Canvas named it oddly.</DialogDescription>
@@ -61,14 +63,14 @@ export function ImportCoursesDialog({ open, onOpenChange }: { open: boolean; onO
               const e = edits[r.canvasCourseId] ?? { term: r.suggested.term, code: r.suggested.code, section: r.suggested.section ?? '' };
               const tracked = !!r.trackedAs;
               return (
-                <label key={r.canvasCourseId} className="grid grid-cols-[auto_1fr] items-start gap-3 rounded-lg border border-line2 px-3 py-2 has-[:checked]:bg-well">
+                <label key={r.canvasCourseId} className="grid grid-cols-[auto_1fr] items-start gap-3 rounded-2xl bg-well/40 px-3 py-2.5 has-[:checked]:bg-well">
                   <Checkbox className="mt-1" checked={!!picked[r.canvasCourseId] && !tracked} disabled={tracked} onCheckedChange={(v) => setPicked((p) => ({ ...p, [r.canvasCourseId]: v === true }))} />
                   <div className="min-w-0 space-y-1.5">
                     <div className="truncate text-[13px] font-medium" title={r.name}>
                       {r.name}
                     </div>
                     <div className="text-xs text-sub">
-                      {r.termName ?? 'no term'} · {r.role}
+                      {r.termName ?? 'no term'} · {ROLE_LABEL[r.role] ?? r.role}
                       {tracked && ` · already tracked as ${r.trackedAs}`}
                     </div>
                     {!tracked && (

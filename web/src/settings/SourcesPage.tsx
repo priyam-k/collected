@@ -1,29 +1,31 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, type Source, type SourceId } from '@collected/shared';
-import { Badge } from '@/components/ui/badge';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useClearSourceConfig, useDisconnectTodoist, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { friendlyDate } from '@/lib/time';
-import { useSearchParams } from 'react-router';
-import { useEffect } from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { relative } from '@/lib/time';
-import { safeHref } from '@/lib/url';
 import { safeColor } from '@/lib/color';
-import { Field, PageTitle } from './ui';
+import { friendlyDate, relative } from '@/lib/time';
+import { safeHref } from '@/lib/url';
+import { Field, PageTitle, StatusTag, type StatusTone } from './ui';
 
-const STATUS_VARIANT: Record<Source['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  connected: 'default',
-  needs_auth: 'destructive',
-  error: 'destructive',
-  disconnected: 'outline',
+/** Source status as a dot and a word; the raw ids ("needs_auth") are not for people. */
+const STATUS: Record<Source['status'], { tone: StatusTone; word: string }> = {
+  connected: { tone: 'ok', word: 'Connected' },
+  needs_auth: { tone: 'bad', word: 'Needs sign-in' },
+  error: { tone: 'bad', word: 'Error' },
+  disconnected: { tone: 'off', word: 'Not connected' },
 };
+
+/** Code inside running text: a well chip, never literal backticks. */
+const Cmd = ({ children }: { children: React.ReactNode }) => <code className="rounded-md bg-well px-1 py-px font-mono text-[11.5px] text-ink">{children}</code>;
 
 export function SourcesPage() {
   const q = useSources();
@@ -33,32 +35,36 @@ export function SourcesPage() {
   return (
     <div className="space-y-4">
       <PageTitle sub="Credentials are encrypted at rest and never shown again after saving.">Sources</PageTitle>
-      <SourceCard source={by.canvas} description="Session cookie from your browser. The iCal feed is the fallback when the cookie expires.">
+      <SourceCard source={by.canvas} description="Signs in with your Canvas session cookie. The calendar feed keeps due dates coming while the cookie has expired.">
         <CanvasForm source={by.canvas} ical={by.canvas_ical} />
       </SourceCard>
-      <SourceCard source={by.gradescope} description="Native email + password login (not the school SSO button).">
+      <SourceCard source={by.gradescope} description="Your Gradescope email and password. Use a Gradescope password, not the school sign-in button.">
         <GradescopeForm source={by.gradescope} />
       </SourceCard>
-      <SourceCard source={by.gcal} description="OAuth connect with read and write access. Needs GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env (artifacts/SETUP.md, Phase 1).">
+      <SourceCard source={by.gcal} description="Connect your Google account to see your calendars and add events to them.">
         <GoogleForm source={by.gcal} />
       </SourceCard>
-      <SourceCard source={by.gcal_ical} description="Read-only, no Google Cloud project needed: one calendar's secret iCal address, refreshed every 30 minutes.">
+      <SourceCard source={by.gcal_ical} description="Read-only and no Google sign-in: one calendar's secret iCal address, refreshed every 30 minutes.">
         <GcalIcalForm source={by.gcal_ical} />
       </SourceCard>
       <SourceCard
         source={by.todoist}
-        description={by.todoist.oauthAvailable ? 'Sign in with Todoist, or paste an API token from Todoist → Settings → Integrations → Developer.' : 'API token from Todoist → Settings → Integrations → Developer. Set TODOIST_CLIENT_ID / TODOIST_CLIENT_SECRET in .env to connect with a click instead (docs/self-host.md).'}
+        description={by.todoist.oauthAvailable ? 'Sign in with Todoist, or paste an API token from Todoist → Settings → Integrations → Developer.' : 'Paste an API token from Todoist → Settings → Integrations → Developer. (Sign in with Todoist appears once this server has a Todoist app set up.)'}
       >
         <TodoistForm source={by.todoist} />
       </SourceCard>
       {by.gtasks && (
-        <SourceCard source={by.gtasks} description="OAuth connect with the tasks scope, asked for separately from Calendar. Same Google client; the Tasks API must be enabled in the Google Cloud project (artifacts/SETUP.md).">
+        <SourceCard source={by.gtasks} description="Connected separately from Calendar, and asks only for your tasks. (The server's Google project needs the Tasks API turned on.)">
           <GTasksForm source={by.gtasks} />
         </SourceCard>
       )}
-      <SourceCard source={by.jobs} description="Public listings from SimplifyJobs on GitHub. No credentials.">
+      <SourceCard source={by.jobs} description="Public internship listings from SimplifyJobs on GitHub. Nothing to sign in to.">
         <p className="text-sm text-muted-foreground">
-          Runs hourly. Tune what counts as a match under <span className="font-medium">Jobs</span>.
+          Runs hourly. Tune what counts as a match under{' '}
+          <Link to="/settings/jobs" className="font-medium text-brand-ink underline-offset-[3px] hover:underline">
+            Jobs
+          </Link>
+          .
         </p>
       </SourceCard>
     </div>
@@ -68,12 +74,13 @@ export function SourcesPage() {
 function SourceCard({ source, description, children }: { source: Source; description: string; children: React.ReactNode }) {
   const setEnabled = useSetSourceEnabled();
   const sync = useSyncSource();
+  const status = STATUS[source.status];
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="mr-auto">{SOURCE_LABELS[source.id]}</CardTitle>
-          <Badge variant={STATUS_VARIANT[source.status]}>{source.status.replace('_', ' ')}</Badge>
+          <StatusTag tone={status.tone}>{status.word}</StatusTag>
           <span className="text-xs text-muted-foreground">synced {relative(source.lastSuccessAt)}</span>
           <Button
             size="sm"
@@ -83,19 +90,29 @@ function SourceCard({ source, description, children }: { source: Source; descrip
               sync.mutate(source.id, {
                 onSuccess: (r) => {
                   const o = r.outcome as { ok: boolean; error?: string; skipped?: string };
-                  o.ok ? toast.success('Synced') : toast.error(o.error ?? o.skipped ?? 'failed');
+                  o.ok ? toast.success(`${SOURCE_LABELS[source.id]} synced`) : toast.error(o.error ?? o.skipped ?? 'Sync failed');
                 },
+                onError: (e) => toast.error(`${SOURCE_LABELS[source.id]} sync failed: ${e.message}`),
               })
             }
           >
-            Sync now
+            {sync.isPending ? 'Syncing…' : 'Sync now'}
           </Button>
           <label className="flex items-center gap-2 text-xs">
-            <Switch checked={source.enabled} onCheckedChange={(enabled) => setEnabled.mutate({ id: source.id, enabled })} /> enabled
+            <Switch
+              checked={source.enabled}
+              disabled={setEnabled.isPending}
+              onCheckedChange={(enabled) => setEnabled.mutate({ id: source.id, enabled }, { onError: (e) => toast.error(`Could not ${enabled ? 'enable' : 'pause'} ${SOURCE_LABELS[source.id]}: ${e.message}`) })}
+            />{' '}
+            Enabled
           </label>
         </div>
         <CardDescription>{description}</CardDescription>
-        {source.lastError && <p className="text-xs text-destructive">{source.lastError}</p>}
+        {source.lastError && (
+          <p className="text-xs text-critical">
+            <span className="font-[560]">Last error:</span> {source.lastError}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {children}
@@ -111,14 +128,14 @@ function DataViewer({ source }: { source: Source }) {
   const q = useSourceSummary(source.id, open);
   const d = q.data;
   return (
-    <div className="rounded-xl border border-line">
-      <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent/50" onClick={() => setOpen((v) => !v)} title="Show what this source has pulled">
+    <div className="overflow-hidden rounded-xl bg-well">
+      <button type="button" aria-expanded={open} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-well2/60" onClick={() => setOpen((v) => !v)} title="Show what this source has pulled">
         {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         <span className="font-medium">Data pulled</span>
         {source.lastRunAt && <span className="text-xs text-muted-foreground">last run {relative(source.lastRunAt)}</span>}
       </button>
       {open && (
-        <div className="space-y-3 border-t px-3 py-2 text-sm">
+        <div className="space-y-3 px-3 pb-3 pt-1 text-sm">
           {q.isPending && <p className="text-xs text-muted-foreground">Loading…</p>}
           {d && (
             <>
@@ -132,15 +149,20 @@ function DataViewer({ source }: { source: Source }) {
               )}
               {d.jobs && <p className="text-xs text-muted-foreground">{d.jobs.total} listings stored · {d.jobs.matched} active matches</p>}
               {(source.id === 'canvas' || source.id === 'gradescope') && (
+                // The id column is for debugging matches; on a phone it would squeeze the counts to a sliver.
                 <table className="w-full text-xs">
                   <thead className="text-left text-muted-foreground">
-                    <tr><th className="py-1 pr-2 font-normal">Course</th><th className="py-1 pr-2 font-normal">{source.id === 'canvas' ? 'Canvas id' : 'Gradescope id'}</th><th className="py-1 pr-2 font-normal">Items</th><th className="py-1 font-normal">Content</th></tr>
+                    <tr><th className="py-1 pr-2 font-normal">Course</th><th className="hidden py-1 pr-2 font-normal sm:table-cell">{source.id === 'canvas' ? 'Canvas id' : 'Gradescope id'}</th><th className="py-1 pr-2 font-normal">Items</th><th className="py-1 font-normal">Content</th></tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-line">
                     {d.byCourse.map((c) => (
-                      <tr key={c.courseId} className="border-t">
-                        <td className="py-1 pr-2 font-medium">{c.code}{c.role === 'ta' && <span className="ml-1 text-muted-foreground">TA</span>}</td>
-                        <td className="py-1 pr-2 font-mono">{c.linkedId ?? <span className="text-caution">not matched</span>}</td>
+                      <tr key={c.courseId} className="align-top">
+                        <td className="py-1 pr-2 font-medium">
+                          {c.code}
+                          {c.role === 'ta' && <span className="ml-1 text-muted-foreground">TA</span>}
+                          {!c.linkedId && <span className="block font-normal text-caution sm:hidden">not matched</span>}
+                        </td>
+                        <td className="hidden py-1 pr-2 font-mono sm:table-cell">{c.linkedId ?? <span className="text-caution">not matched</span>}</td>
                         <td className="py-1 pr-2">{Object.entries(c.kinds).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(', ') || '—'}</td>
                         <td className="py-1">{Object.entries(c.content).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ') || '—'}</td>
                       </tr>
@@ -157,11 +179,12 @@ function DataViewer({ source }: { source: Source }) {
                   <ul className="max-h-64 space-y-0.5 overflow-auto">
                     {d.recent.map((r) => (
                       <li key={r.id} className="flex items-baseline gap-2 text-xs">
-                        <span className="w-20 shrink-0 text-muted-foreground">{r.kind}</span>
+                        {/* Kind, labels and status are secondary; below sm they go so the title keeps its width. */}
+                        <span className="hidden w-20 shrink-0 text-muted-foreground sm:inline">{r.kind}</span>
                         {safeHref(r.url) ? <a className="min-w-0 flex-1 truncate hover:underline" href={safeHref(r.url)} target="_blank" rel="noreferrer">{r.title}</a> : <span className="min-w-0 flex-1 truncate">{r.title}</span>}
-                        <span className="shrink-0 text-muted-foreground">{r.courseId ? d.byCourse.find((c) => c.courseId === r.courseId)?.code : r.labels.length ? r.labels.join(',') : ''}</span>
-                        <span className="w-24 shrink-0 text-right text-muted-foreground">{friendlyDate(r.dueAt ?? r.startsAt)}</span>
-                        <span className="w-16 shrink-0 text-right text-muted-foreground">{r.status}</span>
+                        <span className="hidden shrink-0 text-muted-foreground sm:inline">{r.courseId ? d.byCourse.find((c) => c.courseId === r.courseId)?.code : r.labels.length ? r.labels.join(',') : ''}</span>
+                        <span className="shrink-0 text-right text-muted-foreground sm:w-24">{friendlyDate(r.dueAt ?? r.startsAt)}</span>
+                        <span className="hidden w-16 shrink-0 text-right text-muted-foreground sm:inline">{r.status}</span>
                       </li>
                     ))}
                   </ul>
@@ -192,9 +215,32 @@ function useSave(id: SourceId) {
           onError: (e) => toast.error(e.message),
         },
       ),
-    clear: () => clear.mutate(id, { onSuccess: () => toast.success('Cleared') }),
+    /** Resolves when cleared and rejects on failure, so the confirm dialog stays open to retry. */
+    clear: () =>
+      clear.mutateAsync(id, {
+        onSuccess: () => toast.success(`${SOURCE_LABELS[id]} cleared`),
+        onError: (e) => toast.error(`Could not clear ${SOURCE_LABELS[id]}: ${e.message}`),
+      }),
     pending: save.isPending || clear.isPending,
   };
+}
+
+/** Removing a saved credential stops the source until it is entered again, so it asks first. */
+function RemoveCredential({ source, label = 'Clear', what, onConfirm, pending, size = 'default' }: { source: SourceId; label?: string; what: string; onConfirm: () => Promise<unknown>; pending?: boolean; size?: 'default' | 'sm' }) {
+  return (
+    <ConfirmDialog
+      trigger={(open) => (
+        <Button type="button" size={size} variant="ghost" onClick={open} disabled={pending}>
+          {label}
+        </Button>
+      )}
+      title={`${label} ${SOURCE_LABELS[source]}?`}
+      description={`${what} Syncing stops until you connect it again. What was already pulled stays.`}
+      confirmLabel={label}
+      destructive
+      onConfirm={onConfirm}
+    />
+  );
 }
 
 function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
@@ -223,8 +269,8 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
           label="Session cookie"
           hint={
             <>
-              DevTools → Application → Cookies → your Canvas domain. Paste the whole cookie header, or at least{' '}
-              <code>canvas_session=…</code> (older instances call it <code>_normandy_session</code>). Or run <code>pnpm canvas-cookie</code>.
+              Easiest: run <Cmd>collected connect canvas</Cmd> on your laptop, which reads it from your browser. By hand: DevTools → Application → Cookies → your Canvas domain, and paste
+              the whole cookie header or at least <Cmd>canvas_session=…</Cmd> (older instances call it <Cmd>_normandy_session</Cmd>).
             </>
           }
         >
@@ -235,9 +281,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
             {source.hasConfig ? 'Replace cookie' : 'Save cookie'}
           </Button>
           {source.hasConfig && (
-            <Button type="button" variant="ghost" onClick={canvas.clear}>
-              Clear
-            </Button>
+            <RemoveCredential source="canvas" what="The saved cookie is removed." onConfirm={canvas.clear} pending={canvas.pending} />
           )}
         </div>
       </form>
@@ -278,9 +322,7 @@ function GcalIcalForm({ source }: { source: Source }) {
           {source.hasConfig ? 'Replace address' : 'Save address'}
         </Button>
         {source.hasConfig && (
-          <Button type="button" variant="ghost" onClick={s.clear}>
-            Clear
-          </Button>
+          <RemoveCredential source={source.id} what="The saved credential is removed." onConfirm={s.clear} pending={s.pending} />
         )}
       </div>
     </form>
@@ -310,9 +352,7 @@ function GradescopeForm({ source }: { source: Source }) {
           {source.hasConfig ? 'Replace credentials' : 'Save credentials'}
         </Button>
         {source.hasConfig && (
-          <Button type="button" variant="ghost" onClick={s.clear}>
-            Clear
-          </Button>
+          <RemoveCredential source={source.id} what="The saved credential is removed." onConfirm={s.clear} pending={s.pending} />
         )}
       </div>
     </form>
@@ -339,9 +379,7 @@ function TokenForm({ source, field, label }: { source: Source; field: string; la
         {source.hasConfig ? 'Replace' : 'Save'}
       </Button>
       {source.hasConfig && (
-        <Button type="button" variant="ghost" onClick={s.clear}>
-          Clear
-        </Button>
+        <RemoveCredential source={source.id} what="The saved token is removed." onConfirm={s.clear} pending={s.pending} />
       )}
     </form>
   );
@@ -352,7 +390,7 @@ const TODOIST_ERRORS: Record<string, string> = {
   denied: 'Todoist connect failed: access was denied on the consent screen',
   expired: 'Todoist connect failed: the sign-in link expired, try again',
   exchange: 'Todoist connect failed: Todoist rejected the token exchange',
-  config: 'Todoist connect failed: check TODOIST_CLIENT_ID, TODOIST_CLIENT_SECRET and the redirect URL in the Todoist app console',
+  config: "Todoist connect failed: this server's Todoist app is not set up correctly (client id, secret or redirect URL)",
   unknown: 'Todoist connect failed',
 };
 
@@ -380,9 +418,14 @@ function TodoistForm({ source }: { source: Source }) {
           <a href="/api/todoist/connect">{source.hasConfig ? 'Reconnect Todoist' : 'Connect Todoist'}</a>
         </Button>
         {source.hasConfig && (
-          <Button size="sm" variant="ghost" disabled={disconnect.isPending} onClick={() => disconnect.mutate(undefined, { onSuccess: () => toast.success('Disconnected'), onError: (e) => toast.error(e.message) })}>
-            Disconnect
-          </Button>
+          <RemoveCredential
+            source="todoist"
+            label="Disconnect"
+            size="sm"
+            what="The Todoist token is removed, and a Todoist sign-in is revoked at Todoist too."
+            pending={disconnect.isPending}
+            onConfirm={() => disconnect.mutateAsync(undefined, { onSuccess: () => toast.success('Todoist disconnected'), onError: (e) => toast.error(`Could not disconnect Todoist: ${e.message}`) })}
+          />
         )}
         {source.hasConfig && meta.connectedVia && <span className="text-xs text-muted-foreground">{meta.connectedVia === 'oauth' ? 'signed in with Todoist' : 'using a pasted API token'}</span>}
       </div>
@@ -413,7 +456,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   denied: 'Google connect failed: access was denied on the consent screen',
   expired: 'Google connect failed: the sign-in link expired, try again',
   exchange: 'Google connect failed: Google rejected the token exchange',
-  config: 'Google connect failed: check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and the redirect URL',
+  config: "Google connect failed: this server's Google sign-in is not set up correctly (client id, secret or redirect URL)",
   unknown: 'Google connect failed',
 };
 
@@ -426,7 +469,7 @@ function GoogleForm({ source }: { source: Source }) {
     const g = params.get('google');
     if (!g) return;
     if (g === 'connected') toast.success(params.get('source') === 'gtasks' ? 'Google Tasks connected' : 'Google Calendar connected');
-    else if (g === 'unconfigured') toast.error('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env first');
+    else if (g === 'unconfigured') toast.error('Google sign-in is not set up on this server yet. The self-host guide covers it.');
     else if (params.get('source') === 'gtasks' && params.get('reason') === 'unknown') toast.error('Google Tasks: the first sync failed, see the Google Tasks card (is the Tasks API enabled?)');
     else toast.error(GOOGLE_ERRORS[params.get('reason') ?? ''] ?? GOOGLE_ERRORS.unknown);
     params.delete('google');
@@ -439,7 +482,7 @@ function GoogleForm({ source }: { source: Source }) {
   const toggle = (id: string, on: boolean) => {
     const next = new Set(selected);
     on ? next.add(id) : next.delete(id);
-    patch.mutate({ id: 'gcal', meta: { selectedCalendars: [...next] } });
+    patch.mutate({ id: 'gcal', meta: { selectedCalendars: [...next] } }, { onError: (e) => toast.error(`Could not change calendars: ${e.message}`) });
   };
   return (
     <div className="space-y-3">
@@ -448,11 +491,16 @@ function GoogleForm({ source }: { source: Source }) {
           <a href="/api/google/start">{source.hasConfig ? 'Reconnect Google' : 'Connect Google Calendar'}</a>
         </Button>
         {source.hasConfig && (
-          <Button size="sm" variant="ghost" onClick={() => clear.mutate('gcal', { onSuccess: () => toast.success('Disconnected') })}>
-            Disconnect
-          </Button>
+          <RemoveCredential
+            source="gcal"
+            label="Disconnect"
+            size="sm"
+            what="The Google Calendar sign-in is removed from this server."
+            pending={clear.isPending}
+            onConfirm={() => clear.mutateAsync('gcal', { onSuccess: () => toast.success('Google Calendar disconnected'), onError: (e) => toast.error(`Could not disconnect: ${e.message}`) })}
+          />
         )}
-        {meta.demo && <span className="text-xs text-muted-foreground">showing demo calendars from `cli demo gcal`</span>}
+        {meta.demo && <span className="text-xs text-muted-foreground">showing demo calendars</span>}
       </div>
       {meta.calendars && meta.calendars.length > 0 && (
         <div className="grid gap-1.5 sm:grid-cols-2">
@@ -466,7 +514,7 @@ function GoogleForm({ source }: { source: Source }) {
                 <span className="text-xs text-muted-foreground">· default for new events</span>
               ) : (
                 (c.accessRole === 'owner' || c.accessRole === 'writer') && (
-                  <button className="text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => patch.mutate({ id: 'gcal', meta: { defaultCalendarId: c.id } })}>
+                  <button className="text-xs text-muted-foreground underline-offset-2 hover:underline" disabled={patch.isPending} onClick={() => patch.mutate({ id: 'gcal', meta: { defaultCalendarId: c.id } }, { onError: (e) => toast.error(`Could not change the default calendar: ${e.message}`) })}>
                     make default
                   </button>
                 )
@@ -491,9 +539,14 @@ function GTasksForm({ source }: { source: Source }) {
           <a href="/api/google/start?source=gtasks">{source.hasConfig ? 'Reconnect Google Tasks' : 'Connect Google Tasks'}</a>
         </Button>
         {source.hasConfig && (
-          <Button size="sm" variant="ghost" onClick={() => clear.mutate('gtasks', { onSuccess: () => toast.success('Disconnected') })}>
-            Disconnect
-          </Button>
+          <RemoveCredential
+            source="gtasks"
+            label="Disconnect"
+            size="sm"
+            what="The Google Tasks sign-in is removed from this server; Calendar stays connected."
+            pending={clear.isPending}
+            onConfirm={() => clear.mutateAsync('gtasks', { onSuccess: () => toast.success('Google Tasks disconnected'), onError: (e) => toast.error(`Could not disconnect: ${e.message}`) })}
+          />
         )}
       </div>
       {source.hasConfig && lists.length > 0 && (

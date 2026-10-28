@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { EyeOff, ExternalLink, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { CLOSED_STAGES, JOB_STATE_LABELS, OPEN_STAGES, type Job, type JobStateValue } from '@collected/shared';
-import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,14 +35,24 @@ export function StageSelect({ value, onChange, className, allowUntracked }: { va
   );
 }
 
-/** Text field that saves on blur (or Enter for single-line), so notes don't need a Save button. */
+/**
+ * Text field that saves on blur (or Enter for single-line), so notes don't need a Save button. Closing the pane
+ * unmounts the field without a blur, so it also commits on unmount; refs hold the latest draft and save target.
+ */
 function SavedField({ label, value, onSave, multiline, type, placeholder }: { label: string; value: string | null; onSave(v: string | null): void; multiline?: boolean; type?: string; placeholder?: string }) {
   const [draft, setDraft] = useState(value ?? '');
   useEffect(() => setDraft(value ?? ''), [value]);
+  const latest = useRef({ draft, value, onSave });
+  latest.current = { draft, value, onSave };
   const commit = () => {
-    const v = draft.trim() || null;
-    if (v !== (value ?? null)) onSave(v);
+    const { draft: d, value: before, onSave: save } = latest.current;
+    const v = d.trim() || null;
+    if (v !== (before ?? null)) {
+      latest.current.value = v; // a blur and then an unmount must not save twice
+      save(v);
+    }
   };
+  useEffect(() => () => commit(), []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
@@ -76,11 +86,11 @@ function NewJobForm() {
   };
   return (
     <form onSubmit={submit} className="flex h-full min-h-0 flex-col">
-      <SheetHeader className="border-b border-line bg-well px-[22px] pb-4 pt-5">
+      <SheetHeader className="shrink-0 gap-1.5 px-6 pb-3 pt-6">
         <div className="flex items-center gap-2.5">
-          <SheetTitle className="text-xl font-bold tracking-[-0.02em]">Add a job</SheetTitle>
+          <SheetTitle className="text-[26px] font-[620] leading-tight tracking-[-0.025em]">Add a job</SheetTitle>
           <span className="flex-1" />
-          <SheetClose className="orb size-8 border border-line" aria-label="Close"><X className="size-3.5" /></SheetClose>
+          <SheetClose className="orb size-8" aria-label="Close"><X className="size-3.5" /></SheetClose>
         </div>
         <SheetDescription className="text-[14px] text-sub">Something outside the feed: a referral, a career-fair lead, a company site.</SheetDescription>
       </SheetHeader>
@@ -127,15 +137,15 @@ export function JobPane({ jobId }: { jobId: string | null }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <SheetHeader className="border-b border-line bg-well px-[22px] pb-4 pt-5">
-        <div className="flex items-start gap-2.5">
-          <div className="min-w-0 flex-1">
-            <SheetTitle className="truncate text-xl font-bold tracking-[-0.02em]">{job.company}</SheetTitle>
-            <SheetDescription className="truncate text-[15px] text-sub">{job.title}</SheetDescription>
-          </div>
-          <Badge variant="outline" className="mt-1 shrink-0 text-[10px]">{manual ? 'Manual' : 'Feed'}</Badge>
-          <SheetClose className="orb size-8 border border-line" aria-label="Close"><X className="size-3.5" /></SheetClose>
+      {/* The same header as the course pane: no band behind it, borderless orbs, the title at 26px. */}
+      <SheetHeader className="shrink-0 gap-1.5 px-6 pb-3 pt-6">
+        <div className="flex items-center gap-2.5">
+          <SheetTitle className="min-w-0 truncate text-[26px] font-[620] leading-tight tracking-[-0.025em]">{job.company}</SheetTitle>
+          <span className="label shrink-0 rounded-full bg-well px-2 py-0.5">{manual ? 'Manual' : 'Feed'}</span>
+          <span className="flex-1" />
+          <SheetClose className="orb size-8 shrink-0" aria-label="Close"><X className="size-3.5" /></SheetClose>
         </div>
+        <SheetDescription className="truncate text-[15px] text-sub">{job.title}</SheetDescription>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {job.locations.length > 0 && <span>{job.locations.join(' · ')}</span>}
           {job.postedAt && <span>{manual ? 'Added' : 'Posted'} {friendlyDate(job.postedAt)}</span>}
@@ -157,16 +167,34 @@ export function JobPane({ jobId }: { jobId: string | null }) {
             </Button>
           )}
           {manual && (
-            <Button size="sm" variant="ghost" className="text-destructive" title="Delete this entry" onClick={() => del.mutate(job.id, { onSuccess: () => { toast.success('Deleted'); close(); }, onError: (e) => toast.error(e.message) })}>
-              <Trash2 className="size-3.5" /> Delete
-            </Button>
+            <ConfirmDialog
+              trigger={(open) => (
+                <Button size="sm" variant="ghost" className="text-critical hover:text-critical" title="Delete this entry" onClick={open} disabled={del.isPending}>
+                  <Trash2 className="size-3.5" /> Delete
+                </Button>
+              )}
+              title={`Delete ${job.company}?`}
+              description="This entry, its stage and its notes are removed from the tracker. It was added by hand, so no sync brings it back."
+              confirmLabel="Delete"
+              destructive
+              onConfirm={() =>
+                del.mutateAsync(job.id, {
+                  onSuccess: () => {
+                    toast.success(`Deleted ${job.company}`);
+                    close();
+                  },
+                  onError: (e) => toast.error(`Could not delete: ${e.message}`),
+                })
+              }
+            />
           )}
         </div>
       </SheetHeader>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-auto px-[18px] py-[18px]">
         {!tracked && <p className="text-xs text-muted-foreground">Pick a stage above to start tracking this one. Notes are saved either way.</p>}
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* Keyed by job: switching jobs remounts the fields, so an unsaved edit commits to the job it was typed for. */}
+        <div key={job.id} className="grid gap-3 sm:grid-cols-2">
           <SavedField label="Applied on" type="date" value={job.appliedAt} onSave={(v) => save({ appliedAt: v })} />
           <SavedField label="Next action date" type="date" value={job.nextActionAt} onSave={(v) => save({ nextActionAt: v })} />
           <div className="sm:col-span-2">

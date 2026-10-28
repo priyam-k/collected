@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCreateToken, useLogout, useMe, useRevokeToken, useTokens } from '@/lib/queries';
+import { useCreateToken, useMe, useRevokeToken, useTokens } from '@/lib/queries';
+import { useSignOut } from '@/lib/useSignOut';
 import { Field, PageTitle } from './ui';
 
 function when(iso: string | null): string {
@@ -18,8 +20,7 @@ export function AccountPage() {
   const tokens = useTokens();
   const create = useCreateToken();
   const revoke = useRevokeToken();
-  const logout = useLogout();
-  const navigate = useNavigate();
+  const { signOut, pending: signingOut } = useSignOut();
   const [params] = useSearchParams();
   const cli = params.get('cli') === '1';
   const [name, setName] = useState('');
@@ -70,21 +71,8 @@ export function AccountPage() {
             )}
           </div>
           {!me.data?.authDisabled && (
-            <Button
-              variant="outline"
-              className="ml-auto"
-              onClick={() =>
-                logout.mutate(undefined, {
-                  onSuccess: () => {
-                    // Behind Cloudflare Access the Access cookie would sign the person straight back in; leave that too.
-                    if (me.data?.signIn.access) window.location.assign('/cdn-cgi/access/logout');
-                    else navigate('/signin', { replace: true });
-                  },
-                  onError: (e) => toast.error(e.message),
-                })
-              }
-            >
-              Sign out
+            <Button variant="outline" className="ml-auto" disabled={signingOut} onClick={signOut}>
+              {signingOut ? 'Signing out…' : 'Sign out'}
             </Button>
           )}
         </div>
@@ -131,9 +119,23 @@ export function AccountPage() {
                   <span className="font-mono">{t.prefix}…</span> · created {when(t.createdAt)} · last used {when(t.lastUsedAt)}
                 </div>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => revoke.mutate(t.id, { onSuccess: () => toast.success(`Revoked ${t.name}`), onError: (e) => toast.error(e.message) })}>
-                Revoke
-              </Button>
+              <ConfirmDialog
+                trigger={(open) => (
+                  <Button size="sm" variant="ghost" onClick={open} disabled={revoke.isPending && revoke.variables === t.id}>
+                    Revoke
+                  </Button>
+                )}
+                title={`Revoke ${t.name}?`}
+                description="The collected command on that machine stops working until it signs in with a new token."
+                confirmLabel="Revoke"
+                destructive
+                onConfirm={() =>
+                  revoke.mutateAsync(t.id, {
+                    onSuccess: () => toast.success(`Revoked ${t.name}`),
+                    onError: (e) => toast.error(`Could not revoke ${t.name}: ${e.message}`),
+                  })
+                }
+              />
             </li>
           ))}
           {tokens.data && tokens.data.length === 0 && <li className="px-3 py-3 text-[13px] text-sub">No tokens yet.</li>}

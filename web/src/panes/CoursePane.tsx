@@ -17,6 +17,7 @@ import { DueLabel, StatusBadge, manualRaw, meetingExceptions, nextMeeting } from
 import { CourseDates } from './CourseDates';
 import { CourseFileSync } from './CourseFileSync';
 import { CourseGrades } from './CourseGrades';
+import { usePane } from './PaneContext';
 
 const DAY_LABEL: Record<Meeting['day'], string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' };
 
@@ -58,7 +59,10 @@ function Section({ title, action, children }: { title: ReactNode; action?: React
     </section>
   );
 }
-const Well = ({ children, className }: { children: ReactNode; className?: string }) => <div className={cn('overflow-hidden rounded-2xl bg-well', className)}>{children}</div>;
+/** A container, so rows can drop secondary columns when the pane (330-580px at any screen size) is narrow. */
+const Well = ({ children, className }: { children: ReactNode; className?: string }) => <div className={cn('@container overflow-hidden rounded-2xl bg-well', className)}>{children}</div>;
+/** Download links show on row hover, and always for keyboard focus and on touch screens, which have no hover. */
+const REVEAL = 'opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
 const EmptyWell = ({ children }: { children: ReactNode }) => <div className="rounded-2xl bg-well p-4 text-center text-[13px] text-ter">{children}</div>;
 /** An upstream link; a plain span when the URL is not http(s). */
 function ExtLink({ href, className, title, children }: { href: string | null | undefined; className?: string; title?: string; children: ReactNode }) {
@@ -79,11 +83,11 @@ function FileRow({ f, last, detail }: { f: CourseContentRow; last?: boolean; det
         </FileLink>
         {where && <div className="truncate text-[11px] text-ter" title={String(where)}>{where}</div>}
       </div>
-      <a href={canvasFileUrl(f.externalId, { download: true })} className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/row:opacity-100" title="Download" aria-label={`Download ${f.title}`}>
+      <a href={canvasFileUrl(f.externalId, { download: true })} className={cn('shrink-0 text-ter hover:text-ink', REVEAL)} title="Download" aria-label={`Download ${f.title}`}>
         <Download className="size-3.5" />
       </a>
-      <span className="shrink-0 text-xs text-ter">{fmtSize(f.raw.size)}</span>
-      <span className="w-14 shrink-0 text-right text-xs text-ter">{friendlyDate(String(f.raw.updatedAt ?? f.updatedAt))}</span>
+      <span className="hidden shrink-0 text-xs text-ter @sm:inline">{fmtSize(f.raw.size)}</span>
+      <span className="shrink-0 text-right text-xs text-ter @sm:w-14">{friendlyDate(String(f.raw.updatedAt ?? f.updatedAt))}</span>
     </div>
   );
 }
@@ -132,11 +136,11 @@ function Modules({ rows }: { rows: CourseContentRow[] }) {
                         <ExtLink href={it.url} className="min-w-0 flex-1 truncate" title="Open in Canvas">{it.title}</ExtLink>
                       )}
                       {isFile && (
-                        <a href={canvasFileUrl(String(raw.contentId), { download: true })} className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/row:opacity-100" title="Download" aria-label={`Download ${it.title}`}>
+                        <a href={canvasFileUrl(String(raw.contentId), { download: true })} className={cn('shrink-0 text-ter hover:text-ink', REVEAL)} title="Download" aria-label={`Download ${it.title}`}>
                           <Download className="size-3.5" />
                         </a>
                       )}
-                      <span className="shrink-0 text-[10px] uppercase text-ter/70">{raw.type === 'ExternalUrl' ? 'link' : (raw.type ?? '').toLowerCase()}</span>
+                      <span className="hidden shrink-0 text-[10px] uppercase text-ter/70 @xs:inline">{raw.type === 'ExternalUrl' ? 'link' : (raw.type ?? '').toLowerCase()}</span>
                     </div>
                   );
                 })}
@@ -177,9 +181,9 @@ function AssignmentRow({ item, last }: { item: EffectiveItem; last?: boolean }) 
     <ItemPopover item={item}>
       <span className={cn('flex items-center gap-3 px-3.5 py-2.5 text-[13.5px] transition-colors hover:bg-well2', !last && 'border-b border-line')}>
         <span className={cn('min-w-0 flex-1 truncate', item.effectiveDone && 'text-ter line-through')}>{item.title}</span>
-        {item.points != null && <span className="shrink-0 text-xs text-ter">{item.score != null ? `${item.score}/` : ''}{item.points}</span>}
+        {item.points != null && <span className="hidden shrink-0 text-xs text-ter @sm:inline">{item.score != null ? `${item.score}/` : ''}{item.points}</span>}
         <StatusBadge item={item} />
-        <DueLabel item={item} className="w-28 shrink-0 text-right text-xs" />
+        <DueLabel item={item} className="shrink-0 text-right text-xs @sm:w-28" />
       </span>
     </ItemPopover>
   );
@@ -198,6 +202,9 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   const gradesQ = useCourseGrades(courseId);
   const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'overview');
   const liquid = useLiquid();
+  const { close: closePane } = usePane();
+  // Settings opens straight into this course's editor; the pane closes so it is not left over the settings page.
+  const editHref = `/settings/courses?edit=${encodeURIComponent(courseId)}`;
 
   const assignments = useMemo(() => (assignmentsQ.data ?? []).slice().sort((a, b) => dueMs(a) - dueMs(b)), [assignmentsQ.data]);
   const announcements = useMemo(() => (announcementsQ.data ?? []).slice().sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? '')), [announcementsQ.data]);
@@ -265,7 +272,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
           {course.section && <span className="text-sm text-ter">{course.section}</span>}
           {isTa && <span className="label rounded-full bg-well px-2 py-0.5">TA</span>}
           <span className="flex-1" />
-          <Link to="/settings/courses" className="orb size-8" title="Course settings" aria-label="Course settings"><Settings className="size-3.5" /></Link>
+          <Link to={editHref} onClick={closePane} className="orb size-8" title="Edit this course" aria-label="Edit this course"><Settings className="size-3.5" /></Link>
           <SheetClose className="orb size-8" aria-label="Close"><X className="size-3.5" /></SheetClose>
         </div>
         <SheetDescription className="mt-1.5 text-[15px] text-sub">
@@ -330,7 +337,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
                   ))}
                 </Well>
               ) : (
-                <EmptyWell>No schedule yet. <Link to="/settings/courses" className="text-brand-ink hover:underline">Add one in settings.</Link></EmptyWell>
+                <EmptyWell>No schedule yet. <Link to={editHref} onClick={closePane} className="text-brand-ink hover:underline">Add one in settings.</Link></EmptyWell>
               )}
             </Section>
 
