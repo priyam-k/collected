@@ -1,7 +1,7 @@
 import { and, gte, inArray, isNull, lte, or, eq, type SQL } from 'drizzle-orm';
 import { DONE_STATUSES, type EffectiveItem, type ItemKind, type SourceId } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courses, itemLinks, items, overrides, sources, todoistMap, type ItemRow, type OverrideRow } from '../db/schema.js';
+import { courses, gtasksMap, itemLinks, items, overrides, sources, todoistMap, type ItemRow, type OverrideRow } from '../db/schema.js';
 import { hoursBetween } from './time.js';
 
 export interface ItemQuery {
@@ -44,10 +44,11 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
   if (!rows.length) return [];
 
   const ids = rows.map((r) => r.id);
-  const [ovs, links, maps, courseRows, sourceRows] = await Promise.all([
+  const [ovs, links, maps, gmaps, courseRows, sourceRows] = await Promise.all([
     ctx.db.select().from(overrides).where(inArray(overrides.itemId, ids)),
     ctx.db.select().from(itemLinks).where(or(inArray(itemLinks.aItemId, ids), inArray(itemLinks.bItemId, ids))!),
     ctx.db.select().from(todoistMap).where(inArray(todoistMap.itemId, ids)),
+    ctx.db.select().from(gtasksMap).where(inArray(gtasksMap.itemId, ids)),
     ctx.db.select({ id: courses.id, code: courses.code, color: courses.color, role: courses.role, submitsVia: courses.submitsVia }).from(courses),
     ctx.db.select({ id: sources.id, status: sources.status, lastSuccessAt: sources.lastSuccessAt }).from(sources),
   ]);
@@ -69,9 +70,9 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
     linkedOf.set(l.bItemId, [...(linkedOf.get(l.bItemId) ?? []), l.aItemId]);
   }
   const mirrorClosed = new Set<string>();
-  // A closed mirrored Todoist task (raw.mirror) marks its item done. The todoist ingester stores mirrors as items
-  // with source=todoist and raw.mirror=true and raw.mirrorOf=<itemId>.
-  const mirrorRows = await ctx.db.select().from(items).where(and(eq(items.source, 'todoist'), eq(items.status, 'done')));
+  // A closed mirrored to-do task (raw.mirror) marks its item done. The todoist and gtasks ingesters store mirrors
+  // as items with raw.mirror=true and raw.mirrorOf=<itemId> (the push's marker).
+  const mirrorRows = await ctx.db.select().from(items).where(and(inArray(items.source, ['todoist', 'gtasks']), eq(items.status, 'done')));
   for (const m of mirrorRows) {
     const of = (m.raw as { mirrorOf?: string }).mirrorOf;
     if (of) mirrorClosed.add(of);
@@ -79,6 +80,10 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
   for (const m of maps) {
     // If the mapped Todoist task exists in items and is done, count it.
     const t = rowById.get(`todoist:${m.todoistTaskId}`);
+    if (t?.status === 'done') mirrorClosed.add(m.itemId);
+  }
+  for (const m of gmaps) {
+    const t = rowById.get(`gtasks:${m.gtasksTaskId}`);
     if (t?.status === 'done') mirrorClosed.add(m.itemId);
   }
 
@@ -98,7 +103,7 @@ export async function queryEffectiveItems(ctx: AppContext, q: ItemQuery): Promis
   const out: EffectiveItem[] = [];
   for (const r of rows) {
     if (r.source === 'canvas_ical' && (canvasHealthy || canvasExternalIds.has(r.externalId))) continue;
-    if (r.source === 'todoist' && (r.raw as { mirror?: boolean }).mirror) continue;
+    if ((r.source === 'todoist' || r.source === 'gtasks') && (r.raw as { mirror?: boolean }).mirror) continue;
     const c = r.courseId ? courseById.get(r.courseId) : undefined;
     const ov = ovById.get(r.id) ?? null;
     const linkedIds = linkedOf.get(r.id) ?? [];

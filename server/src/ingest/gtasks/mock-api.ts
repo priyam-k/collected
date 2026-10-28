@@ -36,4 +36,26 @@ export class MockGTasksApi implements GTasksApi {
     this.ops.push(`completeTask ${listId} ${taskId}`);
     return t;
   }
+  async insertTaskList(title: string) {
+    const l: GTaskList = { id: `list${this.seq++}`, title };
+    this.lists.push(l);
+    this.tasks[l.id] = [];
+    this.ops.push(`insertTaskList ${title}`);
+    return l;
+  }
+  async updateTask(listId: string, taskId: string, body: Partial<NewGTask>) {
+    const t = (this.tasks[listId] ?? []).find((x) => x.id === taskId);
+    if (!t) throw new Error(`mock: no task ${listId}/${taskId}`);
+    if (body.title !== undefined) t.title = body.title;
+    if (body.notes !== undefined) t.notes = body.notes;
+    if (body.due !== undefined) t.due = body.due;
+    this.ops.push(`updateTask ${listId} ${taskId}`);
+    return t;
+  }
+  async deleteTask(listId: string, taskId: string) {
+    const list = this.tasks[listId] ?? [];
+    if (!list.some((x) => x.id === taskId)) throw new Error(`mock: no task ${listId}/${taskId}`);
+    this.tasks[listId] = list.filter((x) => x.id !== taskId);
+    this.ops.push(`deleteTask ${listId} ${taskId}`);
+  }
 }

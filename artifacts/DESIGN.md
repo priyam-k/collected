@@ -156,7 +156,7 @@ Timezone rule: everything is stored as UTC ISO strings. The server computes wind
 
 ## Todoist push sync (opt-in module)
 
-Direction: store → Todoist, never back. Todoist-side changes never modify Canvas or Gradescope.
+Direction: store → Todoist, never back. Todoist-side changes never modify Canvas or Gradescope. The same module, through `sync/push-core.ts`, also pushes into Google Tasks (`sync/gtasks-push.ts`, setting `gtasks.push`, DECISIONS 050); everything below holds there too, with a list for the project, `[CODE]` in the title for the course label, and a date-only due with the time in the notes.
 
 - Every effective assignment (after dedup) becomes one Todoist task in project **School**, labels `homework` + lowercase course code (`cmsc422`), due at the assignment due time, description = source link + a marker line `collected:<source>:<external_id>`.
 - The marker makes the map rebuildable by scanning Todoist, which is the guard against duplicates if the DB is lost.

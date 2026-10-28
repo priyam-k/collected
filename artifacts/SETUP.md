@@ -220,7 +220,7 @@ The CLI signs in with a token: `collected login` opens Settings → Account, you
 - Paste the Canvas cookie into prod: point the CLI at prod (`collected init https://collected.example.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas`. Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
 - Enter Gradescope credentials and Todoist token in prod settings.
 - Fill in Gradescope course ids and `submits_via` per course.
-- Enable the Todoist push sync once the homework section looks right for a day.
+- Enable the Todoist push sync once the homework section looks right for a day. If Google Tasks is the app instead, enable its push under Settings → To-do apps → Google Tasks (list `School`, course code in the title); both can be on while switching, each with its own mapping and fuse, but leave only one on afterwards. `pnpm cli push todoist --dry-run` / `pnpm cli push gtasks --dry-run` preview either.
 
 ## Laptop agent (course files → folders)
 

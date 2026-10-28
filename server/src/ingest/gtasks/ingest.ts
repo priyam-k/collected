@@ -5,6 +5,7 @@ import { items, type NewItemRow } from '../../db/schema.js';
 import { upsertItems } from '../../lib/items.js';
 import { getSourceConfig } from '../../lib/sources.js';
 import { addDays, isoOrNull, nowIso } from '../../lib/time.js';
+import { markerIn } from '../../sync/push-core.js';
 import { NeedsAuthError, NotConfiguredError, type Ingester } from '../types.js';
 import type { GTask, GTaskList, GTasksApi } from './api.js';
 import { GTasksHttpApi, accessTokenFromRefreshToken } from './client.js';
@@ -24,6 +25,8 @@ export function gtaskToRow(t: GTask, list: { id: string; title: string | null })
   const { dueAt, allDay } = gtaskDueToIso(t.due);
   const done = t.status === 'completed';
   const listName = list.title ?? null;
+  // A task the push created carries `collected:<itemId>` in its notes: a mirror, hidden from the todo widget like Todoist's.
+  const mirrorOf = markerIn(t.notes);
   return {
     id: `gtasks:${list.id}:${t.id}`,
     source: 'gtasks',
@@ -50,6 +53,8 @@ export function gtaskToRow(t: GTask, list: { id: string; title: string | null })
       completedAt: t.completed ?? null,
       position: t.position ?? null,
       hidden: !!t.hidden,
+      mirror: !!mirrorOf,
+      mirrorOf,
     },
   };
 }

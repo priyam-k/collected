@@ -25,6 +25,11 @@ describe('identityAllows', () => {
       ['POST', '/api/todoist/tasks/quick'],
       ['POST', '/api/gtasks/tasks/quick'],
       ['POST', '/api/gtasks/tasks/L1:T1/close'],
+      ['POST', '/api/todoist/push?dryRun=1'],
+      ['POST', '/api/gtasks/push?dryRun=1&force=1'],
+      ['GET', '/api/todoist/config'],
+      ['GET', '/api/gtasks/config'],
+      ['GET', '/api/todo/status'],
       ['POST', '/api/sources/canvas/sync'],
       ['PATCH', '/api/jobs/x/state'],
     ] as const)
@@ -44,6 +49,12 @@ describe('identityAllows', () => {
       ['POST', '/api/todoist/disconnect'],
       ['GET', '/api/google/start?source=gtasks'],
       ['PUT', '/api/settings/todo.defaultApp'],
+      ['POST', '/api/todoist/push'],
+      ['POST', '/api/todoist/push?force=1'],
+      ['POST', '/api/gtasks/push'],
+      ['POST', '/api/gtasks/push?dryRun=0'],
+      ['PUT', '/api/todoist/config'],
+      ['PUT', '/api/gtasks/config'],
       ['POST', '/api/sources/canvas/cookie'],
     ] as const)
       expect(identityAllows(svc, m, p), `${m} ${p}`).toBe(false);

@@ -164,6 +164,16 @@ export const todoistPushConfigSchema = z.object({
   courseLabels: z.boolean().default(true),
 });
 
+/**
+ * `gtasks.push`: the Google Tasks assignment push (DECISIONS 050). Tasks has no labels and no time-of-day, so the
+ * course goes in a title prefix (`[CMSC422] HW3`) and the time in the notes; the task lands in the list `listName`.
+ */
+export const gtasksPushConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  listName: text(100).trim().min(1).default('School'),
+  titlePrefix: z.enum(['course', 'none']).default('course'),
+});
+
 /** `todo.defaultApp`: where the dashboard's add-task box sends new tasks. Unset means "whichever is connected, Todoist first". */
 export const todoDefaultAppSchema = z.enum(TODO_APPS);
 

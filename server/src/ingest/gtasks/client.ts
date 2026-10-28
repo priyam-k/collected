@@ -99,4 +99,16 @@ export class GTasksHttpApi implements GTasksApi {
   async completeTask(listId: string, taskId: string): Promise<GTask> {
     return this.req<GTask>('PATCH', `/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, { body: { status: 'completed' } });
   }
+
+  async insertTaskList(title: string): Promise<GTaskList> {
+    return this.req<GTaskList>('POST', '/users/@me/lists', { body: { title } });
+  }
+
+  async updateTask(listId: string, taskId: string, body: Partial<NewGTask>): Promise<GTask> {
+    return this.req<GTask>('PATCH', `/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`, { body });
+  }
+
+  async deleteTask(listId: string, taskId: string): Promise<void> {
+    await this.req<unknown>('DELETE', `/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`);
+  }
 }

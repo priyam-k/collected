@@ -115,6 +115,19 @@ export const todoistMap = sqliteTable(
   (t) => [uniqueIndex('todoist_map_task_idx').on(t.todoistTaskId)],
 );
 
+/** Google Tasks push mapping, the twin of todoist_map. The task id is `<listId>:<taskId>` (DECISIONS 050). */
+export const gtasksMap = sqliteTable(
+  'gtasks_map',
+  {
+    itemId: text('item_id').primaryKey(),
+    gtasksTaskId: text('gtasks_task_id').notNull(),
+    lastPushedHash: text('last_pushed_hash'),
+    closedByUs: integer('closed_by_us', { mode: 'boolean' }).notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('gtasks_map_task_idx').on(t.gtasksTaskId)],
+);
+
 export const jobs = sqliteTable(
   'jobs',
   {

@@ -24,6 +24,7 @@ import { onboardingRoutes } from './onboarding.js';
 import { settingsRoutes } from './settings.js';
 import { sourcesRoutes } from './sources.js';
 import { systemRoutes } from './system.js';
+import { todoRoutes } from './todo.js';
 import { todoistRoutes } from './todoist.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -34,9 +35,12 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * makes the small edits the CLI offers, and runs the file sync; it never touches credentials, settings, layout,
  * or the import/export of the whole database, so a leaked `~/.collected/agent.json` is not a full takeover.
  */
-export function identityAllows(user: string, method: string, path: string): boolean {
+export function identityAllows(user: string, method: string, pathWithQuery: string): boolean {
   const machine = user.startsWith('service:') || user.startsWith('token:');
   if (user === 'dev' || (!machine && user !== 'helper')) return true;
+  const q = pathWithQuery.indexOf('?');
+  const path = q === -1 ? pathWithQuery : pathWithQuery.slice(0, q);
+  const query = new URLSearchParams(q === -1 ? '' : pathWithQuery.slice(q + 1));
   if (user === 'helper') return path === '/api/sources/canvas/cookie' && method === 'POST';
   const p = path.replace(/\/+$/, '');
   if (p === '/api/import' || p === '/api/export' || p === '/api/demo') return false;
@@ -44,7 +48,10 @@ export function identityAllows(user: string, method: string, path: string): bool
   if (p.startsWith('/api/google') || p.startsWith('/api/layout') || p.startsWith('/api/widgets')) return false;
   if (p === '/api/sources/canvas/cookie') return false;
   if (p === '/api/todoist/connect' || p === '/api/todoist/callback' || p === '/api/todoist/disconnect') return false;
+  // The assignment push writes to someone's to-do app and its config is a setting: a preview (dryRun=1) is a read, the rest is the owner's.
+  if ((p === '/api/todoist/push' || p === '/api/gtasks/push') && query.get('dryRun') !== '1') return false;
   if (MUTATING.has(method)) {
+    if (p === '/api/todoist/config' || p === '/api/gtasks/config') return false;
     if (p.startsWith('/api/system')) return false;
     if (p.startsWith('/api/settings')) return false;
     if (/^\/api\/sources\/[^/]+\/(config|enabled|meta)$/.test(p)) return false;
@@ -93,7 +100,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {
   // cross-site form posts if its SameSite attribute allows it; this check does not depend on that setting.
   api.use('*', async (c, next) => {
     const user = c.get('user');
-    if (user && !identityAllows(user, c.req.method, c.req.path)) return c.json({ error: 'forbidden for this credential' }, 403);
+    if (user && !identityAllows(user, c.req.method, c.req.path + new URL(c.req.url).search)) return c.json({ error: 'forbidden for this credential' }, 403);
     if (MUTATING.has(c.req.method) && crossSite({ origin: c.req.header('origin'), secFetchSite: c.req.header('sec-fetch-site') }, ctx.env.PUBLIC_URL)) {
       return c.json({ error: 'cross-site request refused' }, 403);
     }
@@ -137,6 +144,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {
   api.route('/grades', gradesRoutes(ctx));
   api.route('/todoist', todoistRoutes(ctx));
   api.route('/gtasks', gtasksRoutes(ctx));
+  api.route('/todo', todoRoutes(ctx));
   api.route('/file-sync', fileSyncRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 

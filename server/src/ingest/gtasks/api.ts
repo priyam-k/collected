@@ -43,6 +43,10 @@ export interface GTasksApi {
   listTasks(listId: string): Promise<{ tasks: GTask[]; truncated: boolean }>;
   insertTask(listId: string, body: NewGTask): Promise<GTask>;
   completeTask(listId: string, taskId: string): Promise<GTask>;
+  /** The push's writes (DECISIONS 050): a list for the pushed assignments, and title/notes/due updates and deletes of tasks it created. */
+  insertTaskList(title: string): Promise<GTaskList>;
+  updateTask(listId: string, taskId: string, body: Partial<NewGTask>): Promise<GTask>;
+  deleteTask(listId: string, taskId: string): Promise<void>;
 }
 
 /** Google's list and task ids are base64url-ish; anything else is refused before it reaches a URL path. */

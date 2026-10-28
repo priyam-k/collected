@@ -14,7 +14,7 @@ function usage(): never {
   cli import <file>        import config JSON (courses, settings, widgets, layouts)
   cli demo <canvas|gradescope|gcal|todoist>  load fixtures into this database (UI development without a session)
   cli demo clear           remove everything the demo loaders created
-  cli push [--dry-run]     run the Todoist push now (ignores the enabled flag)
+  cli push [todoist|gtasks] [--dry-run]  run the assignment push into that app now (default todoist; ignores the enabled flag)
   cli dedup                re-run Canvas/Gradescope assignment linking`);
   process.exit(cmd ? 1 : 0);
 }
@@ -107,18 +107,36 @@ switch (cmd) {
     break;
   }
   case 'push': {
-    const { todoistPushConfigSchema } = await import('@collected/shared');
+    const app = rest.find((a) => !a.startsWith('--')) ?? 'todoist';
+    const dryRun = rest.includes('--dry-run');
     const { getSettingParsed } = await import('./lib/settings.js');
-    const { todoistApiForCtx } = await import('./ingest/todoist/ingest.js');
-    const { executePush, planPush } = await import('./sync/todoist-push.js');
-    const cfg = await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema);
-    const api = await todoistApiForCtx(ctx);
-    const plan = await planPush(ctx, api, cfg);
-    console.log(JSON.stringify({ project: plan.projectName, ops: plan.ops.map((o) => `${o.op}: ${o.title}${o.reason ? ` (${o.reason})` : ''}`), skipped: plan.skipped.length, rebuilt: plan.rebuilt }, null, 2));
-    if (!rest.includes('--dry-run')) {
-      const res = await executePush(ctx, api, plan, cfg);
-      console.log(JSON.stringify({ done: res.done, errors: res.errors }));
-    }
+    const summary = (plan: { targetName: string; ops: { op: string; title: string; reason: string }[]; skipped: unknown[]; rebuilt: number }) =>
+      JSON.stringify({ target: plan.targetName, ops: plan.ops.map((o) => `${o.op}: ${o.title}${o.reason ? ` (${o.reason})` : ''}`), skipped: plan.skipped.length, rebuilt: plan.rebuilt }, null, 2);
+    if (app === 'todoist') {
+      const { todoistPushConfigSchema } = await import('@collected/shared');
+      const { todoistApiForCtx } = await import('./ingest/todoist/ingest.js');
+      const { executePush, planPush } = await import('./sync/todoist-push.js');
+      const cfg = await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema);
+      const api = await todoistApiForCtx(ctx);
+      const plan = await planPush(ctx, api, cfg);
+      console.log(summary(plan));
+      if (!dryRun) {
+        const res = await executePush(ctx, api, plan, cfg);
+        console.log(JSON.stringify({ done: res.done, errors: res.errors }));
+      }
+    } else if (app === 'gtasks') {
+      const { gtasksPushConfigSchema } = await import('@collected/shared');
+      const { gtasksApiForCtx } = await import('./ingest/gtasks/ingest.js');
+      const { executeGtasksPush, planGtasksPush } = await import('./sync/gtasks-push.js');
+      const cfg = await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema);
+      const api = await gtasksApiForCtx(ctx);
+      const plan = await planGtasksPush(ctx, api, cfg);
+      console.log(summary(plan));
+      if (!dryRun) {
+        const res = await executeGtasksPush(ctx, api, plan, cfg);
+        console.log(JSON.stringify({ done: res.done, errors: res.errors }));
+      }
+    } else usage();
     break;
   }
   case 'dedup': {

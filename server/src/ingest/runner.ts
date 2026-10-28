@@ -11,7 +11,7 @@ export function isRunning(id: SourceId): boolean {
   return running.has(id);
 }
 
-/** Post-sync work that depends on more than one source (dedup, push sync). Failures are logged, never propagated. */
+/** Post-sync work that depends on more than one source (dedup, the Todoist and Google Tasks pushes). Failures are logged, never propagated. */
 async function runAfterHooks(ctx: AppContext, id: SourceId): Promise<void> {
   if (id === 'canvas' || id === 'gradescope') {
     try {
@@ -34,6 +34,20 @@ async function runAfterHooks(ctx: AppContext, id: SourceId): Promise<void> {
       }
     } catch (err) {
       if (!(err instanceof NotConfiguredError)) ctx.log.error({ err }, 'todoist push after sync failed');
+    }
+    try {
+      const { gtasksPushConfigSchema } = await import('@collected/shared');
+      const { getSettingParsed } = await import('../lib/settings.js');
+      const cfg = await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema);
+      if (cfg.enabled) {
+        const { gtasksApiForCtx } = await import('../ingest/gtasks/ingest.js');
+        const { executeGtasksPush, planGtasksPush } = await import('../sync/gtasks-push.js');
+        const api = await gtasksApiForCtx(ctx);
+        const plan = await planGtasksPush(ctx, api, cfg);
+        if (plan.ops.length) await executeGtasksPush(ctx, api, plan, cfg);
+      }
+    } catch (err) {
+      if (!(err instanceof NotConfiguredError)) ctx.log.error({ err }, 'gtasks push after sync failed');
     }
   }
 }

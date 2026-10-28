@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { gtasksQuickAddSchema } from '@collected/shared';
+import { gtasksPushConfigSchema, gtasksQuickAddSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { items } from '../db/schema.js';
+import { gtasksMap, items, overrides } from '../db/schema.js';
 import { splitExternalId, type GTasksApi } from '../ingest/gtasks/api.js';
-import { gtaskToRow, gtasksApiForCtx } from '../ingest/gtasks/ingest.js';
+import { gtaskToRow, gtasksApiForCtx, syncGtasks } from '../ingest/gtasks/ingest.js';
+import { getSettingParsed, setSetting } from '../lib/settings.js';
 import { getSourceRow } from '../lib/sources.js';
 import { nowIso } from '../lib/time.js';
-import { bad, parseBody } from './util.js';
+import { executeGtasksPush, planGtasksPush } from '../sync/gtasks-push.js';
+import { bad, parseBody, parsePatch } from './util.js';
 
 interface GtasksMeta {
   lists?: { id: string; title: string }[];
@@ -15,11 +17,35 @@ interface GtasksMeta {
 }
 
 /**
- * Add and close from the to-do widget, mirroring the Todoist routes. Nothing here pushes assignments into Google
- * Tasks, and nothing a Google task does reaches Canvas or Gradescope (DECISIONS 049).
+ * Add and close from the to-do widget, mirroring the Todoist routes, plus the assignment push (DECISIONS 050),
+ * which mirrors `POST /api/todoist/push` and `/api/todoist/config`. Nothing a Google task does reaches Canvas or
+ * Gradescope (DECISIONS 049).
  */
 export function gtasksRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<GTasksApi> = gtasksApiForCtx) {
   const r = new Hono();
+
+  /** Preview (dryRun=1) or execute the one-way push. Execution requires the setting to be enabled unless force=1. */
+  r.post('/push', async (c) => {
+    const dryRun = c.req.query('dryRun') === '1';
+    const force = c.req.query('force') === '1';
+    const cfg = await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema);
+    const api = await apiFactory(ctx);
+    const plan = await planGtasksPush(ctx, api, cfg);
+    if (dryRun) return c.json({ plan });
+    if (!cfg.enabled && !force) bad('push sync is disabled; enable it in Settings → To-do apps → Google Tasks or pass force=1', 409);
+    const result = await executeGtasksPush(ctx, api, plan, cfg);
+    await syncGtasks(ctx, api).catch((err) => ctx.log.warn({ err }, 'post-push gtasks sync failed'));
+    return c.json(result);
+  });
+
+  r.get('/config', async (c) => c.json(await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema)));
+  r.put('/config', async (c) => {
+    const body = await parsePatch(c, gtasksPushConfigSchema);
+    const cfg = await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema);
+    const next = { ...cfg, ...body };
+    await setSetting(ctx, 'gtasks.push', next);
+    return c.json(next);
+  });
 
   /** Close a Google task. `:id` is the item's external id, `<listId>:<taskId>`. */
   r.post('/tasks/:id/close', async (c) => {
@@ -28,6 +54,12 @@ export function gtasksRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => P
     const api = await apiFactory(ctx);
     await api.completeTask(ids.listId, ids.taskId);
     await ctx.db.update(items).set({ status: 'done', updatedAt: nowIso() }).where(eq(items.id, `gtasks:${ids.listId}:${ids.taskId}`));
+    // Mirrors (pushed assignments) also get an override so the source item hides immediately, as the Todoist close does.
+    const mapped = await ctx.db.query.gtasksMap.findFirst({ where: eq(gtasksMap.gtasksTaskId, `${ids.listId}:${ids.taskId}`) });
+    if (mapped) {
+      await ctx.db.update(gtasksMap).set({ closedByUs: true }).where(eq(gtasksMap.itemId, mapped.itemId));
+      await ctx.db.insert(overrides).values({ itemId: mapped.itemId, done: true }).onConflictDoUpdate({ target: overrides.itemId, set: { done: true } });
+    }
     return c.json({ ok: true });
   });
 

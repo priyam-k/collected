@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { items } from '../db/schema.js';
+import { courses, gtasksMap, items, overrides } from '../db/schema.js';
 import fixture from '../ingest/gtasks/fixtures/tasks.json' with { type: 'json' };
 import { syncGtasks } from '../ingest/gtasks/ingest.js';
 import { MockGTasksApi } from '../ingest/gtasks/mock-api.js';
@@ -62,5 +62,58 @@ describe('google connect', () => {
     expect(tasks).toEqual({ scope: ['https://www.googleapis.com/auth/tasks'], incremental: 'true' });
     const cal = await scopes('/google/start');
     expect(cal.scope).toEqual(['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly']);
+  });
+});
+
+describe('google tasks push routes', () => {
+  const put = (app: Hono, path: string, body: unknown) => app.request(path, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('previews with dryRun, refuses to run while disabled, runs with force or once enabled, and patches the config', async () => {
+    const ctx = await testContext();
+    await ctx.db.insert(courses).values({ id: 'c422', term: '2026-fall', code: 'CMSC422', role: 'student', submitsVia: 'both' });
+    await ctx.db.insert(items).values({ id: 'canvas:assignment:1', source: 'canvas', externalId: 'assignment:1', kind: 'assignment', courseId: 'c422', title: 'HW01', dueAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'open' });
+    const api = new MockGTasksApi(fixture);
+    const app = new Hono().route('/gtasks', gtasksRoutes(ctx, async () => api));
+
+    expect(await (await app.request('/gtasks/config')).json()).toEqual({ enabled: false, listName: 'School', titlePrefix: 'course' });
+
+    const preview = await post(app, '/gtasks/push?dryRun=1');
+    expect(preview.status).toBe(200);
+    const { plan } = (await preview.json()) as { plan: { ops: { op: string; title: string }[]; listId: string | null } };
+    expect(plan.ops).toEqual([{ op: 'create', itemId: 'canvas:assignment:1', title: 'HW01', reason: 'new assignment', body: expect.any(Object) }]);
+    expect(api.ops).toEqual([]);
+
+    expect((await post(app, '/gtasks/push')).status).toBe(409);
+    expect(api.ops).toEqual([]);
+
+    const forced = await post(app, '/gtasks/push?force=1');
+    expect(forced.status).toBe(200);
+    const result = (await forced.json()) as { done: Record<string, number>; listId: string };
+    expect(result.done.create).toBe(1);
+    expect(api.lists.map((l) => l.title)).toContain('School');
+    expect(api.tasks[result.listId]!.map((t) => t.title)).toEqual(['[CMSC422] HW01']);
+    // The post-push sync stored the mirror as a hidden item.
+    const mirror = await ctx.db.query.items.findFirst({ where: eq(items.id, `gtasks:${result.listId}:${api.tasks[result.listId]![0]!.id}`) });
+    expect(mirror?.raw).toMatchObject({ mirror: true, mirrorOf: 'canvas:assignment:1' });
+
+    const patched = await put(app, '/gtasks/config', { enabled: true, listName: 'Classes' });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toEqual({ enabled: true, listName: 'Classes', titlePrefix: 'course' });
+    expect((await put(app, '/gtasks/config', { listName: '' })).status).toBe(422);
+    expect((await put(app, '/gtasks/config', { titlePrefix: 'emoji' })).status).toBe(422);
+    expect(await (await app.request('/gtasks/config')).json()).toEqual({ enabled: true, listName: 'Classes', titlePrefix: 'course' });
+  });
+
+  it('closing a pushed mirror from the widget marks the assignment done through an override', async () => {
+    const ctx = await testContext();
+    await ctx.db.insert(courses).values({ id: 'c422', term: '2026-fall', code: 'CMSC422', role: 'student', submitsVia: 'both' });
+    await ctx.db.insert(items).values({ id: 'canvas:assignment:1', source: 'canvas', externalId: 'assignment:1', kind: 'assignment', courseId: 'c422', title: 'HW01', dueAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), status: 'open' });
+    const api = new MockGTasksApi(fixture);
+    const app = new Hono().route('/gtasks', gtasksRoutes(ctx, async () => api));
+    const result = (await (await post(app, '/gtasks/push?force=1')).json()) as { listId: string };
+    const task = api.tasks[result.listId]![0]!;
+    expect((await post(app, `/gtasks/tasks/${encodeURIComponent(`${result.listId}:${task.id}`)}/close`)).status).toBe(200);
+    expect(await ctx.db.query.overrides.findFirst({ where: eq(overrides.itemId, 'canvas:assignment:1') })).toMatchObject({ done: true });
+    expect((await ctx.db.query.gtasksMap.findFirst({ where: eq(gtasksMap.itemId, 'canvas:assignment:1') }))?.closedByUs).toBe(true);
   });
 });

@@ -479,6 +479,29 @@ export interface TodoistPushConfig {
   courseLabels: boolean;
 }
 
+export interface GtasksPushConfig {
+  enabled: boolean;
+  listName: string;
+  titlePrefix: 'course' | 'none';
+}
+
+/** `GET /api/todo/status`: one line per to-do app for the settings page, plus where the add-task box sends. */
+export interface TodoAppStatus {
+  /** The source has credentials and its last run succeeded (`status === 'connected'`). */
+  connected: boolean;
+  /** The source's scheduler switch. */
+  enabled: boolean;
+  /** The assignment push for this app is switched on (`todoist.push` / `gtasks.push` → `enabled`). */
+  pushEnabled: boolean;
+  /** When the push last executed a plan (ISO), null if never. */
+  lastPushAt: string | null;
+}
+export interface TodoStatus {
+  todoist: TodoAppStatus;
+  gtasks: TodoAppStatus;
+  defaultApp: TodoApp | null;
+}
+
 /** `GET /api/auth/me`: who the request is, and which sign-in methods this server offers. */
 export interface Me {
   /** The resolved identity string (email, "dev", "token:<name>", "service:<name>", "helper") or null when signed out. */
