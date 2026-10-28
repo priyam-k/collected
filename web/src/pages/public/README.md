@@ -18,8 +18,8 @@ import { Landing, Privacy, Terms } from '@/pages/public';
 
 ## Placeholders to fill in
 
-- `{{OPERATOR_EMAIL}}` (`OPERATOR_EMAIL` in `PublicLayout.tsx`) is the hosted instance's contact address; it appears in the privacy policy, the terms, and the landing page's invite link.
-- `{{GOVERNING_JURISDICTION}}` in `Terms.tsx`.
+- `OPERATOR_EMAIL` in `PublicLayout.tsx` (the upstream hosted instance uses admin@priyamkabra.com; change it) is the hosted instance's contact address; it appears in the privacy policy, the terms, and the landing page's invite link.
+- `GOVERNING_JURISDICTION` in `PublicLayout.tsx`, used by `Terms.tsx`.
 - `GITHUB_URL` in `PublicLayout.tsx` if the repository moves.
 - The product screenshot: the landing page loads `/docs/screenshots/dashboard.png`. Vite serves `web/public/` at the web root, so put the image at `web/public/docs/screenshots/dashboard.png` (a copy or symlink of `docs/screenshots/dashboard.png`). Until it exists the slot renders a placeholder grid rather than a broken image.
 - The "Last updated" dates are `PRIVACY_UPDATED` and `TERMS_UPDATED`; move them when the text changes.

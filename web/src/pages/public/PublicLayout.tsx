@@ -9,7 +9,9 @@ export const GITHUB_URL = 'https://github.com/priyam-k/collected';
 export const SELF_HOST_DOC_URL = `${GITHUB_URL}/blob/main/docs/self-host.md`;
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 /** Replaced by the operator of a hosted instance; also used verbatim in the privacy policy text. */
-export const OPERATOR_EMAIL = '{{OPERATOR_EMAIL}}';
+/** Operators of a self-hosted copy: change these two lines (see README.md in this folder). */
+export const OPERATOR_EMAIL = 'admin@priyamkabra.com';
+export const GOVERNING_JURISDICTION = 'the State of Maryland, United States';
 
 function ThemeButton() {
   const { theme, resolved, setTheme } = useTheme();

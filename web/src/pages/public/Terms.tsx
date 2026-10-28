@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { LICENSE_URL, OPERATOR_EMAIL, Prose, PublicLayout } from './PublicLayout';
+import { GOVERNING_JURISDICTION, LICENSE_URL, OPERATOR_EMAIL, Prose, PublicLayout } from './PublicLayout';
 
 export const TERMS_UPDATED = 'October 26, 2026';
 
@@ -62,7 +62,7 @@ export function Terms() {
 
         <h2>Governing law</h2>
         <p>
-          These terms are governed by the laws of <code>{'{{GOVERNING_JURISDICTION}}'}</code>, without regard to conflict-of-law rules. Nothing in them limits rights that the consumer law where you live gives you and that cannot be waived.
+          These terms are governed by the laws of {GOVERNING_JURISDICTION}, without regard to conflict-of-law rules. Nothing in them limits rights that the consumer law where you live gives you and that cannot be waived.
         </p>
 
         <h2>Contact</h2>
