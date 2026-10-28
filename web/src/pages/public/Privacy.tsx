@@ -1,6 +1,6 @@
 import { OPERATOR_EMAIL, Prose, PublicLayout } from './PublicLayout';
 
-export const PRIVACY_UPDATED = 'October 26, 2026';
+export const PRIVACY_UPDATED = 'October 28, 2026';
 
 /**
  * Privacy policy for a hosted deployment. Written in plain language on purpose: the person reading it is a student
@@ -11,7 +11,7 @@ export function Privacy() {
     <PublicLayout>
       <Prose title="Privacy policy" updated={PRIVACY_UPDATED}>
         <p>
-          collected is a dashboard that copies your school and personal data from services you connect (Canvas, Gradescope, Google Calendar, Todoist, a job feed) into one place so you can see it on one board. This page explains what a hosted instance of collected stores, why, where it lives, who can see it, and how to get it out again. It is short because the answer is simple: the instance keeps a copy of what your sources say, keeps your credentials for those sources encrypted so it can refresh that copy, and shares it with no one.
+          collected is a dashboard that copies your school and personal data from services you connect (Canvas, Gradescope, Google Calendar, Todoist, Google Tasks, a job feed) into one place so you can see it on one board. This page explains what a hosted instance of collected stores, why, where it lives, who can see it, and how to get it out again. It is short because the answer is simple: the instance keeps a copy of what your sources say, keeps your credentials for those sources encrypted so it can refresh that copy, and shares it with no one.
         </p>
         <p>
           The <strong>operator</strong> is whoever runs the instance you signed in to. For this instance, that is <code>{OPERATOR_EMAIL}</code>. If you run collected on your own server, you are the operator and this page describes what your server does.
@@ -34,7 +34,7 @@ export function Privacy() {
             <strong>Calendar events</strong> from the Google calendars you select (or from a calendar's iCal address): titles, times, locations, descriptions, the calendar's name and colour.
           </li>
           <li>
-            <strong>Tasks</strong> from Todoist: content, due dates, labels, project and section names, completion state.
+            <strong>Tasks</strong> from Todoist and from Google Tasks: content, notes, due dates, labels, project, section or list names, completion state. If you turn on the assignment push, the tasks it creates in those apps carry a short marker (<code>collected:&lt;id&gt;</code>) so it can find them again.
           </li>
           <li>
             <strong>Job listings</strong> from the public feed you configure, and your own notes and stage for the ones you track.
@@ -48,7 +48,8 @@ export function Privacy() {
           <li>Your Canvas session cookie.</li>
           <li>Your Gradescope email address and password.</li>
           <li>A Google refresh token for the Calendar scopes you granted, or the secret iCal address of a calendar.</li>
-          <li>Your Todoist API token.</li>
+          <li>A separate Google refresh token for the Tasks scope, if you connected Google Tasks.</li>
+          <li>Your Todoist access token, obtained either by signing in with Todoist or by pasting an API token.</li>
         </ul>
         <p>
           Each of these is encrypted with AES-256-GCM before it is written to disk, using a key that is kept on the server and never leaves it. The web app never shows a credential again after you save it. The operator can see that a credential is set, not what it is, unless they also hold the key file on the server (see "Security" below for what that means).
@@ -58,7 +59,7 @@ export function Privacy() {
 
         <h2>Why it is stored</h2>
         <p>
-          To show it to you. The board, the course panes, the to-do list, the grade estimates and the Todoist push all read from the server's copy, which is refreshed on a timer (every 5 to 60 minutes depending on the source) using the stored credentials. Nothing is stored for any other purpose: there is no analytics, no advertising, no profiling, no training of anything.
+          To show it to you. The board, the course panes, the to-do list, the grade estimates and the assignment push into Todoist or Google Tasks all read from the server's copy, which is refreshed on a timer (every 5 to 60 minutes depending on the source) using the stored credentials. Nothing is stored for any other purpose: there is no analytics, no advertising, no profiling, no training of anything.
         </p>
 
         <h2>Where it is stored</h2>
@@ -82,7 +83,7 @@ export function Privacy() {
         <h2>What is shared with third parties</h2>
         <p>Nothing, with one optional exception you control.</p>
         <p>
-          The instance talks to the sources you connected, using your credentials, to read your data, and to Google Calendar or Todoist to create the events and tasks you ask it to create. It does not send your data to anyone else, does not sell it, and does not use it for advertising.
+          The instance talks to the sources you connected, using your credentials, to read your data, and to Google Calendar, Todoist or Google Tasks to create, update, complete or delete the events and tasks you asked it to manage. It does not send your data to anyone else, does not sell it, and does not use it for advertising.
         </p>
         <p>
           <strong>The optional exception: the file-sync classifier.</strong> If you turn on file sync on your laptop and enable its model, the laptop agent sends the <em>names</em> of Canvas files and folders that no rule covers to TypeSafe (typesafe.ai), which answers with the folder each file belongs in. Only file names, folder names and your target descriptions are sent, never file contents, grades, events or credentials, and the request goes from your laptop under your own TypeSafe API key, not from the operator's server. Leave the model off and nothing is sent anywhere.
@@ -90,20 +91,20 @@ export function Privacy() {
 
         <h2>Google user data</h2>
         <p>
-          If you connect Google Calendar through Google sign-in, collected requests the <code>calendar.readonly</code> and <code>calendar.events</code> scopes. Its use of information received from Google APIs adheres to the{' '}
+          Signing in with Google uses only your email address, name and profile picture (the <code>openid</code>, <code>email</code> and <code>profile</code> scopes). Connecting Google Calendar requests the <code>calendar.readonly</code> and <code>calendar.events</code> scopes; connecting Google Tasks separately requests the <code>tasks</code> scope. collected's use of information received from Google APIs adheres to the{' '}
           <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">
             Google API Services User Data Policy
           </a>
           , including the Limited Use requirements. Specifically:
         </p>
         <ul>
-          <li>Calendar data is used only to display your events on the dashboard and to create the events you add from it. It is not used for any other purpose.</li>
+          <li>Calendar data is used only to display your events on the dashboard and to create the events you add from it. Tasks data is used only to show your tasks on the dashboard, to add and complete the tasks you ask for, and, if you turn the push on, to mirror your assignments as tasks. Neither is used for any other purpose.</li>
           <li>It is not transferred to anyone except as necessary to provide that feature (the server stores it so it can show it to you), or as required by law.</li>
           <li>It is never sold, never used for advertising, and never used to train or improve any model, generalized or otherwise.</li>
           <li>No human reads it, except with your explicit permission, for security purposes, to comply with the law, or in aggregated, anonymized form for internal operations.</li>
         </ul>
         <p>
-          You can revoke access at any time from Settings → Sources → Disconnect (which deletes the refresh token) or from your{' '}
+          You can revoke access at any time from Settings → Sources → Disconnect (which deletes that refresh token) or from your{' '}
           <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
             Google account permissions
           </a>

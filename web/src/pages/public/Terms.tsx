@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { GOVERNING_JURISDICTION, LICENSE_URL, OPERATOR_EMAIL, Prose, PublicLayout } from './PublicLayout';
 
-export const TERMS_UPDATED = 'October 26, 2026';
+export const TERMS_UPDATED = 'October 28, 2026';
 
 /** Terms for a hosted deployment. Short on purpose; the software's own licence is the AGPL, linked below. */
 export function Terms() {
@@ -14,7 +14,7 @@ export function Terms() {
 
         <h2>The service</h2>
         <p>
-          collected copies data from services you connect (Canvas, Gradescope, Google Calendar, Todoist, a job feed) and shows it on one board. It is provided <strong>as is</strong>, free of charge, during an invite-only beta. It can change, pause or shut down; if it shuts down you will get at least 30 days' notice and a way to export your data.
+          collected copies data from services you connect (Canvas, Gradescope, Google Calendar, Todoist, Google Tasks, a job feed) and shows it on one board. It is provided <strong>as is</strong>, free of charge, during an invite-only beta. It can change, pause or shut down; if it shuts down you will get at least 30 days' notice and a way to export your data.
         </p>
 
         <h2>No warranty</h2>
