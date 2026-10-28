@@ -40,7 +40,7 @@ jobs:
           test -n "$latest" || { echo "no dump on the box yet" >&2; exit 1; }
           mkdir -p out && scp "box:$latest" out/
           ls -la out
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: collected-db-${{ github.run_id }}
           path: out/*.db.gz
