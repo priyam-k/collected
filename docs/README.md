@@ -1,6 +1,6 @@
 # docs/
 
-Documentation for people who run or use collected. The engineering notes (architecture, decisions, progress) live in [`artifacts/`](../artifacts/).
+Documentation for people who run or use collected. The engineering notes (architecture, decisions, setup) live in [`artifacts/`](../artifacts/).
 
 | File | What it is for |
 | --- | --- |

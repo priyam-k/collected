@@ -27,7 +27,7 @@ Both run in CI on every pull request, plus `pnpm audit --prod --audit-level=high
 
 ## Conventions
 
-The full list is in `CLAUDE.md` at the repository root; the ones that trip people up:
+The ones that trip people up:
 
 - **Ingesters** upsert by `(source, external_id)`, soft-delete what they no longer see, and always write their status to `sources`. An empty or failed upstream answer is never a deletion. Every ingester is also a CLI command (`pnpm sync <source>`); build and debug it that way first.
 - **Todoist push is one-way.** It creates, updates, closes and deletes tasks for assignments; it never reopens a task and never touches Canvas or Gradescope from a Todoist event.
@@ -37,7 +37,7 @@ The full list is in `CLAUDE.md` at the repository root; the ones that trip peopl
 - **The agent trusts nothing from the server about paths.** Targets are checked against `allowedTargets`, every vault write goes through `assertInside`, downloads follow only https redirects to public hosts.
 - **Secrets** go through `server/src/lib/crypto.ts`, never on a command line in docs or help text, never logged or committed.
 - **Widgets**: one folder under `web/src/widgets/<type>/`, one entry in `registry.ts`, every size tier from `useWidgetSize()`, and empty, loading and error states.
-- **Docs**: `artifacts/DECISIONS.md` is append-only (new numbered entry when a decision changes), `artifacts/PROGRESS.md` tracks milestones, `artifacts/SETUP.md` must stay accurate when env vars or flows change.
+- **Docs**: `artifacts/DECISIONS.md` is append-only (new numbered entry when a decision changes); `artifacts/SETUP.md` and `docs/self-host.md` must stay accurate when env vars or flows change.
 - **Dependencies**: none added casually. Open an issue first if a change needs one.
 
 ## Commits and pull requests

@@ -18,3 +18,9 @@ __pycache__/
 e2e/test-results/
 e2e/playwright-report/
 e2e/blob-report/
+
+# Private working notes; the public docs stay in artifacts/ (SETUP, DESIGN, OVERVIEW, DECISIONS, seed-config)
+CLAUDE.md
+artifacts/PROGRESS.md
+artifacts/REFERENCE.md
+artifacts/SECURITY-REVIEW.md
