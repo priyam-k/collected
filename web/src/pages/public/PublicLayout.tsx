@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Moon, Sun, SunMoon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useGlass } from '@/lib/liquid';
 import { useTheme } from '@/lib/theme';
 
 export const GITHUB_URL = 'https://github.com/priyam-k/collected';
@@ -15,9 +16,9 @@ function ThemeButton() {
   const Icon = theme === 'system' ? SunMoon : resolved === 'dark' ? Sun : Moon;
   const next = theme === 'system' ? (resolved === 'dark' ? 'light' : 'dark') : theme === 'dark' ? 'light' : 'dark';
   return (
-    <Button variant="ghost" size="icon-sm" aria-label="Toggle theme" title={`Theme: ${theme}`} onClick={() => setTheme(next)}>
-      <Icon className="size-4" />
-    </Button>
+    <button className="glass-btn" aria-label="Toggle theme" title={`Theme: ${theme}`} onClick={() => setTheme(next)}>
+      <Icon className="size-[18px]" strokeWidth={1.7} />
+    </button>
   );
 }
 
@@ -25,39 +26,40 @@ function ThemeButton() {
 export function Brand({ className = '' }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <span aria-hidden className="grid size-7 place-items-center rounded-full bg-ink text-[11px] font-semibold text-background shadow-[var(--shadow)]">
+      <span aria-hidden className="grid size-7 place-items-center rounded-full bg-ink text-[12px] font-semibold text-ground">
         c
       </span>
-      <span className="text-[15px] font-semibold tracking-tight">collected</span>
+      <span className="text-[15px] font-semibold tracking-[-0.01em]">collected</span>
     </span>
   );
 }
 
 /**
- * Chrome for the signed-out pages: a one-line header with the product name and a Sign in link, the page, and a
+ * Chrome for the signed-out pages: a floating glass bar with the product name and a Sign in link, the page, and a
  * footer with Privacy, Terms, and GitHub. Pages wrap themselves in it, so each route is a single element.
  */
 export function PublicLayout({ children }: { children: ReactNode }) {
+  const glass = useGlass<HTMLDivElement>();
   return (
-    <div className="flex min-h-full flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-line bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4 sm:px-6">
-          <Link to="/" className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="collected home">
+    <div className="flex min-h-full flex-col text-foreground">
+      <header className="pointer-events-none sticky top-0 z-20 px-3 pt-3 sm:px-6 sm:pt-4">
+        <div ref={glass} className="glass pointer-events-auto mx-auto flex h-[52px] w-full max-w-5xl items-center gap-2 p-1.5 pl-4">
+          <Link to="/" className="rounded-full" aria-label="collected home">
             <Brand />
           </Link>
-          <nav className="ml-auto flex items-center gap-1 sm:gap-2">
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hidden rounded-full px-3 py-1.5 text-[13px] font-medium text-sub hover:text-ink sm:inline">
+          <nav className="ml-auto flex items-center gap-0.5">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="glass-btn hidden px-3.5 text-[14px] font-medium text-sub hover:text-ink sm:inline-flex">
               GitHub
             </a>
             <ThemeButton />
-            <Button asChild size="sm">
+            <Button asChild>
               <Link to="/signin">Sign in</Link>
             </Button>
           </nav>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 sm:px-6">{children}</main>
-      <footer className="border-t border-line">
+      <footer className="mt-8 border-t border-line">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-6 text-[13px] text-sub sm:px-6">
           <Brand className="mr-auto opacity-80" />
           <Link to="/privacy" className="hover:text-ink">
@@ -79,8 +81,8 @@ export function PublicLayout({ children }: { children: ReactNode }) {
 export function Prose({ title, updated, children }: { title: string; updated: string; children: ReactNode }) {
   return (
     <article className="mx-auto max-w-prose py-10 sm:py-14 [&_a]:underline [&_a]:underline-offset-4 [&_a:hover]:text-ink [&_h2]:mt-10 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mt-6 [&_h3]:text-[15px] [&_h3]:font-semibold [&_li]:mt-1.5 [&_li]:leading-relaxed [&_p]:mt-3 [&_p]:leading-relaxed [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_code]:rounded [&_code]:bg-well [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em]">
-      <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-      <p className="!mt-2 text-sm text-sub">Last updated: {updated}</p>
+      <h1 className="text-[40px] font-[620] leading-[1.06] tracking-[-0.03em]">{title}</h1>
+      <p className="label !mt-3">Last updated · {updated}</p>
       {children}
     </article>
   );

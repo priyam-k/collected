@@ -21,7 +21,7 @@ interface Row {
   location: string | null;
 }
 
-const toneFor = (k: Row['kind']) => (k === 'quiz' ? 'var(--amber)' : 'var(--coral)');
+const toneFor = (k: Row['kind']) => (k === 'quiz' ? 'var(--caution)' : 'var(--critical)');
 
 /** Days-until in one word: "today", "tmrw", or the number; the label below says "days". */
 function countdown(when: Date): { big: string; small: string; urgent: boolean } {
@@ -70,8 +70,8 @@ export function ExamsWidget({ size }: WidgetProps) {
       <WidgetHeader>
         {rows.length > 0 && (
           soon > 0 ? (
-            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-coral" style={{ background: 'color-mix(in oklab, var(--coral) 18%, var(--card))' }}>
-              <span className="size-1.5 rounded-full bg-coral" />{soon} this week
+            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
+              <span className="size-1.5 rounded-full bg-critical" />{soon} this week
             </span>
           ) : (
             <span className="text-[12.5px] text-sub">{rows.length} upcoming</span>
@@ -91,15 +91,15 @@ export function ExamsWidget({ size }: WidgetProps) {
               <li key={r.item.id}>
                 <ItemPopover item={r.item}>
                   <span className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-well">
-                    <span className={cn('grid w-[52px] shrink-0 place-items-center rounded-[12px] py-1.5 leading-none', c.urgent ? 'text-white' : 'text-ink')} style={{ background: c.urgent ? toneFor(r.kind) : 'var(--well)' }}>
-                      <span className={cn('font-bold tracking-[-0.03em]', c.big.length > 2 ? 'text-[13px]' : 'text-xl')}>{c.big}</span>
-                      <span className={cn('mt-0.5 text-[10px]', c.urgent ? 'text-white/80' : 'text-ter')}>{c.small}</span>
+                    <span className="grid w-[54px] shrink-0 place-items-center rounded-[14px] bg-well py-2 leading-none" style={c.urgent ? { color: toneFor(r.kind), background: `color-mix(in srgb, ${toneFor(r.kind)} 10%, var(--well))` } : undefined}>
+                      <span className={cn('font-[560] tracking-[-0.03em]', c.big.length > 2 ? 'text-[14px]' : 'text-[22px]')}>{c.big}</span>
+                      <span className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.06em] opacity-75">{c.small}</span>
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-[11.5px]">
                         <span className="size-1.5 shrink-0 rounded-full" style={{ background: tone }} />
                         {r.item.course && <button className="font-medium hover:underline" style={{ color: tone }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); open({ kind: 'course', courseId: r.item.course!.id, tab: 'dates' }); }}>{r.item.course.code}</button>}
-                        <span className="uppercase tracking-wide text-ter">{r.kind}</span>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ter">{r.kind}</span>
                       </span>
                       <span className="block truncate text-[13.5px] font-medium">{r.item.title}</span>
                       <span className="block truncate text-xs text-sub">{format(r.when, 'EEE MMM d')}{r.item.allDay ? '' : ` · ${format(r.when, 'h:mm a')}`}{r.location ? ` · ${r.location}` : ''}</span>

@@ -29,7 +29,7 @@ function Dot({ s, className }: { s: Source; className?: string }) {
   if (s.status === 'connected' && !standby) return <span className={cn('size-2 shrink-0 rounded-full bg-teal', className)} />;
   if (s.status === 'error') return <span className={cn('size-2 shrink-0 rounded-full bg-coral', className)} />;
   if (s.status === 'needs_auth') return <span className={cn('size-2 shrink-0 rounded-full bg-amber', className)} />;
-  return <span className={cn('size-2 shrink-0 rounded-full bg-well2 shadow-[inset_0_0_0_1.5px_var(--ter)]', className)} />;
+  return <span className={cn('size-2 shrink-0 rounded-full shadow-[inset_0_0_0_1.5px_var(--line-strong)]', className)} />;
 }
 
 export function SourcesWidget({ size }: WidgetProps) {
@@ -53,13 +53,13 @@ export function SourcesWidget({ size }: WidgetProps) {
   };
 
   const summary = attention.length ? (
-    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-amber">
-      <span className="size-1.5 rounded-full bg-amber ring-glow" style={{ '--glow-color': 'var(--amber)' } as React.CSSProperties} />
+    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-caution">
+      <span className="size-1.5 rounded-full bg-caution" />
       {attention.length} need{attention.length === 1 ? 's' : ''} attention
     </span>
   ) : (
-    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-teal">
-      <span className="size-1.5 rounded-full bg-teal ring-glow" style={{ '--glow-color': 'var(--teal)' } as React.CSSProperties} />
+    <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-positive">
+      <span className="size-1.5 rounded-full bg-positive" />
       All live
     </span>
   );
@@ -99,7 +99,7 @@ export function SourcesWidget({ size }: WidgetProps) {
               {s.status === 'error' || s.status === 'needs_auth' ? (
                 <span className={cn('truncate text-xs', s.status === 'error' ? 'text-coral' : 'text-amber')} title={s.lastError ?? undefined}>{STATUS_LABEL[s.status]}</span>
               ) : (
-                <span className="text-xs text-ter">{standby ? 'standby' : shortAgo(s.lastSuccessAt)}</span>
+                <span className="font-mono text-[11px] text-ter">{standby ? 'standby' : shortAgo(s.lastSuccessAt)}</span>
               )}
               <button
                 type="button"

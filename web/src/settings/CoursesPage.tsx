@@ -97,7 +97,7 @@ export function CoursesPage() {
       </div>
       {q.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
       {q.data && (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
@@ -281,7 +281,7 @@ function LinkedAssignments({ courseId }: { courseId: string }) {
   const freeCanvas = canvas.filter((x) => !linkedIds.has(x.id));
   const freeGs = gradescope.filter((x) => !linkedIds.has(x.id));
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <div className="space-y-2 rounded-2xl bg-well/60 p-4">
       <div className="text-sm font-medium">Linked assignments</div>
       <p className="text-xs text-muted-foreground">Pairs count as one item; done on either side marks both done. Auto pairs come from title and due-date similarity.</p>
       {links.length > 0 && (
@@ -299,11 +299,11 @@ function LinkedAssignments({ courseId }: { courseId: string }) {
       )}
       {freeCanvas.length > 0 && freeGs.length > 0 && (
         <div className="flex flex-wrap items-end gap-2 text-sm">
-          <select className="h-8 min-w-40 flex-1 rounded-md border bg-background px-2 text-sm" value={pick.a} onChange={(e) => setPick({ ...pick, a: e.target.value })}>
+          <select className="h-8 min-w-40 flex-1 rounded-[10px] border border-line2 bg-well px-2 text-sm" value={pick.a} onChange={(e) => setPick({ ...pick, a: e.target.value })}>
             <option value="">Canvas assignment…</option>
             {freeCanvas.map((x) => <option key={x.id} value={x.id}>{x.title}{x.dueAt ? ` · ${friendlyDate(x.dueAt)}` : ''}</option>)}
           </select>
-          <select className="h-8 min-w-40 flex-1 rounded-md border bg-background px-2 text-sm" value={pick.b} onChange={(e) => setPick({ ...pick, b: e.target.value })}>
+          <select className="h-8 min-w-40 flex-1 rounded-[10px] border border-line2 bg-well px-2 text-sm" value={pick.b} onChange={(e) => setPick({ ...pick, b: e.target.value })}>
             <option value="">Gradescope assignment…</option>
             {freeGs.map((x) => <option key={x.id} value={x.id}>{x.title}{x.dueAt ? ` · ${friendlyDate(x.dueAt)}` : ''}</option>)}
           </select>

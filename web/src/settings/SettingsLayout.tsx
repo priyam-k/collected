@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes, Navigate, Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
+import { useLiquid } from '@/lib/liquid';
 import { cn } from '@/lib/utils';
 import { SourcesPage } from './SourcesPage';
 import { CoursesPage } from './CoursesPage';
@@ -22,29 +23,32 @@ const NAV = [
 ];
 
 export function SettingsLayout() {
+  // NavLink marks the current section with aria-current="page"; the thumb springs to it.
+  const liquid = useLiquid<HTMLElement>();
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-12 pt-3 sm:px-4">
-      <header className="mb-4 flex items-center gap-3">
-        <Link to="/" className="inline-flex h-8 items-center gap-1 rounded-full border border-line2 bg-card px-3 text-[13px] text-sub shadow-[var(--shadow)] transition-colors hover:bg-well hover:text-ink">
-          <ArrowLeft className="size-4" /> Dashboard
+    <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+      <header className="mb-8">
+        <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
+          <ArrowLeft className="size-4" strokeWidth={1.7} /> Dashboard
         </Link>
-        <h1 className="text-2xl font-bold tracking-[-0.03em]">Settings</h1>
+        <p className="label mt-7">collected</p>
+        <h1 className="mt-1.5 text-[38px] font-[620] leading-[1.05] tracking-[-0.03em] sm:text-[44px]">Settings</h1>
       </header>
-      <div className="grid gap-6 md:grid-cols-[11rem_1fr]">
-        <nav className="flex gap-1 overflow-x-auto md:flex-col">
+      <div className="grid gap-6 md:grid-cols-[12rem_1fr] md:gap-8">
+        <nav ref={liquid} className="relative flex gap-1 self-start overflow-x-auto rounded-[22px] p-1 [scrollbar-width:none] md:sticky md:top-6 md:flex-col md:bg-well">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
               to={`/settings/${n.to}`}
               className={({ isActive }) =>
-                cn('whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] transition-colors', isActive ? 'bg-well2 font-semibold text-ink' : 'text-sub hover:bg-well hover:text-ink')
+                cn('relative z-[1] whitespace-nowrap rounded-full px-4 py-2 text-[14px] transition-colors', isActive ? 'font-semibold text-ink' : 'text-sub hover:text-ink')
               }
             >
               {n.label}
             </NavLink>
           ))}
         </nav>
-        <div className="min-w-0">
+        <div className="surface min-w-0 p-5 sm:p-8">
           <Routes>
             <Route index element={<Navigate to="/settings/sources" replace />} />
             <Route path="sources" element={<SourcesPage />} />

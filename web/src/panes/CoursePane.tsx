@@ -6,6 +6,7 @@ import { SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { canvasFileUrl, canvasOrigin } from '@/lib/canvas';
 import { safeColor } from '@/lib/color';
 import { safeHref } from '@/lib/url';
+import { useLiquid } from '@/lib/liquid';
 import { useCourseContent, useCourseGrades, useCourses, useItems, type CourseContentRow } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -65,7 +66,7 @@ function ExtLink({ href, className, title, children }: { href: string | null | u
   return safe ? <a href={safe} target="_blank" rel="noreferrer" className={className} title={title}>{children}</a> : <span className={className}>{children}</span>;
 }
 
-const More = ({ onClick, children }: { onClick(): void; children: ReactNode }) => <button className="text-[12.5px] text-indigo hover:underline" onClick={onClick}>{children}</button>;
+const More = ({ onClick, children }: { onClick(): void; children: ReactNode }) => <button className="text-[12.5px] text-brand-ink hover:underline" onClick={onClick}>{children}</button>;
 
 function FileRow({ f, last, detail }: { f: CourseContentRow; last?: boolean; detail?: boolean }) {
   const where = detail ? [f.raw.folderPath, f.moduleName].filter(Boolean).join(' · ') : '';
@@ -161,7 +162,7 @@ function Announcement({ item, defaultOpen, last }: { item: EffectiveItem; defaul
         <div className="px-4 pb-3 text-[13px] leading-relaxed">
           {item.description ? <p className="whitespace-pre-wrap text-sub">{item.description}</p> : <p className="text-ter">No text (open in Canvas).</p>}
           {safeHref(item.url) && (
-            <a href={safeHref(item.url)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-indigo hover:underline">
+            <a href={safeHref(item.url)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-brand-ink hover:underline">
               Open in Canvas <ExternalLink className="size-3" />
             </a>
           )}
@@ -196,6 +197,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   const contentQ = useCourseContent(courseId);
   const gradesQ = useCourseGrades(courseId);
   const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? 'overview');
+  const liquid = useLiquid();
 
   const assignments = useMemo(() => (assignmentsQ.data ?? []).slice().sort((a, b) => dueMs(a) - dueMs(b)), [assignmentsQ.data]);
   const announcements = useMemo(() => (announcementsQ.data ?? []).slice().sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? '')), [announcementsQ.data]);
@@ -215,7 +217,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
   }
 
   const isTa = course.role === 'ta';
-  const color = safeColor(course.color) ?? 'var(--indigo)';
+  const color = safeColor(course.color) ?? 'var(--brand)';
   const origin = canvasOrigin([...assignments.map((a) => a.url), syllabus?.url, ...files.map((f) => f.url)]);
   const links: CourseLink[] = [
     ...(course.canvasCourseId && origin ? [{ label: 'Canvas', url: `${origin}/courses/${course.canvasCourseId}` }] : []),
@@ -256,15 +258,15 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="shrink-0 border-b border-line bg-well px-[22px] pb-4 pt-5">
+      <header className="shrink-0 px-6 pb-3 pt-6">
         <div className="flex items-center gap-2.5">
-          <span className="size-2.5 shrink-0 rounded-full ring-glow" style={{ background: color, '--glow-color': color } as CSSProperties} />
-          <SheetTitle className="text-xl font-bold tracking-[-0.02em]">{course.code}</SheetTitle>
+          <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
+          <SheetTitle className="text-[26px] font-[620] leading-tight tracking-[-0.025em]">{course.code}</SheetTitle>
           {course.section && <span className="text-sm text-ter">{course.section}</span>}
-          {isTa && <span className="rounded-full bg-card px-2 py-0.5 text-[10px] font-semibold uppercase text-sub">TA</span>}
+          {isTa && <span className="label rounded-full bg-well px-2 py-0.5">TA</span>}
           <span className="flex-1" />
-          <Link to="/settings/courses" className="orb size-8 border border-line" title="Course settings" aria-label="Course settings"><Settings className="size-3.5" /></Link>
-          <SheetClose className="orb size-8 border border-line" aria-label="Close"><X className="size-3.5" /></SheetClose>
+          <Link to="/settings/courses" className="orb size-8" title="Course settings" aria-label="Course settings"><Settings className="size-3.5" /></Link>
+          <SheetClose className="orb size-8" aria-label="Close"><X className="size-3.5" /></SheetClose>
         </div>
         <SheetDescription className="mt-1.5 text-[15px] text-sub">
           {course.name ?? course.term}
@@ -279,9 +281,9 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
             ))}
           </div>
         )}
-        <div className="seg mt-3.5 flex w-full overflow-x-auto">
+        <div className="seg mt-4 flex w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" ref={liquid}>
           {tabs.filter((t) => !t.hidden).map((t) => (
-            <button key={t.key} className={cn('!flex-none !py-1.5 !text-[12.5px]', tab === t.key && 'seg-on')} onClick={() => setTab(t.key)}>
+            <button key={t.key} className={cn('!flex-none !py-1.5 !text-[12.5px]', tab === t.key && 'seg-on')} aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}{t.count ? ` · ${t.count}` : ''}{t.key === 'grades' && g?.current != null ? ` · ${g.current.toFixed(0)}%` : ''}
             </button>
           ))}
@@ -294,22 +296,22 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
             <div className="grid grid-cols-2 gap-3">
               {isTa ? (
                 <div className="flex flex-col justify-center gap-1 rounded-2xl bg-well p-4">
-                  <div className="text-[12.5px] text-sub">Grading</div>
-                  <div className="text-[26px] font-bold tracking-[-0.03em] text-indigo">{grading.length}</div>
+                  <div className="label">Grading</div>
+                  <div className="text-[30px] font-[560] leading-none tracking-[-0.02em] text-brand-ink">{grading.length}</div>
                   <div className="text-[13px] text-sub">{grading.length ? 'in the queue' : 'queue is empty'}</div>
                 </div>
               ) : (
                 <button className="flex items-center gap-3.5 rounded-2xl bg-well p-4 text-left transition-colors hover:bg-well2" onClick={() => setTab('grades')}>
                   <GradeRing course={course} percent={g?.current} size={64} />
                   <div className="min-w-0">
-                    <div className="text-[12.5px] text-sub">Grade</div>
+                    <div className="label">Grade</div>
                     <div className="mt-0.5 text-[13px]">{g ? (g.current == null ? 'Nothing graded yet' : `${g.weighted ? 'Weighted' : 'By points'} · ${g.graded} of ${g.total} graded`) : '…'}</div>
                   </div>
                 </button>
               )}
               <button className="flex flex-col justify-center gap-1 rounded-2xl bg-well p-4 text-left transition-colors hover:bg-well2" onClick={() => setTab('assignments')}>
-                <div className="text-[12.5px] text-sub">{isTa ? 'Upcoming' : 'To do'}</div>
-                <div className={cn('text-[26px] font-bold tracking-[-0.03em]', first.length ? 'text-ink' : 'text-teal')}>{assignmentsQ.isPending ? '…' : first.length}</div>
+                <div className="label">{isTa ? 'Upcoming' : 'To do'}</div>
+                <div className={cn('text-[30px] font-[560] leading-none tracking-[-0.02em]', first.length ? 'text-ink' : 'text-positive')}>{assignmentsQ.isPending ? '…' : first.length}</div>
                 <div className="truncate text-[13px] text-sub">{first.length ? (first[0]!.dueAt ? `Next: ${first[0]!.title}` : first[0]!.title) : isTa ? 'Nothing coming up.' : 'Nothing left. Nice.'}</div>
               </button>
             </div>
@@ -318,17 +320,17 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
               {scheduleRows.length ? (
                 <Well>
                   {scheduleRows.map((r, i) => (
-                    <div key={i} className={cn('flex items-center gap-3 px-3.5 py-3', i < scheduleRows.length - 1 && 'border-b border-line')} style={r.isNext ? { background: 'color-mix(in oklab, var(--indigo) 10%, transparent)' } : undefined}>
+                    <div key={i} className={cn('flex items-center gap-3 px-3.5 py-3', i < scheduleRows.length - 1 && 'border-b border-line')} style={r.isNext ? { background: 'color-mix(in oklab, var(--brand) 10%, transparent)' } : undefined}>
                       <span className="w-[76px] shrink-0 text-[13.5px] text-sub">{meetingLabel(r.kind)}</span>
                       <span className="text-[13.5px] font-medium">{r.label}</span>
                       {r.m.location && <span className="truncate text-xs text-ter">{r.m.location}</span>}
                       <span className="flex-1" />
-                      {r.isNext && <span className="grid h-[22px] place-items-center rounded-full bg-indigo px-2.5 text-[11px] font-semibold text-white">{meeting?.virtual ? 'Next · online' : 'Next'}</span>}
+                      {r.isNext && <span className="grid h-[22px] place-items-center rounded-full bg-brand px-2.5 text-[11px] font-semibold text-on-brand">{meeting?.virtual ? 'Next · online' : 'Next'}</span>}
                     </div>
                   ))}
                 </Well>
               ) : (
-                <EmptyWell>No schedule yet. <Link to="/settings/courses" className="text-indigo hover:underline">Add one in settings.</Link></EmptyWell>
+                <EmptyWell>No schedule yet. <Link to="/settings/courses" className="text-brand-ink hover:underline">Add one in settings.</Link></EmptyWell>
               )}
             </Section>
 
@@ -365,7 +367,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
                           <ExtLink href={q.url} className="min-w-0 flex-1 truncate hover:underline">{q.title}</ExtLink>
                           <span className="text-xs text-ter">{raw.submissions ?? 0} subs · {pct}%{raw.openRegradeRequests ? ` · ${raw.openRegradeRequests} regrades` : ''}{raw.published ? '' : ' · unpublished'}</span>
                         </div>
-                        <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-card"><div className="h-full rounded bg-indigo" style={{ width: `${pct}%` }} /></div>
+                        <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-card"><div className="h-full rounded bg-brand" style={{ width: `${pct}%` }} /></div>
                       </div>
                     );
                   })}
@@ -414,7 +416,7 @@ export function CoursePane({ courseId, initialTab }: { courseId: string; initial
         {tab === 'syllabus' && syllabus && (
           <div className="space-y-3">
             {safeHref(syllabus.url) && (
-              <a href={safeHref(syllabus.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-indigo hover:underline">
+              <a href={safeHref(syllabus.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-ink hover:underline">
                 Open in Canvas <ExternalLink className="size-3" />
               </a>
             )}

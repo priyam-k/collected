@@ -103,7 +103,7 @@ function DataViewer({ source }: { source: Source }) {
   const q = useSourceSummary(source.id, open);
   const d = q.data;
   return (
-    <div className="rounded-md border">
+    <div className="rounded-xl border border-line">
       <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent/50" onClick={() => setOpen((v) => !v)} title="Show what this source has pulled">
         {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         <span className="font-medium">Data pulled</span>
@@ -132,7 +132,7 @@ function DataViewer({ source }: { source: Source }) {
                     {d.byCourse.map((c) => (
                       <tr key={c.courseId} className="border-t">
                         <td className="py-1 pr-2 font-medium">{c.code}{c.role === 'ta' && <span className="ml-1 text-muted-foreground">TA</span>}</td>
-                        <td className="py-1 pr-2 font-mono">{c.linkedId ?? <span className="text-amber-600 dark:text-amber-400">not matched</span>}</td>
+                        <td className="py-1 pr-2 font-mono">{c.linkedId ?? <span className="text-caution">not matched</span>}</td>
                         <td className="py-1 pr-2">{Object.entries(c.kinds).map(([k, n]) => `${n} ${k}${n === 1 ? '' : 's'}`).join(', ') || '—'}</td>
                         <td className="py-1">{Object.entries(c.content).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ') || '—'}</td>
                       </tr>

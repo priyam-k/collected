@@ -51,8 +51,8 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
       <WidgetHeader>
         {unread > 0 ? (
           <>
-            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-indigo" style={{ background: 'color-mix(in oklab, var(--indigo) 18%, var(--card))' }}>
-              <span className="size-1.5 rounded-full bg-indigo" />{unread} new
+            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-brand-ink" style={{ background: 'color-mix(in oklab, var(--brand) 18%, var(--card))' }}>
+              <span className="size-1.5 rounded-full bg-brand" />{unread} new
             </span>
             {!xs && <button className="text-xs text-ter hover:text-ink" onClick={() => mark(rows.map((r) => r.id))}>Mark all read</button>}
           </>
@@ -73,7 +73,7 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
               <li key={a.id} onClickCapture={() => isNew && mark([a.id])}>
                 <ItemPopover item={a}>
                   <span className="flex items-start gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-well">
-                    <span className={cn('mt-[7px] size-1.5 shrink-0 rounded-full', !isNew && 'opacity-0')} style={{ background: 'var(--indigo)' }} />
+                    <span className={cn('mt-[7px] size-1.5 shrink-0 rounded-full', !isNew && 'opacity-0')} style={{ background: 'var(--brand)' }} />
                     <span className="min-w-0 flex-1">
                       <span className={cn('block truncate text-[13.5px] leading-[1.35]', isNew ? 'font-semibold text-ink' : 'font-medium text-sub')}>{a.title}</span>
                       <span className="mt-0.5 flex items-center gap-2 text-[11.5px]">

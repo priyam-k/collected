@@ -58,14 +58,14 @@ export function QuickAdd({ defaultDate }: { defaultDate?: Date }) {
           <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} placeholder="all day" />
         </div>
         <div className="flex gap-2">
-          <select className="h-8 flex-1 rounded-md border bg-background px-2 text-sm" value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!time}>
+          <select className="h-8 flex-1 rounded-[10px] border border-line2 bg-well px-2 text-sm" value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!time}>
             <option value="30">30 min</option>
             <option value="60">1 hour</option>
             <option value="90">1.5 hours</option>
             <option value="120">2 hours</option>
           </select>
           {writable.length > 1 && (
-            <select className="h-8 flex-1 rounded-md border bg-background px-2 text-sm" value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>
+            <select className="h-8 flex-1 rounded-[10px] border border-line2 bg-well px-2 text-sm" value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>
               <option value="">{writable.find((c) => c.id === meta.defaultCalendarId)?.summary ?? 'Default calendar'}</option>
               {writable.map((c) => <option key={c.id} value={c.id}>{c.summary}</option>)}
             </select>

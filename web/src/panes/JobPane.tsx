@@ -24,7 +24,7 @@ export function StageSelect({ value, onChange, className, allowUntracked }: { va
       onChange={(e) => onChange(e.target.value as JobStateValue)}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
-      className={cn('h-7 rounded-md border bg-background px-1.5 text-xs', className)}
+      className={cn('h-7 rounded-[10px] border border-line2 bg-well px-1.5 text-xs', className)}
       aria-label="Stage"
     >
       {allowUntracked && <option value="new">Not tracked</option>}
@@ -142,7 +142,7 @@ export function JobPane({ jobId }: { jobId: string | null }) {
           {job.category && <span>{job.category}</span>}
           {job.terms.length > 0 && <span>{job.terms.join(', ')}</span>}
           {job.sponsorship && job.sponsorship !== 'Other' && <span>{job.sponsorship}</span>}
-          {!job.active && <span className="text-amber-600 dark:text-amber-400">no longer listed</span>}
+          {!job.active && <span className="text-caution">no longer listed</span>}
         </div>
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {safeHref(job.url) && (

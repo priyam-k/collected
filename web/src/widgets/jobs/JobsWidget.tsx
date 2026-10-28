@@ -4,6 +4,7 @@ import { Check, ExternalLink, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { JOB_STATE_LABELS, type Job } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
+import { useLiquid } from '@/lib/liquid';
 import { useJobStats, useJobs, useMarkJobsSeen, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -15,16 +16,6 @@ import type { WidgetProps } from '@/widgets/types';
 type Mode = 'new' | 'starred' | 'matches';
 const PAGE = 12;
 
-/** Category pill colour: the design's Software = indigo, AI/ML = lime; the rest spread over the other accents. */
-function categoryTone(category: string | null): string {
-  const c = (category ?? '').toLowerCase();
-  if (c.includes('software')) return 'var(--indigo)';
-  if (c.includes('ai') || c.includes('ml') || c.includes('data')) return 'var(--lime)';
-  if (c.includes('hardware')) return 'var(--teal)';
-  if (c.includes('product')) return 'var(--amber)';
-  if (c.includes('quant')) return 'var(--coral)';
-  return 'var(--sub)';
-}
 const shortCategory = (c: string | null) => (c ?? '').replace('AI/ML/Data', 'AI / ML').replace('Software', 'Software');
 
 function useMarkSeenWhenVisible(jobs: Job[]) {
@@ -81,7 +72,6 @@ function Orb({ on, tone, label, onClick, children }: { on?: boolean; tone: strin
 function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; refCb: (el: HTMLElement | null) => void }) {
   const { open } = usePane();
   const tracked = job.state !== 'new' && job.state !== 'starred' && job.state !== 'hidden';
-  const tone = categoryTone(job.category);
   return (
     <div
       ref={refCb}
@@ -91,10 +81,11 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => open({ kind: 'job', jobId: job.id })}
       onKeyDown={(e) => e.key === 'Enter' && open({ kind: 'job', jobId: job.id })}
-      className={cn('group/card flex min-w-0 cursor-pointer flex-col gap-[5px] rounded-[14px] bg-well p-3 text-left shadow-[inset_0_1px_0_var(--line)] transition-colors hover:bg-well2', tape ? 'w-[236px] shrink-0' : 'w-full', !job.seenAt && 'ring-1 ring-inset ring-indigo/35', job.state === 'starred' && 'bg-[color-mix(in_oklab,var(--amber)_8%,var(--well))]')}
+      className={cn('group/card relative flex min-w-0 cursor-pointer flex-col gap-[5px] rounded-[16px] bg-well p-3 text-left transition-colors hover:bg-well2', tape ? 'w-[236px] shrink-0' : 'w-full', job.state === 'starred' && 'bg-[color-mix(in_srgb,var(--caution)_8%,var(--well))]')}
       title="Details and tracking"
     >
       <div className="flex items-center gap-2">
+        {!job.seenAt && <span className="size-1.5 shrink-0 rounded-full bg-brand" title="New" />}
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{job.company}</span>
         {safeHref(job.url) && (
           <a href={safeHref(job.url)} target="_blank" rel="noreferrer" className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/card:opacity-100" title="Open the posting" aria-label="Open the posting" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
@@ -106,20 +97,20 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
       <div className={cn('text-[12.5px] leading-[1.4] text-sub', compact ? 'truncate' : 'line-clamp-2')} title={job.title}>{job.title}</div>
       {!compact && <div className="truncate text-xs text-ter">{job.locations.slice(0, 2).join(' · ')}{job.locations.length > 2 ? ` +${job.locations.length - 2}` : ''}</div>}
       <div className={cn('flex items-center gap-1.5', compact ? 'mt-0.5' : 'mt-1.5')}>
-        <Orb on={job.state === 'starred'} tone="var(--amber)" label={job.state === 'starred' ? 'Remove star' : 'Star: keep this one in the Starred list'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
+        <Orb on={job.state === 'starred'} tone="var(--caution)" label={job.state === 'starred' ? 'Remove star' : 'Star: keep this one in the Starred list'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
           <Star className={cn('size-3.5', job.state === 'starred' && 'fill-current')} />
         </Orb>
-        <Orb on={tracked} tone="var(--teal)" label={tracked ? `${JOB_STATE_LABELS[job.state]} · open to change` : 'Mark as applied'} onClick={() => (tracked ? open({ kind: 'job', jobId: job.id }) : onState('applied'))}>
+        <Orb on={tracked} tone="var(--positive)" label={tracked ? `${JOB_STATE_LABELS[job.state]} · open to change` : 'Mark as applied'} onClick={() => (tracked ? open({ kind: 'job', jobId: job.id }) : onState('applied'))}>
           <Check className="size-3.5" />
         </Orb>
-        <Orb tone="var(--coral)" label="Hide this listing from the feed" onClick={() => onState('hidden')}>
+        <Orb tone="var(--critical)" label="Hide this listing from the feed" onClick={() => onState('hidden')}>
           <X className="size-3.5" />
         </Orb>
         <span className="flex-1" />
         {tracked ? (
-          <span className="grid h-6 place-items-center rounded-full px-2.5 text-[11px] font-semibold text-teal" style={{ background: 'color-mix(in oklab, var(--teal) 18%, var(--card))' }}>{JOB_STATE_LABELS[job.state]}</span>
+          <span className="grid h-6 place-items-center rounded-full px-2.5 text-[11px] font-semibold text-positive" style={{ background: 'color-mix(in srgb, var(--positive) 12%, var(--surface))' }}>{JOB_STATE_LABELS[job.state]}</span>
         ) : job.category ? (
-          <span className="grid h-6 max-w-[7rem] place-items-center truncate rounded-full px-2.5 text-[11px] font-semibold" style={{ color: tone, background: `color-mix(in oklab, ${tone} 18%, var(--card))` }}>{shortCategory(job.category)}</span>
+          <span className="grid h-6 max-w-[7rem] place-items-center truncate rounded-full bg-surface px-2.5 text-[11px] font-medium text-sub">{shortCategory(job.category)}</span>
         ) : null}
       </div>
     </div>
@@ -128,6 +119,7 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
 
 export function JobsWidget({ size }: WidgetProps) {
   const [mode, setMode] = useState<Mode>('new');
+  const liquid = useLiquid();
   const [visible, setVisible] = useState(PAGE);
   const q = useJobs({ matchesOnly: true, limit: 200, state: mode === 'starred' ? ['starred'] : undefined });
   const stats = useJobStats();
@@ -159,9 +151,9 @@ export function JobsWidget({ size }: WidgetProps) {
           </>
         )}
         {size.tier !== 'xs' && (
-          <span className="seg">
+          <span className="seg" ref={liquid}>
             {(['new', 'starred', 'matches'] as Mode[]).map((m) => (
-              <button key={m} className={cn(mode === m && 'seg-on')} onClick={() => { setMode(m); setVisible(PAGE); }} title={m === 'new' ? 'Unseen matches first' : m === 'starred' ? 'Only starred listings' : 'Every listing that matches your filter, newest first'}>
+              <button key={m} className={cn(mode === m && 'seg-on')} aria-pressed={mode === m} onClick={() => { setMode(m); setVisible(PAGE); }} title={m === 'new' ? 'Unseen matches first' : m === 'starred' ? 'Only starred listings' : 'Every listing that matches your filter, newest first'}>
                 {m === 'new' ? 'New' : m === 'starred' ? 'Starred' : 'Matches'}
               </button>
             ))}

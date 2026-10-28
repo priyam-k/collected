@@ -57,7 +57,7 @@ export function TodoistPage() {
     <div className="space-y-6">
       <PageTitle sub="One-way: assignments become Todoist tasks and get closed when the source says done. Nothing you do in Todoist ever changes Canvas or Gradescope.">Todoist sync</PageTitle>
       {!todoist?.hasConfig && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+        <p className="rounded-2xl bg-[color-mix(in_srgb,var(--caution)_10%,var(--surface))] p-4 text-sm">
           Add your Todoist API token under <Link className="underline" to="/settings/sources">Sources</Link> first.
         </p>
       )}
@@ -66,7 +66,7 @@ export function TodoistPage() {
         <Field label="Project" hint="Tasks are created here. Created for you if it doesn't exist.">
           {meta.projects?.length ? (
             <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="h-9 w-full rounded-[10px] border border-line2 bg-well px-2 text-sm"
               value={cfg.projectId ?? ''}
               onChange={(e) => {
                 const p = meta.projects!.find((x) => x.id === e.target.value);
@@ -106,7 +106,7 @@ export function TodoistPage() {
           )}
         </div>
         {plan && (
-          <div className="overflow-hidden rounded-md border">
+          <div className="overflow-hidden rounded-xl border border-line">
             {plan.ops.length === 0 ? (
               <p className="p-3 text-sm text-muted-foreground">Nothing to do. Todoist already matches.</p>
             ) : (

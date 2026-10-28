@@ -27,7 +27,7 @@ const DEFAULT_CONFIG: FileSyncConfig = {
   skipHint: 'duplicates, temporary or scratch files, starter code archives, and anything not worth keeping',
 };
 
-const selectCls = 'h-7 rounded-md border bg-background px-1.5 text-xs';
+const selectCls = 'h-7 rounded-[10px] border border-line2 bg-well px-1.5 text-xs';
 
 function ConfigEditor({ course, initial, onDone }: { course: Course; initial: FileSyncConfig; onDone(): void }) {
   const save = useSaveCourse();
@@ -123,7 +123,7 @@ function ConfigEditor({ course, initial, onDone }: { course: Course; initial: Fi
   );
 }
 
-const targetTone = (t: string): string => (t === FILE_SYNC_SKIP ? 'text-ter line-through' : t === FILE_SYNC_UNSORTED ? 'text-amber' : 'text-indigo');
+const targetTone = (t: string): string => (t === FILE_SYNC_SKIP ? 'text-ter line-through' : t === FILE_SYNC_UNSORTED ? 'text-amber' : 'text-brand-ink');
 
 function DecisionRow({ f, course, config, last }: { f: FileSyncFileView; course: Course; config: FileSyncConfig; last: boolean }) {
   const set = useSetFileSyncTarget();
@@ -148,10 +148,10 @@ function DecisionRow({ f, course, config, last }: { f: FileSyncFileView; course:
         </div>
       </div>
       {d?.decidedBy === 'model' && f.folderPath && d.target !== FILE_SYNC_UNSORTED && (
-        <button className="shrink-0 text-[11px] text-indigo opacity-0 hover:underline group-hover/row:opacity-100" onClick={makeRule} title={`Always send ${f.folderPath} to ${d.target}`}>make rule</button>
+        <button className="shrink-0 text-[11px] text-brand-ink opacity-0 hover:underline group-hover/row:opacity-100" onClick={makeRule} title={`Always send ${f.folderPath} to ${d.target}`}>make rule</button>
       )}
       <select
-        className={cn(selectCls, 'shrink-0 font-medium', d ? targetTone(d.target) : 'text-ter', f.manualTarget && 'ring-1 ring-indigo/40')}
+        className={cn(selectCls, 'shrink-0 font-medium', d ? targetTone(d.target) : 'text-ter', f.manualTarget && 'ring-1 ring-brand/40')}
         value={f.manualTarget ?? ''}
         onChange={(e) => set.mutate({ courseId: course.id, fileId: f.fileId, target: e.target.value || null }, { onError: (err) => toast.error(err.message) })}
         aria-label={`Folder for ${f.title}`}
@@ -205,7 +205,7 @@ export function CourseFileSync({ course }: { course: Course }) {
       <section>
         {header}
         <div className="rounded-2xl bg-well p-4 text-[13px]">
-          <div className="mb-1 flex items-center gap-2 font-medium"><FolderSync className="size-4 text-indigo" /> Keep this course's files in folders on your laptop</div>
+          <div className="mb-1 flex items-center gap-2 font-medium"><FolderSync className="size-4 text-brand-ink" /> Keep this course's files in folders on your laptop</div>
           <p className="mb-3 text-xs text-ter">New Canvas files land in named folders (slides, assignments, …) automatically, sorted by rules you write or by a decision model for the rest. Nothing is overwritten once you've edited it.</p>
           {editing ? <ConfigEditor course={course} initial={DEFAULT_CONFIG} onDone={() => setEditing(false)} /> : <Button size="xs" onClick={() => setEditing(true)}>Set up</Button>}
         </div>

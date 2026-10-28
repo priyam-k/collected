@@ -18,7 +18,7 @@ export function HotLinks({ links, compact }: { links: CourseLink[]; compact?: bo
     <div className="flex flex-wrap gap-1">
       {links.map((l) => {
         const href = safeHref(l.url);
-        const className = cn('inline-flex h-7 items-center gap-1 rounded-full border border-line bg-card px-3 text-[12px] font-medium text-ink transition-colors hover:bg-well2', compact && 'h-6 px-2.5 text-[11.5px]', !href && 'opacity-50');
+        const className = cn('inline-flex h-7 items-center gap-1 rounded-full bg-well px-3 text-[12px] font-medium text-ink transition-colors hover:bg-well2', compact && 'h-6 px-2.5 text-[11.5px]', !href && 'opacity-50');
         const inner = (
           <>
             {l.label}
@@ -107,7 +107,7 @@ const STATUS_LABEL: Partial<Record<ItemStatus, string>> = { missing: 'missing', 
 export function StatusBadge({ item }: { item: EffectiveItem }) {
   if (item.effectiveDone) return <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{STATUS_LABEL[item.status] ?? 'done'}</Badge>;
   if (item.status === 'missing') return <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">missing</Badge>;
-  if (item.dueAt && isPast(item.dueAt)) return <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-amber-600 dark:text-amber-400">overdue</Badge>;
+  if (item.dueAt && isPast(item.dueAt)) return <Badge variant="outline" className="h-5 border-critical/40 px-1.5 text-[10px] text-critical">overdue</Badge>;
   return null;
 }
 
@@ -115,7 +115,7 @@ export function DueLabel({ item, className }: { item: EffectiveItem; className?:
   const when = item.dueAt ?? item.startsAt;
   if (!when) return <span className={cn('text-muted-foreground', className)}>no date</span>;
   const past = isPast(when) && !item.effectiveDone;
-  return <span className={cn(past ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground', className)}>{friendlyDate(when, { withTime: true, allDay: item.allDay })}</span>;
+  return <span className={cn(past ? 'font-medium text-critical' : 'text-muted-foreground', className)}>{friendlyDate(when, { withTime: true, allDay: item.allDay })}</span>;
 }
 
 export function ItemRow({ item, showCourse }: { item: EffectiveItem; showCourse?: boolean }) {

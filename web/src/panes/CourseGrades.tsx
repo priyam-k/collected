@@ -39,7 +39,7 @@ function AssignmentRows({ list }: { list: GradedAssignment[] }) {
 function CategoryRow({ c, weighted }: { c: GradeCategoryResult; weighted: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="rounded-md border">
+    <li className="rounded-xl border border-line">
       <button type="button" className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-accent/60" onClick={() => setOpen((v) => !v)}>
         {open ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
         <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
@@ -65,7 +65,7 @@ function CategoryEditor({ course, initial, onDone }: { course: Course; initial: 
     save.mutate({ id: course.id, grading }, { onSuccess: () => { toast.success(mode === 'auto' ? 'Back to Canvas groups' : 'Weights saved'); onDone(); }, onError: (e) => toast.error(e.message) });
   };
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <div className="space-y-2 rounded-2xl bg-well/60 p-4">
       <p className="text-xs text-muted-foreground">
         Weights are percent of the final grade. A category takes assignments from its Canvas groups, or any assignment whose title matches the regex. Leave every weight empty for a points-based total.
       </p>
@@ -82,7 +82,7 @@ function CategoryEditor({ course, initial, onDone }: { course: Course; initial: 
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="xs" variant="secondary" onClick={() => setCats([...cats, { id: `c${Date.now()}`, name: '', weight: null, groupIds: [], match: null, dropLowest: 0 }])}><Plus className="size-3" /> Category</Button>
-        <span className={cn('text-xs', total && total !== 100 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{total ? `weights add to ${num(total)}%` : 'unweighted'}</span>
+        <span className={cn('text-xs', total && total !== 100 ? 'text-caution' : 'text-muted-foreground')}>{total ? `weights add to ${num(total)}%` : 'unweighted'}</span>
         <span className="ml-auto flex items-center gap-1">
           {course.grading?.mode === 'manual' && <Button size="xs" variant="ghost" onClick={() => submit('auto')}>Use Canvas groups</Button>}
           <Button size="xs" variant="ghost" onClick={onDone}>Cancel</Button>
@@ -118,7 +118,7 @@ export function CourseGrades({ course }: { course: Course }) {
         <div className="text-xs text-muted-foreground">
           {g.canvas?.currentScore != null && (
             <div>
-              Canvas says <span className={cn('tabular-nums', canvasDiffers ? 'text-amber-600 dark:text-amber-400' : 'text-foreground')}>{pct(g.canvas.currentScore)}</span>
+              Canvas says <span className={cn('tabular-nums', canvasDiffers ? 'text-caution' : 'text-foreground')}>{pct(g.canvas.currentScore)}</span>
               {g.canvas.currentGrade && <span> ({g.canvas.currentGrade})</span>}
               {canvasDiffers && <span> · differs: Canvas may hide or weight things differently</span>}
             </div>
@@ -144,7 +144,7 @@ export function CourseGrades({ course }: { course: Course }) {
       {g.uncategorized.length > 0 && (
         <section className="space-y-1">
           <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Not in a category · {g.uncategorized.length}</h4>
-          <div className="rounded-md border"><AssignmentRows list={g.uncategorized} /></div>
+          <div className="rounded-xl border border-line"><AssignmentRows list={g.uncategorized} /></div>
           {g.weighted && <p className="text-xs text-muted-foreground">These count toward the points total but not the weighted grade. Add a category with a matching regex to place them.</p>}
         </section>
       )}

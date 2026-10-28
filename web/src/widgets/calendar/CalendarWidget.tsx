@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { addDays, addMonths, addWeeks, format, isSameMonth, startOfDay } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
+import { useLiquid } from '@/lib/liquid';
 import { useItems } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { ErrorState } from '@/widgets/Placeholder';
@@ -17,6 +18,7 @@ export function CalendarWidget({ size, instance }: WidgetProps) {
   const [override, setOverride] = useState<CalView | null>(null);
   const view: CalView = override ?? pinned ?? autoView(size.width, size.height);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
+  const liquid = useLiquid();
   const range = useMemo(() => rangeFor(view, anchor), [view, anchor]);
   const q = useItems({ from: range.from.toISOString(), to: range.to.toISOString(), limit: 1000, includeDone: view === 'month' || view === 'week' });
 
@@ -39,9 +41,9 @@ export function CalendarWidget({ size, instance }: WidgetProps) {
             <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label="Next" title="Next period" onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
           </span>
           {size.tier !== 'sm' && (
-            <span className="seg">
+            <span className="seg" ref={liquid}>
               {(['agenda', 'strip', 'week', 'month'] as CalView[]).map((v) => (
-                <button key={v} className={cn(view === v && 'seg-on')} title={`${VIEW_LABEL[v]} view (auto-picked from widget size unless you choose one)`} onClick={() => setOverride(v === (pinned ?? autoView(size.width, size.height)) ? null : v)}>
+                <button key={v} className={cn(view === v && 'seg-on')} aria-pressed={view === v} title={`${VIEW_LABEL[v]} view (auto-picked from widget size unless you choose one)`} onClick={() => setOverride(v === (pinned ?? autoView(size.width, size.height)) ? null : v)}>
                   {VIEW_LABEL[v]}
                 </button>
               ))}

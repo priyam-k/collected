@@ -4,82 +4,167 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Palette from the "Collected Dashboard v2" design: a small set of named tokens (bg / card / well / well2 for
- * surfaces, ink / sub / ter for text, five accents) that the shadcn names below alias to, so every existing
- * component picks the look up without edits. Light values on :root, dark values on .dark.
+ * Caustic, adapted for a dashboard. Two grounds (eggshell on :root, charcoal on .dark) and four accents picked with
+ * data-accent on <html> (red, blue, forest, royal). One accent marks state: the current item, the primary action,
+ * filled ticks, focus. Status colours (positive, critical, caution) are fixed per ground and always come with a word.
+ *
+ * The older names (bg / card / well / ink / sub / ter, and indigo / teal / amber / lime / coral) are kept as aliases
+ * so every component follows the new palette: indigo is the accent, coral critical, amber caution, teal and lime
+ * positive. The shadcn names alias on top of those.
  */
-:root {
-  --radius: 0.875rem;
-  --bg: #eef0f5;
-  --card: #ffffff;
-  --well: #f3f4f8;
-  --well2: #e7e9f0;
-  --line: rgba(20, 24, 40, 0.06);
-  --line2: rgba(20, 24, 40, 0.1);
-  --ink: #17181d;
-  --sub: #5f6370;
-  --ter: #7d818e;
-  --indigo: #5b5ce6;
-  --teal: #178f78;
-  --amber: #b86f0a;
-  --lime: #5f8a05;
-  --coral: #d6453a;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 12px 30px -16px rgba(30, 40, 80, 0.22);
-  --glow: 0 0 18px -6px;
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/fonts/MonaSans-Variable.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
-  --background: var(--bg);
+:root {
+  color-scheme: light;
+  --radius: 1rem;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* eggshell */
+  --ground: #f3efe6;
+  --surface: #fbf9f4;
+  --surface-hover: #f5f3ee;
+  --well: #ebe6db;
+  --well-deep: #e2dccf;
+  --line: #e3ddd0;
+  --line-mid: #d6cfc1;
+  --line-strong: #8a8376;
+  --tick: #ddd7ca;
+  --ink: #1f1c17;
+  --ink-muted: #655f54;
+  --ink-faint: #746d60;
+  --positive: #2e6f45;
+  --critical: #b42a1f;
+  --caution: #8a5a00;
+  --on-brand: #fffaf3;
+  --glass-fill: rgba(251, 249, 244, 0.55);
+  --glass-rim: rgba(255, 255, 255, 0.95);
+  --frost-fill: rgba(251, 249, 244, 0.78);
+  --shadow-card: 0 1px 2px rgba(60, 50, 30, 0.05), 0 6px 20px -12px rgba(60, 50, 30, 0.16);
+  --shadow-lift: 0 2px 4px rgba(60, 50, 30, 0.05), 0 22px 48px -18px rgba(60, 50, 30, 0.3);
+  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 -1px 1px rgba(60, 50, 30, 0.08), 0 6px 18px -6px rgba(60, 50, 30, 0.22);
+  --sheen: rgba(255, 255, 255, 0.7);
+
+  /* blue unless data-accent says otherwise */
+  --brand: #2e5aa8;
+  --brand-ink: #284f94;
+  --brand-soft: #e4e8ec;
+}
+:root[data-accent="red"] { --brand: #c8442f; --brand-ink: #a93524; --brand-soft: #f5e5de; }
+:root[data-accent="forest"] { --brand: #2f6b47; --brand-ink: #295e3e; --brand-soft: #e5e9e1; }
+:root[data-accent="royal"] { --brand: #5b3e96; --brand-ink: #4f3486; --brand-soft: #e9e4ea; }
+
+:root.dark {
+  color-scheme: dark;
+  /* charcoal */
+  --ground: #1b1c1f;
+  --surface: #26272b;
+  --surface-hover: #2f3034;
+  --well: #202125;
+  --well-deep: #2c2d32;
+  --line: #313237;
+  --line-mid: #3a3b41;
+  --line-strong: #727379;
+  --tick: #3a3b41;
+  --ink: #eeede9;
+  --ink-muted: #9d9c98;
+  --ink-faint: #8f8e88;
+  --positive: #6cc48a;
+  --critical: #ff7e70;
+  --caution: #e8b54d;
+  --on-brand: #1b1c1f;
+  --glass-fill: rgba(44, 45, 50, 0.5);
+  --glass-rim: rgba(255, 255, 255, 0.22);
+  --frost-fill: rgba(38, 39, 43, 0.8);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px -16px rgba(0, 0, 0, 0.5);
+  --shadow-lift: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 24px 56px -18px rgba(0, 0, 0, 0.7);
+  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 -1px 1px rgba(0, 0, 0, 0.4), 0 8px 24px -6px rgba(0, 0, 0, 0.55);
+  --sheen: rgba(255, 255, 255, 0.035);
+
+  --brand: #7d9fe0;
+  --brand-ink: #96b2ea;
+  --brand-soft: #343a48;
+}
+:root.dark[data-accent="red"] { --brand: #e8695a; --brand-ink: #ef8577; --brand-soft: #453233; }
+:root.dark[data-accent="forest"] { --brand: #6fae86; --brand-ink: #88c09c; --brand-soft: #323d3a; }
+:root.dark[data-accent="royal"] { --brand: #a68bd8; --brand-ink: #b9a3e3; --brand-soft: #3a3747; }
+
+:root {
+  --focus-ring: 0 0 0 2px var(--ground), 0 0 0 4px var(--brand);
+
+  /* legacy names, kept so older call sites follow the palette */
+  --bg: var(--ground);
+  --card: var(--surface);
+  --well2: var(--well-deep);
+  --line2: var(--line-mid);
+  --sub: var(--ink-muted);
+  --ter: var(--ink-faint);
+  --indigo: var(--brand);
+  --teal: var(--positive);
+  --lime: var(--positive);
+  --amber: var(--caution);
+  --coral: var(--critical);
+  --shadow: var(--shadow-card);
+
+  --background: var(--ground);
   --foreground: var(--ink);
   --card-foreground: var(--ink);
-  --popover: var(--card);
+  --popover: var(--surface);
   --popover-foreground: var(--ink);
-  --primary: var(--ink);
-  --primary-foreground: var(--bg);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
   --secondary: var(--well);
   --secondary-foreground: var(--ink);
   --muted: var(--well);
-  --muted-foreground: var(--sub);
-  --accent: var(--well2);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--well-deep);
   --accent-foreground: var(--ink);
-  --destructive: var(--coral);
-  --border: var(--line2);
-  --input: var(--line2);
-  --ring: var(--indigo);
-  --chart-1: var(--indigo);
-  --chart-2: var(--teal);
-  --chart-3: var(--amber);
-  --chart-4: var(--lime);
-  --chart-5: var(--coral);
-  --sidebar: var(--card);
+  --destructive: var(--critical);
+  --border: var(--line-mid);
+  --input: var(--line-strong);
+  --ring: var(--brand);
+  --chart-1: var(--brand);
+  --chart-2: var(--positive);
+  --chart-3: var(--caution);
+  --chart-4: var(--ink-muted);
+  --chart-5: var(--critical);
+  --sidebar: var(--surface);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--indigo);
-  --sidebar-primary-foreground: #fff;
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
   --sidebar-accent: var(--well);
   --sidebar-accent-foreground: var(--ink);
-  --sidebar-border: var(--line2);
-  --sidebar-ring: var(--indigo);
-}
-
-.dark {
-  --bg: #1a1b20;
-  --card: #23252c;
-  --well: #2a2c34;
-  --well2: #31343d;
-  --line: rgba(255, 255, 255, 0.06);
-  --line2: rgba(255, 255, 255, 0.1);
-  --ink: #f3f3f6;
-  --sub: #a0a3ad;
-  --ter: #6c6f7a;
-  --indigo: #8b8cf8;
-  --teal: #45c9ad;
-  --amber: #f5a742;
-  --lime: #bde85a;
-  --coral: #ff7a6e;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 14px 34px -18px rgba(0, 0, 0, 0.7);
-  --glow: 0 0 22px -6px;
+  --sidebar-border: var(--line-mid);
+  --sidebar-ring: var(--brand);
 }
 
 @theme inline {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, sans-serif;
+  --font-sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-tick: var(--tick);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-positive: var(--positive);
+  --color-critical: var(--critical);
+  --color-caution: var(--caution);
   --color-ink: var(--ink);
   --color-sub: var(--sub);
   --color-ter: var(--ter);
@@ -92,10 +177,11 @@
   --color-amber: var(--amber);
   --color-lime: var(--lime);
   --color-coral: var(--coral);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 22px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -137,53 +223,100 @@
     height: 100%;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    letter-spacing: -0.01em;
+    @apply text-foreground antialiased;
+    /* a little light from above so the ground is not a flat sheet */
+    background:
+      radial-gradient(1400px 520px at 50% -260px, color-mix(in srgb, var(--surface) 75%, transparent), transparent 75%) fixed,
+      var(--ground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01" off;
+    letter-spacing: -0.006em;
+    text-rendering: optimizeLegibility;
+    transition: background-color 240ms var(--ease);
   }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(150, 152, 165, 0.25); border-radius: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+  ::selection { background: var(--brand-soft); color: var(--ink); }
+  :focus-visible { outline: 2px solid transparent; }
+  button:focus-visible, a:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible, summary:focus-visible { box-shadow: var(--focus-ring); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-muted) 28%, transparent); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--ink-muted) 45%, transparent); }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 }
 
 @layer components {
-  /* A widget card or drawer: 18px corners, soft shadow, tinted from --accent at the top-left. */
+  /* Mono eyebrow: the only uppercase text. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  .metric {
+    font-weight: 560;
+    letter-spacing: -0.02em;
+    font-variant-numeric: proportional-nums;
+    line-height: 1;
+  }
+
+  /* A widget card or drawer: generous corners, a whisper of lift, a barely-there top sheen. */
   .surface {
-    border-radius: 18px;
-    background: radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--accent, var(--card)) 7%, var(--card)), var(--card) 60%);
-    box-shadow: var(--shadow);
+    position: relative;
+    border-radius: 22px;
+    background: linear-gradient(180deg, var(--sheen), transparent 120px) var(--surface);
+    box-shadow: var(--shadow-card);
   }
-  /* Header bar inside a surface. */
+  /* Header row inside a surface: the card title and its controls, no bar behind them. */
   .surface-head {
-    background: var(--well);
-    border-bottom: 1px solid var(--line);
+    background: transparent;
   }
-  /* Segmented pill control container; children use .seg-on / plain. */
+
+  /* Segmented control: a well track with a surface thumb. With useLiquid the thumb springs between items. */
   .seg {
+    position: relative;
     display: inline-flex;
     gap: 2px;
     padding: 3px;
     border-radius: 999px;
-    background: var(--card);
-    border: 1px solid var(--line);
+    background: var(--well);
   }
-  .seg > * {
+  .seg > :not(.liquid-thumb) {
+    position: relative;
+    z-index: 1;
     padding: 5px 11px;
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--sub);
+    font-size: 12.5px;
+    font-weight: 520;
+    color: var(--ink-muted);
     white-space: nowrap;
     cursor: pointer;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 140ms var(--ease), background-color 140ms var(--ease);
   }
-  .seg > *:hover { color: var(--ink); }
+  .seg > :not(.liquid-thumb):hover { color: var(--ink); }
   .seg > .seg-on {
     color: var(--ink);
-    font-weight: 600;
-    background: var(--well2);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
   }
-  /* Filter chips (To do sections, drawer tabs). */
+  .seg.liquid-live > .seg-on { background: transparent; box-shadow: none; }
+
+  /* The travelling highlight drawn by useLiquid. */
+  .liquid-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    border-radius: 999px;
+    pointer-events: none;
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    will-change: transform, width, height;
+  }
+  .dark .liquid-thumb { background: var(--surface-hover); }
+
+  /* Filter chips (To do sections, drawer tabs). The selected one takes the accent tint. */
   .chip {
     display: inline-grid;
     place-items: center;
@@ -191,46 +324,152 @@
     padding: 0 12px;
     border-radius: 999px;
     background: var(--well);
-    color: var(--sub);
-    font-size: 12px;
+    color: var(--ink-muted);
+    font-size: 12.5px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 140ms var(--ease), background-color 140ms var(--ease);
   }
-  .chip:hover { color: var(--ink); background: var(--well2); }
-  .chip.chip-on { background: var(--ink); color: var(--bg); font-weight: 600; }
-  /* Round icon button, 28px, sits on a well. */
+  .chip:hover { color: var(--ink); background: var(--well-deep); }
+  .chip.chip-on { background: var(--brand-soft); color: var(--brand-ink); font-weight: 600; }
+
+  /* Round icon button, 28px. */
   .orb {
     display: grid;
     place-items: center;
     width: 28px;
     height: 28px;
     border-radius: 999px;
-    background: var(--card);
-    color: var(--sub);
+    background: var(--well);
+    color: var(--ink-muted);
     cursor: pointer;
     border: 0;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 140ms var(--ease), background-color 140ms var(--ease), transform 140ms var(--ease);
   }
-  .orb:hover { color: var(--ink); }
-  .ring-glow { box-shadow: var(--glow) var(--glow-color, var(--indigo)); }
+  .orb:hover { color: var(--ink); background: var(--well-deep); }
+  .orb:active { transform: scale(.94); }
+
+  /* A row of ticks: --value is 0..100. Filled ticks take --meter-color (the accent by default). */
+  .meter {
+    --tick-w: 3px;
+    --tick-gap: 3px;
+    --v: calc(var(--value, 0) * 1%);
+    position: relative;
+    height: var(--meter-h, 14px);
+    background: repeating-linear-gradient(90deg, var(--tick) 0 var(--tick-w), transparent var(--tick-w) calc(var(--tick-w) + var(--tick-gap)));
+  }
+  .meter::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: round(down, var(--v), calc(var(--tick-w) + var(--tick-gap)));
+    background: repeating-linear-gradient(90deg, var(--meter-color, var(--brand)) 0 var(--tick-w), transparent var(--tick-w) calc(var(--tick-w) + var(--tick-gap)));
+  }
+
+  /* Liquid glass, for things that float above the page: the toolbar pill, the edit-mode pill. Never reading text. */
+  .glass {
+    position: relative;
+    isolation: isolate;
+    border-radius: 999px;
+    background: var(--glass-fill);
+    -webkit-backdrop-filter: blur(3px) saturate(150%);
+    backdrop-filter: blur(3px) saturate(150%);
+    box-shadow: var(--shadow-glass);
+    color: var(--ink);
+  }
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(140deg, var(--glass-rim), transparent 32%, transparent 68%, color-mix(in srgb, var(--glass-rim) 55%, transparent));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  /* Frost: the rare floating panel that carries text (menus, popovers). */
+  .frost {
+    background: var(--frost-fill);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    box-shadow: var(--shadow-lift), inset 0 0 0 1px color-mix(in srgb, var(--line-mid) 70%, transparent);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .glass, .frost { background: var(--surface); -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  }
+  .glass-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 40px;
+    min-width: 40px;
+    padding: 0 6px;
+    border-radius: 999px;
+    color: var(--ink);
+    transition: background-color 140ms var(--ease), transform 140ms var(--ease);
+  }
+  .glass-btn:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .glass-btn:active { transform: scale(.96); }
+  .glass-btn:disabled { opacity: .5; }
 }
 
-/* react-grid-layout: theme the drag placeholder and resize handle instead of the library's red box. */
+/* Mona Sans's tabular figures draw a slashed zero that reads as code, so the sans keeps proportional figures. */
+.tabular-nums:not(.font-mono) { font-variant-numeric: proportional-nums; }
+
+/* Accent picker swatches show each accent as it reads on the current ground. */
+[data-accent-swatch] { color: var(--on-brand); }
+[data-accent-swatch="blue"] { background: #2e5aa8; }
+[data-accent-swatch="red"] { background: #c8442f; }
+[data-accent-swatch="forest"] { background: #2f6b47; }
+[data-accent-swatch="royal"] { background: #5b3e96; }
+.dark [data-accent-swatch="blue"] { background: #7d9fe0; }
+.dark [data-accent-swatch="red"] { background: #e8695a; }
+.dark [data-accent-swatch="forest"] { background: #6fae86; }
+.dark [data-accent-swatch="royal"] { background: #a68bd8; }
+
+/* Toasts: an opaque surface, the status word carries the colour. */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  font-family: var(--font-sans);
+  border-radius: 16px;
+  border: 0;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lift), inset 0 0 0 1px var(--line);
+}
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] { color: var(--positive); }
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] { color: var(--critical); }
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] { color: var(--caution); }
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] { color: var(--brand); }
+[data-sonner-toaster] [data-sonner-toast] [data-description] { color: var(--ink-muted); }
+
+/* react-grid-layout: the drop target is a well with a still accent ring; the dragged card lifts. */
 .react-grid-item.react-grid-placeholder {
-  background: color-mix(in oklab, var(--indigo) 16%, transparent) !important;
+  background: color-mix(in srgb, var(--brand) 10%, transparent) !important;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 45%, transparent);
   opacity: 1 !important;
-  border-radius: 18px;
-  transition-duration: 100ms;
+  border-radius: 22px;
+  transition-duration: 120ms;
 }
 .react-grid-item > .react-resizable-handle {
-  opacity: 0.55;
+  opacity: 0.6;
+  bottom: 6px !important;
+  right: 6px !important;
 }
 .react-grid-item > .react-resizable-handle::after {
-  border-color: var(--muted-foreground) !important;
+  border-color: var(--ink-muted) !important;
 }
 .react-grid-item.react-draggable-dragging {
   z-index: 30;
-  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.4);
+  box-shadow: var(--shadow-lift);
+}
+.react-grid-item.cssTransforms {
+  transition-timing-function: var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg > *, .chip, .orb, .glass-btn { transition: none; }
 }

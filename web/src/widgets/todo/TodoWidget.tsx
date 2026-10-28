@@ -150,7 +150,7 @@ export function TodoWidget({ size }: WidgetProps) {
                 title={it.source === 'todoist' ? 'Complete this task in Todoist' : 'Mark done here only. Canvas / Gradescope are never changed.'}
                 onClick={() => complete(it)}
                 onMouseDown={(e) => e.stopPropagation()}
-                className={cn('mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-bg transition-colors', late ? 'border-coral hover:bg-coral' : it.course ? 'hover:bg-[var(--c)]' : 'border-ter hover:bg-ink')}
+                className={cn('mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-surface transition-colors', late ? 'border-critical hover:bg-critical' : it.course ? 'hover:bg-[var(--c)]' : 'border-line-strong hover:bg-ink')}
                 style={it.course && !late ? ({ borderColor: it.course.color ?? 'var(--ter)', '--c': it.course.color ?? 'var(--ink)' } as React.CSSProperties) : undefined}
               >
                 <Check className="size-3 opacity-0 transition-opacity group-hover/row:opacity-100" />
@@ -179,14 +179,14 @@ export function TodoWidget({ size }: WidgetProps) {
     <div className="flex h-full flex-col">
       <WidgetHeader>
         {overdue > 0 && (
-          <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-coral" style={{ background: 'color-mix(in oklab, var(--coral) 18%, var(--card))' }}>
-            <span className="size-1.5 rounded-full bg-coral ring-glow" style={{ '--glow-color': 'var(--coral)' } as React.CSSProperties} />
+          <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
+            <span className="size-1.5 rounded-full bg-critical" />
             {overdue} overdue
           </span>
         )}
-        <span className="grid h-7 place-items-center rounded-full border border-line bg-card px-[11px] text-[12.5px] font-medium text-sub">{merged.length} open</span>
+        <span className="grid h-7 place-items-center rounded-full bg-well px-[11px] text-[12.5px] font-medium text-sub">{merged.length} open</span>
       </WidgetHeader>
-      <div className="flex shrink-0 flex-wrap gap-1.5 px-3 pb-1.5 pt-2.5">
+      <div className="flex shrink-0 flex-wrap gap-1.5 px-3.5 pb-2 pt-1">
         {(!columns ? tabs : [all]).map((s) => (
           <button
             key={s.key}
@@ -219,8 +219,8 @@ export function TodoWidget({ size }: WidgetProps) {
           <div className="grid h-full gap-3 px-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(sections.length, size.tier === 'lg' ? 4 : 3)}, minmax(0, 1fr))` }}>
             {sections.map((s) => (
               <section key={s.key} className="min-w-0">
-                <h4 className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-ter">
-                  {s.label} <span className="font-normal">{s.rows.length}</span>
+                <h4 className="label mb-1 px-2.5">
+                  {s.label} <span className="text-ter">{s.rows.length}</span>
                 </h4>
                 {list(s)}
               </section>
@@ -231,9 +231,9 @@ export function TodoWidget({ size }: WidgetProps) {
         )}
       </div>
       {todoistOn && size.tier !== 'xs' && (
-        <form onSubmit={submitQuickAdd} className="mx-2.5 mb-2.5 mt-1.5 flex h-[38px] shrink-0 items-center gap-2.5 rounded-full border border-line bg-well pl-3.5 pr-1">
+        <form onSubmit={submitQuickAdd} className="mx-3 mb-3 mt-1.5 flex h-[40px] shrink-0 items-center gap-2.5 rounded-full bg-well pl-4 pr-1 transition-shadow focus-within:shadow-[var(--focus-ring)]">
           <input className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ter" placeholder="Add a task… tomorrow 5pm @grocery #Home" value={text} onChange={(e) => setText(e.target.value)} />
-          <button type="submit" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)" className="grid size-[30px] place-items-center rounded-full bg-ink text-bg transition-opacity disabled:opacity-40">
+          <button type="submit" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)" className="grid size-8 place-items-center rounded-full bg-brand text-on-brand transition-[opacity,transform] active:scale-95 disabled:opacity-35">
             <Plus className="size-4" />
           </button>
         </form>

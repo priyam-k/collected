@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { format } from 'date-fns';
-import { Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
+import { Check, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, type Layouts, type Source } from '@collected/shared';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
+import { useGlass, useLiquid } from '@/lib/liquid';
 import { qk, useCourses, useItems, useSettings, useSources, useSyncAll, useUpsertWidget } from '@/lib/queries';
-import { useTheme } from '@/lib/theme';
+import { ACCENTS, useTheme } from '@/lib/theme';
 import { relative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { meetingExceptions, windowFromNow } from '@/widgets/shared';
@@ -22,6 +22,13 @@ import { useDashboardLayout } from './useLayout';
 import type { WidgetPreset } from '@/widgets/types';
 
 const DAY_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+/** "2026-fall" → "Fall 2026"; anything else as stored. */
+function termLabel(term: string | undefined): string | null {
+  if (!term) return null;
+  const m = /^(\d{4})-(\w+)$/.exec(term);
+  return m ? `${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} ${m[1]}` : term;
+}
 
 /** "2 classes today · 10 overdue · synced 5 min ago" under the date. */
 function useSummary() {
@@ -56,7 +63,8 @@ function useSummary() {
   const now = Date.now();
   const overdue = (due.data ?? []).filter((i) => i.dueAt && new Date(i.dueAt).getTime() < now && !i.effectiveDone).length;
   const broken = (sources.data ?? []).filter((s) => s.enabled && (s.status === 'error' || s.status === 'needs_auth')).length;
-  return { classes, overdue, last, broken, ready: courses.isSuccess && due.isSuccess };
+  const term = termLabel((courses.data ?? []).find((c) => !c.archived)?.term);
+  return { classes, overdue, last, broken, term, ready: courses.isSuccess && due.isSuccess };
 }
 
 export function Dashboard() {
@@ -67,6 +75,7 @@ export function Dashboard() {
   const upsert = useUpsertWidget();
   const [trayOpen, setTrayOpen] = useState(false);
   const summary = useSummary();
+  const glass = useGlass<HTMLDivElement>();
 
   const hide = (id: string) => {
     upsert.mutate({ id, hidden: true });
@@ -95,56 +104,71 @@ export function Dashboard() {
     setEditMode(false);
   };
 
-  const parts = [
-    summary.ready ? `${summary.classes} ${summary.classes === 1 ? 'class' : 'classes'} today` : null,
-    summary.ready ? `${summary.overdue} overdue` : null,
-    summary.broken ? `${summary.broken} ${summary.broken === 1 ? 'source needs' : 'sources need'} attention` : summary.last ? `synced ${relative(summary.last)}` : null,
-  ].filter(Boolean);
+  // Status words carry their colour; everything else in the line stays muted.
+  const parts: ReactNode[] = [];
+  if (summary.ready) {
+    parts.push(`${summary.classes} ${summary.classes === 1 ? 'class' : 'classes'} today`);
+    parts.push(summary.overdue ? <span className="font-medium text-critical">{summary.overdue} overdue</span> : 'nothing overdue');
+  }
+  if (summary.broken) parts.push(<span className="font-medium text-caution">{summary.broken} {summary.broken === 1 ? 'source needs' : 'sources need'} attention</span>);
+  else if (summary.last) parts.push(`synced ${relative(summary.last)}`);
+  const eyebrow = [format(new Date(), 'EEEE'), summary.term].filter(Boolean).join(' · ');
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3 px-4 pb-6 pt-3.5">
-      <header className="flex items-center gap-3 px-0.5">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="text-2xl font-bold leading-[1.1] tracking-[-0.03em]">{format(new Date(), "'Today,' MMMM d")}</h1>
-          <p className={cn('truncate text-[13px] text-sub', summary.broken && 'text-amber')}>{parts.join(' · ') || ' '}</p>
-        </div>
-        <span className="flex-1" />
-        <div className="flex items-center gap-2">
-          {editMode ? (
-            <>
-              <Button variant="outline" onClick={() => setTrayOpen(true)}>
-                <Plus className="size-4" /> Add widget
-              </Button>
-              <Button onClick={leaveEdit}>Done</Button>
-            </>
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" onClick={() => setEditMode(true)} aria-label="Edit layout">
-                  Edit layout
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Rearrange widgets (e)</TooltipContent>
-            </Tooltip>
-          )}
-          <RefreshAll />
-          <ThemeToggle />
-          <ProfileMenu />
+    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-4 pb-28 pt-7 sm:px-6 sm:pb-10">
+      <header className="flex items-end gap-3 px-0.5 sm:pr-[300px]">
+        <div className="flex min-w-0 flex-col">
+          <p className="label">{eyebrow}</p>
+          <h1 className="mt-1.5 text-[38px] font-[620] leading-[1.04] tracking-[-0.032em] sm:text-[44px]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
+          <p className="mt-2 truncate text-[15px] text-sub">
+            {parts.length ? parts.map((p, i) => <span key={i}>{i > 0 && <span className="text-ter"> · </span>}{p}</span>) : ' '}
+          </p>
         </div>
       </header>
 
       {editMode && (
-        <p className="-mt-1 px-0.5 text-xs text-sub">
-          Drag by the title bar, resize from the corner, hide with the eye. Press <kbd className="rounded-md border border-line2 px-1">Esc</kbd> when done.
+        <p className="-mt-2 px-0.5 text-[13px] text-sub">
+          Drag a card by its title, resize from the corner, hide with the eye. <kbd className="rounded-md bg-well px-1.5 py-px font-mono text-[11px]">Esc</kbd> when done.
         </p>
       )}
 
+      {/* Floating toolbar: liquid glass over the board. Top right on wide screens, bottom centre on phones. */}
+      <div
+        ref={glass}
+        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1.5rem,calc((100vw-1600px)/2+1.5rem))] sm:top-6"
+      >
+        {editMode ? (
+          <>
+            <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setTrayOpen(true)}>
+              <Plus className="size-4" /> Add widget
+            </button>
+            <button className="h-10 rounded-full bg-brand px-5 text-[14px] font-[560] text-on-brand transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--brand)_88%,var(--ink))] active:scale-[.98]" onClick={leaveEdit}>
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setEditMode(true)} aria-label="Edit layout">
+                  Edit
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Rearrange widgets (e)</TooltipContent>
+            </Tooltip>
+            <RefreshAll />
+            <ThemeToggle />
+            <ProfileMenu />
+          </>
+        )}
+      </div>
+
       {error ? (
-        <p className="text-sm text-coral">Could not load layout: {error.message}</p>
+        <p className="text-sm text-critical">Error: could not load layout: {error.message}</p>
       ) : !ready ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3.5 sm:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="surface h-40 animate-pulse opacity-60" />
+            <div key={i} className="surface h-44 animate-pulse opacity-70" />
           ))}
         </div>
       ) : (
@@ -158,9 +182,9 @@ export function Dashboard() {
             onHide={hide}
           />
           {!instances.some((w) => !w.hidden) && (
-            <div className="surface p-8 text-center text-sm text-sub">
+            <div className="surface p-10 text-center text-sm text-sub">
               Nothing on the dashboard.{' '}
-              <button className="underline" onClick={() => { setEditMode(true); setTrayOpen(true); }}>
+              <button className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand" onClick={() => { setEditMode(true); setTrayOpen(true); }}>
                 Add a widget
               </button>
               .
@@ -218,9 +242,9 @@ function RefreshAll() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" variant="outline" aria-label="Sync all sources" onClick={refresh} disabled={spinning}>
-          <RefreshCw className={cn('size-4', spinning && 'animate-spin')} />
-        </Button>
+        <button className="glass-btn" aria-label="Sync all sources" onClick={refresh} disabled={spinning}>
+          <RefreshCw className={cn('size-[18px]', spinning && 'animate-spin')} strokeWidth={1.7} />
+        </button>
       </TooltipTrigger>
       <TooltipContent>{spinning ? 'Syncing…' : 'Sync all sources'}</TooltipContent>
     </Tooltip>
@@ -234,42 +258,59 @@ function ThemeToggle() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" variant="outline" aria-label="Toggle theme" onClick={() => setTheme(next)}>
-          <Icon className="size-4" />
-        </Button>
+        <button className="glass-btn" aria-label="Toggle theme" onClick={() => setTheme(next)}>
+          <Icon className="size-[18px]" strokeWidth={1.7} />
+        </button>
       </TooltipTrigger>
       <TooltipContent>{theme === 'system' ? 'Following the system; click for ' : 'Switch to '}{next}</TooltipContent>
     </Tooltip>
   );
 }
 
-/** Gradient avatar with your initials (Settings → Layout); opens settings and theme choices. */
+/** Your initials on the accent (Settings → Layout); opens settings, the theme, and the accent. */
 function ProfileMenu() {
   const settings = useSettings();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent } = useTheme();
+  const liquid = useLiquid();
   const initials = String(settings.data?.['profile.initials'] ?? '').trim().slice(0, 3).toUpperCase();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          aria-label="Profile and settings"
-          className="grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold text-white shadow-[var(--shadow)] outline-none focus-visible:ring-[3px] focus-visible:ring-indigo/40"
-          style={{ background: 'linear-gradient(140deg, var(--indigo), color-mix(in oklab, var(--indigo) 60%, var(--teal)))' }}
-        >
-          {initials || <UserRound className="size-4" />}
+        <button aria-label="Profile and settings" className="ml-0.5 grid size-10 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-semibold tracking-[0.01em] text-on-brand transition-transform active:scale-95">
+          {initials || <UserRound className="size-[18px]" strokeWidth={1.7} />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align="end" sideOffset={10} className="w-60">
         <DropdownMenuItem asChild>
           <Link to="/settings"><Settings className="size-4" /> Settings</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs text-sub">Theme</DropdownMenuLabel>
-        {(['system', 'light', 'dark'] as const).map((t) => (
-          <DropdownMenuItem key={t} onClick={() => setTheme(t)} className={cn('capitalize', theme === t && 'font-semibold')}>
-            {t}
-          </DropdownMenuItem>
-        ))}
+        <div className="px-2.5 pb-2 pt-1.5">
+          <p className="label">Appearance</p>
+          <div className="seg mt-2 flex w-full" role="group" aria-label="Theme" ref={liquid}>
+            {(['system', 'light', 'dark'] as const).map((t) => (
+              <button key={t} className={cn('flex-1 capitalize', theme === t && 'seg-on')} aria-pressed={theme === t} onClick={() => setTheme(t)}>
+                {t === 'system' ? 'Auto' : t}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between" role="group" aria-label="Accent">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                aria-label={`${a.label} accent`}
+                aria-pressed={accent === a.id}
+                title={a.label}
+                onClick={() => setAccent(a.id)}
+                className={cn('grid size-9 place-items-center rounded-full transition-[box-shadow] duration-150', accent === a.id ? 'shadow-[inset_0_0_0_2px_var(--ink)]' : 'hover:shadow-[inset_0_0_0_2px_var(--line-mid)]')}
+              >
+                <span data-accent-swatch={a.id} className="grid size-6 place-items-center rounded-full">
+                  {accent === a.id && <Check className="size-3.5" strokeWidth={2.4} />}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

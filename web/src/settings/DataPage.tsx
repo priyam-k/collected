@@ -36,7 +36,7 @@ export function DataPage() {
   return (
     <div className="space-y-6">
       <PageTitle sub="Courses, settings, widget instances, and layouts. No credentials.">Export / import</PageTitle>
-      <section className="space-y-2 rounded-md border p-3">
+      <section className="space-y-2 rounded-2xl bg-well/60 p-4">
         <div className="text-sm font-medium">Demo data</div>
         <p className="text-xs text-muted-foreground">`pnpm cli demo …` loads fixture rows so widgets have something to show before accounts are connected. Once real sources are connected, remove them here.</p>
         <Button variant="outline" onClick={clearDemo}>Remove demo data</Button>

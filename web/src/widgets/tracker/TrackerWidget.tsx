@@ -13,14 +13,14 @@ import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 
 const STAGE_TONE: Partial<Record<JobStateValue, string>> = {
-  starred: 'text-amber-600 dark:text-amber-400',
-  applied: 'text-sky-600 dark:text-sky-400',
-  screen: 'text-violet-600 dark:text-violet-400',
-  interviewing: 'text-violet-600 dark:text-violet-400',
-  offer: 'text-emerald-600 dark:text-emerald-400',
-  rejected: 'text-muted-foreground',
-  ghosted: 'text-muted-foreground',
-  withdrawn: 'text-muted-foreground',
+  starred: 'text-caution',
+  applied: 'text-ink',
+  screen: 'text-brand-ink',
+  interviewing: 'text-brand-ink',
+  offer: 'text-positive',
+  rejected: 'text-ter',
+  ghosted: 'text-ter',
+  withdrawn: 'text-ter',
 };
 
 /** Next-action date, then applied date, then last touch: the one line under the company. */
@@ -43,18 +43,18 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => open({ kind: 'job', jobId: job.id })}
       onKeyDown={(e) => e.key === 'Enter' && open({ kind: 'job', jobId: job.id })}
-      className="group/card flex min-w-0 cursor-pointer flex-col gap-1 rounded-[14px] bg-well p-3 text-sm shadow-[inset_0_1px_0_var(--line)] transition-colors hover:bg-well2"
+      className="group/card flex min-w-0 cursor-pointer flex-col gap-1 rounded-[16px] bg-well p-3 text-sm transition-colors hover:bg-well2"
     >
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{job.company}</div>
           <div className="truncate text-xs text-muted-foreground" title={job.title}>{job.title}</div>
         </div>
-        {showStage && <span className={cn('shrink-0 text-[10px] uppercase tracking-wide', STAGE_TONE[job.state])}>{JOB_STATE_LABELS[job.state]}</span>}
+        {showStage && <span className={cn('shrink-0 font-mono text-[10px] uppercase tracking-[0.08em]', STAGE_TONE[job.state])}>{JOB_STATE_LABELS[job.state]}</span>}
       </div>
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-        {m.urgent && <CalendarClock className="size-3 text-amber-500" />}
-        <span className={cn('min-w-0 flex-1 truncate', m.urgent && 'text-amber-600 dark:text-amber-400')}>{m.text}</span>
+        {m.urgent && <CalendarClock className="size-3 text-caution" />}
+        <span className={cn('min-w-0 flex-1 truncate', m.urgent && 'font-medium text-caution')}>{m.text}</span>
         <StageSelect value={job.state} onChange={onStage} className="h-5 shrink-0 px-1 text-[10px] opacity-0 group-hover/card:opacity-100 focus:opacity-100" />
       </div>
     </div>
@@ -118,8 +118,8 @@ export function TrackerWidget({ size }: WidgetProps) {
               const list = stage === 'closed' ? closedJobs : (byStage.get(stage) ?? []);
               return (
                 <section key={stage} className="flex w-52 shrink-0 flex-col">
-                  <h4 className={cn('mb-1.5 flex items-baseline gap-1 px-1 text-[11px] font-semibold uppercase tracking-wide', stage === 'closed' ? 'text-ter' : STAGE_TONE[stage])}>
-                    {stage === 'closed' ? 'Closed' : JOB_STATE_LABELS[stage]} <span className="font-normal text-muted-foreground">{list.length}</span>
+                  <h4 className={cn('label mb-1.5 flex items-baseline gap-1.5 px-1', stage === 'closed' ? 'text-ter' : STAGE_TONE[stage])}>
+                    {stage === 'closed' ? 'Closed' : JOB_STATE_LABELS[stage]} <span className="text-ter">{list.length}</span>
                   </h4>
                   <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                     {list.map((j) => <Card key={j.id} job={j} onStage={(s) => onStage(j, s)} showStage={stage === 'closed'} />)}

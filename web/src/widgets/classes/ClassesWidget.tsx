@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
@@ -9,38 +9,30 @@ import { friendlyDate, isPast } from '@/lib/time';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
+import { TickArc } from '@/widgets/instruments';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
 
 /**
- * Conic ring with the current grade inside; TA courses show "TA", ungraded ones a dash. The filled arc is the
- * course colour on a well track, with a soft halo ring outside rather than a blur.
+ * A dial of ticks with the current grade inside; TA courses show "TA" on a full ring, ungraded ones a dash on an
+ * unlit ring. Lit ticks take the course colour.
  */
 export function GradeRing({ course, percent, size = 34 }: { course: Pick<Course, 'role' | 'color'>; percent: number | null | undefined; size?: number }) {
-  const color = safeColor(course.color) ?? 'var(--indigo)';
-  const thickness = size >= 56 ? 5 : 3.5;
-  const inner = size - thickness * 2;
+  const color = safeColor(course.color) ?? 'var(--brand)';
   const ta = course.role === 'ta';
   const pct = ta ? 100 : Math.max(0, Math.min(100, percent ?? 0));
-  const lit = ta || percent != null;
   const big = size >= 56;
+  const h = size / 2;
   return (
-    <div
-      className="grid shrink-0 place-items-center rounded-full"
-      style={{
-        width: size,
-        height: size,
-        background: lit ? `conic-gradient(${color} 0 ${pct}%, var(--well2) ${pct}% 100%)` : 'var(--well2)',
-        boxShadow: lit ? `0 0 0 ${big ? 4 : 3}px color-mix(in oklab, ${color} 14%, transparent)` : undefined,
-      } as CSSProperties}
-    >
-      <div className="grid place-items-center rounded-full bg-card" style={{ width: inner, height: inner }}>
-        <span className="flex items-baseline font-bold leading-none tabular-nums tracking-[-0.02em]" style={{ color: lit ? color : 'var(--ter)', fontSize: big ? 17 : ta ? 9 : 10 }}>
-          {ta ? 'TA' : percent == null ? '–' : Math.round(percent)}
-          {big && percent != null && !ta && <span className="ml-px text-[10px] font-semibold text-sub">%</span>}
-        </span>
-      </div>
+    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="absolute inset-0" aria-hidden>
+        <TickArc cx={h} cy={h} r={h - 0.8} len={big ? 6 : 4} value={pct / 100} color={color} ticks={big ? 48 : 30} width={big ? 1.8 : 1.5} />
+      </svg>
+      <span className="flex items-baseline font-[600] leading-none tabular-nums tracking-[-0.02em] text-ink" style={{ fontSize: big ? 18 : ta ? 9.5 : 10.5 }}>
+        {ta ? 'TA' : percent == null ? <span className="text-ter">–</span> : Math.round(percent)}
+        {big && percent != null && !ta && <span className="ml-px text-[10px] font-semibold text-sub">%</span>}
+      </span>
     </div>
   );
 }
@@ -89,7 +81,7 @@ export function ClassesWidget({ size }: WidgetProps) {
               <button
                 type="button"
                 className={cn('flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-well')}
-                style={isToday ? { background: 'color-mix(in oklab, var(--indigo) 8%, transparent)' } : undefined}
+                style={isToday ? { background: 'var(--brand-soft)' } : undefined}
                 title={`Open ${c.code}: assignments, grades, dates, files`}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={() => open({ kind: 'course', courseId: c.id })}
@@ -102,7 +94,7 @@ export function ClassesWidget({ size }: WidgetProps) {
                   </div>
                   {next ? (
                     <div className="mt-px truncate text-xs text-sub">
-                      {next.title} · <span className={cn('font-medium', (isToday || (next.dueAt && isPast(next.dueAt))) ? 'text-coral' : 'text-sub')}>{isToday ? `due ${next.dueAt ? format(new Date(next.dueAt), 'h:mm a') : 'today'}` : friendlyDate(next.dueAt, { withTime: false })}</span>
+                      {next.title} · <span className={cn('font-medium', (isToday || (next.dueAt && isPast(next.dueAt))) ? 'text-critical' : 'text-sub')}>{isToday ? `due ${next.dueAt ? format(new Date(next.dueAt), 'h:mm a') : 'today'}` : friendlyDate(next.dueAt, { withTime: false })}</span>
                     </div>
                   ) : (
                     <div className="mt-px text-xs text-ter">{itemsQ.isPending ? '…' : 'Nothing due in 3 weeks'}</div>

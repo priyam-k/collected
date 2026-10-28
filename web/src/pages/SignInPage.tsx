@@ -1,4 +1,5 @@
 import { Navigate, useLocation, useSearchParams } from 'react-router';
+import { AsciiOrb } from '@/components/AsciiOrb';
 import { Button } from '@/components/ui/button';
 import { isSignedIn, useMe } from '@/lib/queries';
 
@@ -21,24 +22,29 @@ export function SignInPage() {
   const google = me.data?.signIn.google ?? true;
   return (
     <main className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-line2 bg-card p-6 shadow-[var(--shadow)]">
-        <h1 className="text-2xl font-bold tracking-[-0.03em]">collected</h1>
-        <p className="mt-1 text-[13px] text-sub">Your courses, calendar, tasks and jobs on one board.</p>
+      <div className="surface w-full max-w-sm p-7">
+        <div className="grid h-[132px] place-items-center overflow-hidden rounded-[16px] bg-well">
+          <AsciiOrb className="h-[120px] w-[200px]" />
+        </div>
+        <p className="label mt-6">Sign in</p>
+        <h1 className="mt-1.5 text-[30px] font-[620] leading-tight tracking-[-0.028em]">collected</h1>
+        <p className="mt-1.5 text-[14px] text-sub">Your courses, calendar, tasks and jobs on one board.</p>
         {error && ERRORS[error] && (
-          <p role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-ink">
+          <p role="alert" className="mt-4 rounded-xl bg-[color-mix(in_srgb,var(--critical)_10%,var(--surface))] px-3.5 py-2.5 text-[13px] text-ink">
+            <span className="font-semibold text-critical">Error: </span>
             {ERRORS[error]}
           </p>
         )}
         <div className="mt-6">
           {google ? (
-            <Button asChild className="w-full">
+            <Button asChild size="lg" className="w-full">
               <a href={`/api/auth/google/start?next=${encodeURIComponent(next)}`}>Sign in with Google</a>
             </Button>
           ) : (
             <p className="text-[13px] text-sub">This server has no sign-in method configured.</p>
           )}
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">Google is used for your identity only. Calendar access is a separate, optional step in Settings.</p>
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Google is used for your identity only. Calendar access is a separate, optional step in Settings.</p>
       </div>
     </main>
   );

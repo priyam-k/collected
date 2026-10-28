@@ -16,12 +16,12 @@ import { manualRaw } from '@/widgets/shared';
 
 const DAY_INDEX: Record<Meeting['day'], number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 const KIND_TONE: Record<CourseEventKind, string> = {
-  exam: 'bg-red-500',
-  final: 'bg-red-600',
-  quiz: 'bg-orange-500',
+  exam: 'bg-critical',
+  final: 'bg-critical',
+  quiz: 'bg-caution',
   cancelled: 'bg-muted-foreground',
-  virtual: 'bg-sky-500',
-  other: 'bg-emerald-500',
+  virtual: 'bg-brand',
+  other: 'bg-positive',
 };
 const EXAMISH = /\b(exam|midterm|final|quiz|test)\b/i;
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -78,7 +78,7 @@ function EventForm({ course, draft, onChange, onSaved, onCancel }: { course: Cou
     else create.mutate(body, opts);
   };
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-md border p-3">
+    <form onSubmit={submit} className="space-y-2 rounded-2xl bg-well/60 p-4">
       <div className="flex flex-wrap gap-1">
         {COURSE_EVENT_KINDS.map((k) => (
           <button
@@ -183,7 +183,7 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
   };
   const remove = (it: EffectiveItem) => del.mutate(it.externalId, { onSuccess: () => toast.success('Removed'), onError: (e) => toast.error(e.message) });
 
-  const dotFor = (r: (typeof dated)[number]): string => (r.from === 'manual' ? KIND_TONE[manualRaw(r.item)!.eventKind] : r.from === 'assignment' ? 'bg-red-500/70' : 'bg-primary/60');
+  const dotFor = (r: (typeof dated)[number]): string => (r.from === 'manual' ? KIND_TONE[manualRaw(r.item)!.eventKind] : r.from === 'assignment' ? 'bg-critical/70' : 'bg-primary/60');
   const kindOf = (r: (typeof dated)[number]): string => (r.from === 'manual' ? COURSE_EVENT_LABELS[manualRaw(r.item)!.eventKind] : r.from === 'assignment' ? 'Canvas assignment' : 'Canvas event');
 
   const Row = ({ r }: { r: (typeof dated)[number] }) => {
@@ -214,17 +214,17 @@ export function CourseDates({ course, assignments }: { course: Course; assignmen
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-xl border border-line">
         <div className="flex items-center gap-1 border-b px-2 py-1">
           <Button size="icon-xs" variant="ghost" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}><ChevronLeft className="size-3.5" /></Button>
           <Button size="icon-xs" variant="ghost" aria-label="Next month" onClick={() => setMonth((m) => addMonths(m, 1))}><ChevronRight className="size-3.5" /></Button>
           <span className="ml-1 text-sm font-medium">{format(month, 'MMMM yyyy')}</span>
           <span className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground">
             <span className="inline-flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-primary/15 ring-1 ring-primary/30" /> class day</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-red-500" /> exam</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-orange-500" /> quiz</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-critical" /> exam</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-caution" /> quiz</span>
             <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-muted-foreground" /> cancelled</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-sky-500" /> virtual</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block size-1.5 rounded-full bg-brand" /> virtual</span>
           </span>
         </div>
         <div className="grid grid-cols-7 text-center text-[10px] text-muted-foreground">

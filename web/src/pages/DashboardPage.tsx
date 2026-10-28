@@ -1,38 +1,48 @@
 import { Link } from 'react-router';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dashboard } from '@/dashboard/Dashboard';
 import { EditModeProvider } from '@/dashboard/EditMode';
 import { useCourses, useSources } from '@/lib/queries';
+import { cn } from '@/lib/utils';
+
+const code = 'rounded-md bg-well px-1.5 py-px font-mono text-[12px] text-ink';
 
 /** Shown above the board until there is at least one course: the two steps that make the dashboard mean something. */
 function FirstRun() {
   const sources = useSources();
   const canvas = sources.data?.find((s) => s.id === 'canvas');
   const canvasOk = canvas?.status === 'connected';
+  const step = (n: number, done: boolean) => (
+    <span className={cn('mt-px grid size-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold', done ? 'bg-[color-mix(in_srgb,var(--positive)_14%,var(--surface))] text-positive' : 'bg-well text-ink')}>
+      {done ? <Check className="size-3.5" strokeWidth={2.4} /> : n}
+    </span>
+  );
   return (
-    <section aria-label="Set up" className="mx-auto mb-4 max-w-3xl rounded-2xl border border-line2 bg-card p-5 shadow-[var(--shadow)]">
-      <h2 className="text-lg font-semibold tracking-[-0.02em]">Welcome. Two steps and the board fills itself.</h2>
-      <ol className="mt-3 space-y-3 text-[13px]">
-        <li className="flex items-start gap-3">
-          <span className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${canvasOk ? 'bg-emerald-500/20 text-emerald-500' : 'bg-well2 text-ink'}`}>{canvasOk ? '✓' : '1'}</span>
+    <section aria-label="Set up" className="surface mx-auto mb-2 mt-6 w-[calc(100%-2rem)] max-w-3xl p-6 sm:p-7">
+      <p className="label">Getting started</p>
+      <h2 className="mt-2 text-[26px] font-[620] leading-tight tracking-[-0.025em]">Two steps and the board fills itself.</h2>
+      <ol className="mt-5 space-y-5 text-[14px]">
+        <li className="flex items-start gap-3.5">
+          {step(1, canvasOk)}
           <div>
-            <div className="font-medium">Connect Canvas</div>
-            <div className="text-sub">
-              On your laptop: <code className="rounded bg-well px-1">npm i -g collected-cli</code>, then <code className="rounded bg-well px-1">collected init &lt;this url&gt;</code>, <code className="rounded bg-well px-1">collected login</code> and{' '}
-              <code className="rounded bg-well px-1">collected connect canvas</code>. Or paste a session cookie under <Link to="/settings/sources" className="underline">Sources</Link>.
+            <div className="font-semibold">Connect Canvas {canvasOk && <span className="ml-1 font-medium text-positive">Connected</span>}</div>
+            <div className="mt-1 leading-relaxed text-sub">
+              On your laptop: <code className={code}>npm i -g collected-cli</code>, then <code className={code}>collected init &lt;this url&gt;</code>, <code className={code}>collected login</code> and{' '}
+              <code className={code}>collected connect canvas</code>. Or paste a session cookie under <Link to="/settings/sources" className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">Sources</Link>.
             </div>
           </div>
         </li>
-        <li className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-well2 text-xs font-semibold text-ink">2</span>
+        <li className="flex items-start gap-3.5">
+          {step(2, false)}
           <div>
-            <div className="font-medium">Pick your courses</div>
-            <div className="text-sub">Import them from your Canvas enrollments, or add them by hand.</div>
-            <div className="mt-2 flex gap-2">
-              <Button asChild size="sm">
+            <div className="font-semibold">Pick your courses</div>
+            <div className="mt-1 text-sub">Import them from your Canvas enrollments, or add them by hand.</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button asChild>
                 <Link to="/settings/courses">Import from Canvas</Link>
               </Button>
-              <Button asChild size="sm" variant="outline">
+              <Button asChild variant="outline">
                 <Link to="/settings/sources">Connect other sources</Link>
               </Button>
             </div>

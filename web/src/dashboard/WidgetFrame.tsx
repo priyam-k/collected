@@ -2,11 +2,11 @@ import { forwardRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { EyeOff, GripVertical } from 'lucide-react';
 import type { Source, WidgetInstance } from '@collected/shared';
 import { Button } from '@/components/ui/button';
+import { safeColor } from '@/lib/color';
 import { cn } from '@/lib/utils';
 import { useCourses } from '@/lib/queries';
 import { ConnectPlaceholder } from '@/widgets/Placeholder';
 import { getWidgetDef, widgetTitle } from '@/widgets/registry';
-import type { WidgetAccent } from '@/widgets/types';
 import { useWidgetSize } from './useWidgetSize';
 import { WidgetHeaderSlot } from './WidgetHeader';
 
@@ -24,18 +24,11 @@ interface Props {
   children?: ReactNode;
 }
 
-const ACCENT_VAR: Record<Exclude<WidgetAccent, 'course'>, string> = {
-  indigo: 'var(--indigo)',
-  coral: 'var(--coral)',
-  teal: 'var(--teal)',
-  lime: 'var(--lime)',
-  amber: 'var(--amber)',
-};
-
 /**
- * The chrome around every widget: a tinted surface, a well header (title, the widget's own controls via
- * WidgetHeader, edit-mode grip and hide), and a body whose size drives the widget's tier. The body is a CSS
- * container so widget styles can use @container queries.
+ * The chrome around every widget: a card with the title inside it (no bar behind), the widget's own controls via
+ * WidgetHeader on the right, edit-mode grip and hide, and a body whose size drives the widget's tier. A course
+ * widget carries its course colour as a dot by the title and as --course for the body. The body is a CSS container
+ * so widget styles can use @container queries.
  */
 export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFrame(
   { instance, sources, editMode, onHide, style, className, onMouseDown, onMouseUp, onTouchEnd, children },
@@ -50,23 +43,26 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
     const s = sources.find((x) => x.id === id);
     return !s || s.status === 'disconnected' || s.status === 'needs_auth';
   }) ?? [];
-  const accent = def?.accent ?? 'indigo';
-  const courseColor = accent === 'course' ? coursesQ.data?.find((c) => c.id === (instance.config as { courseId?: string }).courseId)?.color : null;
-  const accentVar = accent === 'course' ? (courseColor ?? 'var(--indigo)') : ACCENT_VAR[accent];
+  const courseColor = def?.accent === 'course' ? safeColor(coursesQ.data?.find((c) => c.id === (instance.config as { courseId?: string }).courseId)?.color) : null;
 
   return (
     <div
       ref={ref}
-      style={{ ...style, '--accent': accentVar } as CSSProperties}
-      className={cn('surface group flex flex-col overflow-hidden text-card-foreground', editMode && 'ring-1 ring-indigo/40', className)}
+      style={{ ...style, ...(courseColor ? { '--course': courseColor } : {}) } as CSSProperties}
+      className={cn(
+        'surface group flex flex-col overflow-hidden text-card-foreground transition-shadow duration-200',
+        editMode && 'shadow-[var(--shadow-card),inset_0_0_0_1.5px_color-mix(in_srgb,var(--brand)_40%,transparent)]',
+        className,
+      )}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
       onTouchEnd={onTouchEnd}
     >
-      <div className={cn('surface-head flex min-h-11 shrink-0 items-center gap-2.5 px-3.5 py-1.5', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')} title={editMode ? 'Drag to move' : undefined}>
-        {editMode && <GripVertical className="size-3.5 shrink-0 text-ter" />}
-        <span className="shrink-0 text-[15px] font-semibold text-sub">{title}</span>
-        <div ref={setSlot} className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2.5 gap-y-1.5" />
+      <div className={cn('surface-head flex min-h-[50px] shrink-0 items-center gap-2.5 pl-4 pr-3 pt-1.5', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')} title={editMode ? 'Drag to move' : undefined}>
+        {editMode && <GripVertical className="-ml-1 size-3.5 shrink-0 text-ter" />}
+        {courseColor && <span className="size-2 shrink-0 rounded-full" style={{ background: courseColor }} />}
+        <h3 className="min-w-0 shrink-0 truncate text-[16px] font-semibold leading-tight tracking-[-0.015em] text-ink">{title}</h3>
+        <div ref={setSlot} className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1.5" />
         {editMode && (
           <Button size="icon-xs" variant="ghost" aria-label="Hide widget" title="Hide this widget (bring it back from Add widget)" onMouseDown={(e) => e.stopPropagation()} onClick={onHide}>
             <EyeOff className="size-3.5" />

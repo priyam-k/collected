@@ -4,7 +4,7 @@ import { getWidgetDef } from '@/widgets/registry';
 export const BREAKPOINTS = { lg: 1100, md: 700, sm: 0 } as const;
 export const COLS = { lg: 12, md: 8, sm: 4 } as const;
 export const ROW_HEIGHT = 40;
-export const MARGIN: [number, number] = [8, 8];
+export const MARGIN: [number, number] = [14, 14];
 
 /** Where the core widgets go on a fresh install (lg, 12 columns). */
 const DEFAULT_LG: Record<string, Omit<LayoutItem, 'i'>> = {

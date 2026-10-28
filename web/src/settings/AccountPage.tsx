@@ -58,13 +58,13 @@ export function AccountPage() {
       <PageTitle sub={me.data?.authDisabled ? 'Authentication is off (AUTH_DISABLED); this is local development.' : me.data?.signIn.access && !me.data.user?.picture ? 'Signed in through Cloudflare Access.' : 'Signed in with Google.'}>Account</PageTitle>
 
       {user && (
-        <div className="flex items-center gap-3 rounded-xl border border-line2 bg-card p-3">
+        <div className="flex items-center gap-3 rounded-2xl bg-well/60 p-3.5">
           {user.picture ? <img src={user.picture} alt="" className="size-10 rounded-full" referrerPolicy="no-referrer" /> : <div className="size-10 rounded-full bg-well2" />}
           <div className="min-w-0">
             <div className="truncate font-medium">{user.name ?? user.email}</div>
             <div className="truncate text-[13px] text-sub">{user.email}</div>
             {!user.picture && me.data?.signIn.google && !me.data.authDisabled && (
-              <a href="/api/auth/google/start?next=%2Fsettings%2Faccount" className="text-[13px] text-indigo hover:underline">
+              <a href="/api/auth/google/start?next=%2Fsettings%2Faccount" className="text-[13px] text-brand-ink hover:underline">
                 Add your Google name and photo
               </a>
             )}
@@ -107,7 +107,7 @@ export function AccountPage() {
           </form>
         )}
         {fresh && (
-          <div role="status" className="space-y-2 rounded-xl border border-line2 bg-well p-3">
+          <div role="status" className="space-y-2 rounded-2xl bg-well p-3.5">
             <div className="text-[13px]">
               Token for <strong>{fresh.name}</strong>. It is shown once; copy it now.
             </div>
@@ -122,7 +122,7 @@ export function AccountPage() {
             </div>
           </div>
         )}
-        <ul className="divide-y divide-line2 rounded-xl border border-line2 bg-card">
+        <ul className="divide-y divide-line rounded-2xl bg-well/60">
           {(tokens.data ?? []).map((t) => (
             <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-[13px]">
               <div className="min-w-0 flex-1">
