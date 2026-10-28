@@ -110,7 +110,7 @@ function DemoShowcase() {
             <span className="size-3 rounded-full bg-[#ff5f57]" />
             <span className="size-3 rounded-full bg-[#febc2e]" />
             <span className="size-3 rounded-full bg-[#28c840]" />
-            <span className="mx-auto hidden h-7 w-[min(360px,50%)] items-center justify-center rounded-full bg-well text-[12px] text-sub sm:flex">collected.your-school.dev</span>
+            <span className="mx-auto hidden h-7 w-[min(360px,50%)] items-center justify-center rounded-full bg-well text-[12px] text-sub sm:flex">collected.priyamkabra.com</span>
             <span className="ml-auto flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-[11.5px] font-semibold text-brand-ink sm:ml-0">
               <span className="size-1.5 animate-pulse rounded-full bg-brand" /> Live demo
             </span>
@@ -263,7 +263,7 @@ function Closing() {
 
 export function Landing() {
   return (
-    <PublicLayout wide>
+    <PublicLayout wide nav="sections">
       <div className="landing">
         <Hero />
         <DemoShowcase />

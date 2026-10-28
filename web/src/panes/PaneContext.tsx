@@ -21,7 +21,7 @@ const Ctx = createContext<PaneApi>({ pane: null, open: () => {}, close: () => {}
 export const usePane = () => useContext(Ctx);
 
 /** One right-hand sheet for the whole app. Content stays mounted through the close animation. */
-export function PaneProvider({ children }: { children: ReactNode }) {
+export function PaneProvider({ children, container }: { children: ReactNode; container?: HTMLElement | null }) {
   const [pane, setPane] = useState<Pane | null>(null);
   const [visible, setVisible] = useState(false);
   const open = useCallback((p: Pane) => {
@@ -42,7 +42,7 @@ export function PaneProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={api}>
       {children}
       <Sheet open={visible} onOpenChange={(o) => !o && close()}>
-        <SheetContent side="right" showCloseButton={false} className="inset-y-3 right-3 h-auto w-[min(580px,92vw)] max-w-none gap-0 overflow-hidden rounded-[24px] border-0 bg-card p-0 shadow-[0_30px_80px_-30px_rgba(0,0,0,.8),0_1px_0_rgba(255,255,255,.06)_inset] sm:max-w-none" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <SheetContent container={container} side="right" showCloseButton={false} className="inset-y-3 right-3 h-auto w-[min(580px,calc(100%-1.5rem))] max-w-none gap-0 overflow-hidden rounded-[24px] border-0 bg-card p-0 shadow-[0_30px_80px_-30px_rgba(0,0,0,.8),0_1px_0_rgba(255,255,255,.06)_inset] sm:max-w-none" onOpenAutoFocus={(e) => e.preventDefault()}>
           {pane?.kind === 'course' && <CoursePane key={`${pane.courseId}:${pane.tab ?? ''}`} courseId={pane.courseId} initialTab={pane.tab} />}
           {pane?.kind === 'job' && <JobPane jobId={pane.jobId} />}
           {pane?.kind === 'job-new' && <JobPane jobId={null} />}

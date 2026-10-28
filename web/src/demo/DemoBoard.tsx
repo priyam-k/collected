@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { format } from 'date-fns';
 import { RefreshCw, RotateCcw } from 'lucide-react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Layouts } from '@collected/shared';
 import { Grid } from '@/dashboard/Grid';
 import { useDashboardLayout } from '@/dashboard/useLayout';
@@ -16,10 +17,23 @@ export const DEMO_WIDTH = 1280;
 const DAY_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
 /**
- * Its own query client and course pane, with every API call answered in the browser (demo/api.ts) while mounted.
- * Kept apart from the app's client so demo rows never mix with a signed-in person's cache.
+ * Links inside the demo would leave it (settings pages a visitor cannot open, the made-up courses' hotlinks), so a
+ * click on any of them is caught here and explained instead. React events reach this through portals too, so the
+ * course pane and popovers are covered.
  */
-export function DemoProviders({ children }: { children: ReactNode }) {
+function blockLinks(e: React.MouseEvent) {
+  const a = (e.target as Element).closest?.('a[href]');
+  if (!a) return;
+  e.preventDefault();
+  toast('Links are off in the demo', { id: 'demo-links', description: 'Sign in to use them with your own courses.' });
+}
+
+/**
+ * Its own query client and course pane, with every API call answered in the browser (demo/api.ts) while mounted.
+ * Kept apart from the app's client so demo rows never mix with a signed-in person's cache. `paneHost` keeps the
+ * course pane inside the demo's window instead of over the whole page.
+ */
+export function DemoProviders({ children, paneHost }: { children: ReactNode; paneHost?: HTMLElement | null }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, staleTime: 30_000 } } }));
   // Installed during the first render too: children start fetching before a parent's effects run.
   useState(() => setApiOverride(demoApi));
@@ -29,7 +43,9 @@ export function DemoProviders({ children }: { children: ReactNode }) {
   }, []);
   return (
     <QueryClientProvider client={client}>
-      <PaneProvider>{children}</PaneProvider>
+      <div className="contents" onClickCapture={blockLinks}>
+        <PaneProvider container={paneHost}>{children}</PaneProvider>
+      </div>
     </QueryClientProvider>
   );
 }
@@ -128,6 +144,7 @@ function Board({ editMode, setEditMode, scale }: { editMode: boolean; setEditMod
  */
 export function DemoBoard({ height, className, onEditModeChange }: { height: number | 'auto'; className?: string; onEditModeChange?(v: boolean): void }) {
   const outer = useRef<HTMLDivElement>(null);
+  const [paneHost, setPaneHost] = useState<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [editMode, setEditModeState] = useState(false);
   const setEditMode = (v: boolean) => {
@@ -152,8 +169,16 @@ export function DemoBoard({ height, className, onEditModeChange }: { height: num
     );
   }
   return (
-    <DemoProviders>
-      <div ref={outer} className={cn('relative w-full overflow-hidden', className)} style={{ height }}>
+    <DemoProviders paneHost={paneHost}>
+      {/* translateZ makes this the containing block for the pane's fixed positioning, so it opens inside the window */}
+      <div
+        ref={(el) => {
+          outer.current = el;
+          setPaneHost(el);
+        }}
+        className={cn('relative w-full overflow-hidden [transform:translateZ(0)]', className)}
+        style={{ height }}
+      >
         <div
           className="origin-top-left overflow-y-auto overflow-x-hidden [scrollbar-width:thin]"
           style={{ width: DEMO_WIDTH, transform: scale === 1 ? undefined : `scale(${scale})`, height: height / scale }}

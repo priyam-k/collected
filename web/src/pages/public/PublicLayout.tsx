@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import { Moon, Sun, SunMoon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useGlass } from '@/lib/liquid';
+import { useGlass, useLiquid } from '@/lib/liquid';
 import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 
 export const GITHUB_URL = 'https://github.com/priyam-k/collected';
 export const SELF_HOST_DOC_URL = `${GITHUB_URL}/blob/main/docs/self-host.md`;
@@ -36,6 +37,14 @@ export function Brand({ className = '' }: { className?: string }) {
   );
 }
 
+/** The other public pages, linked from everywhere but the landing page (which links its own sections). */
+const PAGES: [string, string][] = [
+  ['Home', '/'],
+  ['Live demo', '/demo'],
+  ['Privacy', '/privacy'],
+  ['Terms', '/terms'],
+];
+
 const SECTIONS: [string, string][] = [
   ['Demo', '/#demo'],
   ['How it works', '/#how'],
@@ -45,11 +54,13 @@ const SECTIONS: [string, string][] = [
 ];
 
 /**
- * Chrome for the signed-out pages: a floating glass bar with the product name, the landing page's sections and a
- * Sign in link, the page, and a footer. `wide` lets the landing page run full width; legal pages keep a measure.
+ * Chrome for the signed-out pages: a floating glass bar with the product name, links and a Sign in button, the page,
+ * and a footer. The landing page links its own sections (`nav="sections"`); every other page links the public pages,
+ * the current one marked by a springing thumb. `wide` lets a page run full width; legal pages keep a measure.
  */
-export function PublicLayout({ children, wide }: { children: ReactNode; wide?: boolean }) {
+export function PublicLayout({ children, wide, nav = 'pages' }: { children: ReactNode; wide?: boolean; nav?: 'sections' | 'pages' }) {
   const glass = useGlass<HTMLDivElement>();
+  const liquid = useLiquid<HTMLElement>();
   return (
     <div className="flex min-h-full flex-col text-foreground">
       <header className="pointer-events-none sticky top-0 z-30 px-3 pt-3 sm:px-6 sm:pt-4">
@@ -57,13 +68,23 @@ export function PublicLayout({ children, wide }: { children: ReactNode; wide?: b
           <Link to="/" className="rounded-full" aria-label="collected home">
             <Brand />
           </Link>
-          <nav aria-label="Sections" className="mx-auto hidden items-center gap-0.5 lg:flex">
-            {SECTIONS.map(([label, href]) => (
-              <a key={href} href={href} className="glass-btn px-3.5 text-[14px] font-medium text-sub hover:text-ink">
-                {label}
-              </a>
-            ))}
-          </nav>
+          {nav === 'sections' ? (
+            <nav aria-label="Sections" className="mx-auto hidden items-center gap-0.5 lg:flex">
+              {SECTIONS.map(([label, href]) => (
+                <a key={href} href={href} className="glass-btn px-3.5 text-[14px] font-medium text-sub hover:text-ink">
+                  {label}
+                </a>
+              ))}
+            </nav>
+          ) : (
+            <nav ref={liquid} aria-label="Pages" className="relative mx-auto hidden items-center gap-0.5 md:flex">
+              {PAGES.map(([label, to]) => (
+                <NavLink key={to} to={to} end className={({ isActive }) => cn('glass-btn relative z-[1] px-3.5 text-[14px] font-medium', isActive ? 'text-ink' : 'text-sub hover:text-ink')}>
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+          )}
           <nav className="ml-auto flex items-center gap-0.5 lg:ml-0">
             <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="glass-btn hidden px-3.5 text-[14px] font-medium text-sub hover:text-ink sm:inline-flex">
               GitHub
