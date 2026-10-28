@@ -30,6 +30,8 @@ export function todoistAuthUrl(env: Env, state: string): string {
   u.searchParams.set('client_id', id);
   u.searchParams.set('scope', TODOIST_SCOPE);
   u.searchParams.set('state', state);
+  // Required once the app has more than one redirect URL registered; must match the console entry exactly.
+  u.searchParams.set('redirect_uri', todoistRedirectUri(env));
   return u.toString();
 }
 
@@ -41,7 +43,7 @@ export async function exchangeTodoistCode(env: Env, code: string, fetchImpl: typ
   const res = await fetchImpl(TODOIST_TOKEN_URL, {
     method: 'POST',
     headers: FORM,
-    body: new URLSearchParams({ client_id: id, client_secret: secret, code }),
+    body: new URLSearchParams({ client_id: id, client_secret: secret, code, redirect_uri: todoistRedirectUri(env) }),
     signal: withTimeout(undefined, REQUEST_TIMEOUT_MS),
     redirect: 'manual',
   });
