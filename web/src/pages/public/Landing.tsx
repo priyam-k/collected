@@ -12,7 +12,8 @@ import { Reveal, useScrollProgress } from './landing/motion';
 import { Terminal } from './landing/Terminal';
 import { GITHUB_URL, LICENSE_URL, OPERATOR_EMAIL, PublicLayout, SELF_HOST_DOC_URL } from './PublicLayout';
 
-const ONE_LINE = 'Canvas, Gradescope, Google Calendar, Todoist, Google Tasks and an internship feed, pulled into one dashboard you arrange yourself. Open source, self-hosted, and readable by your AI agents.';
+const PITCH = 'Canvas, Gradescope, Google Calendar, Todoist, Google Tasks and an internship feed, pulled into one dashboard you arrange yourself.';
+const PITCH_2 = 'Open source, self-hosted, and readable by your AI agents.';
 
 const WORKS_WITH: [string, typeof GraduationCap][] = [
   ['Canvas', GraduationCap],
@@ -53,7 +54,10 @@ function Hero() {
           </h1>
         </Reveal>
         <Reveal delay={120}>
-          <p className="mx-auto mt-7 max-w-2xl text-[clamp(17px,1.7vw,21px)] leading-[1.55] text-sub">{ONE_LINE}</p>
+          <p className="mx-auto mt-7 max-w-2xl text-[clamp(17px,1.7vw,21px)] leading-[1.55] text-sub">
+            {PITCH} <br className="hidden sm:block" />
+            {PITCH_2}
+          </p>
         </Reveal>
         <Reveal delay={180}>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

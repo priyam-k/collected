@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type { PreviewFile } from '@/lib/canvas';
 import { CoursePane } from './CoursePane';
@@ -41,7 +42,10 @@ export function PaneProvider({ children, container }: { children: ReactNode; con
   return (
     <Ctx.Provider value={api}>
       {children}
-      <Sheet open={visible} onOpenChange={(o) => !o && close()}>
+      {/* Inside a container (the landing page's demo) the pane is not modal, so the page around it keeps scrolling;
+          its backdrop dims only the container, and a click on it closes the pane. */}
+      {container && visible && createPortal(<div aria-hidden className="absolute inset-0 z-[49] bg-[rgba(24,20,14,.28)] backdrop-blur-[4px] duration-200 animate-in fade-in-0 dark:bg-[rgba(0,0,0,.45)]" onClick={close} />, container)}
+      <Sheet open={visible} onOpenChange={(o) => !o && close()} modal={!container}>
         <SheetContent container={container} side="right" showCloseButton={false} className="inset-y-3 right-3 h-auto w-[min(580px,calc(100%-1.5rem))] max-w-none gap-0 overflow-hidden rounded-[24px] border-0 bg-card p-0 shadow-[0_30px_80px_-30px_rgba(0,0,0,.8),0_1px_0_rgba(255,255,255,.06)_inset] sm:max-w-none" onOpenAutoFocus={(e) => e.preventDefault()}>
           {pane?.kind === 'course' && <CoursePane key={`${pane.courseId}:${pane.tab ?? ''}`} courseId={pane.courseId} initialTab={pane.tab} />}
           {pane?.kind === 'job' && <JobPane jobId={pane.jobId} />}
