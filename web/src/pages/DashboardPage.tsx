@@ -28,7 +28,7 @@ function FirstRun() {
           <div>
             <div className="font-semibold">Connect Canvas {canvasOk && <span className="ml-1 font-medium text-positive">Connected</span>}</div>
             <div className="mt-1 leading-relaxed text-sub">
-              On your laptop: <code className={code}>npm i -g collected-cli</code>, then <code className={code}>collected init &lt;this url&gt;</code>, <code className={code}>collected login</code> and{' '}
+              On your laptop: <code className={code}>npm i -g collected-cli</code>, then <code className={code}>collected init {window.location.origin}</code>, <code className={code}>collected login</code> and{' '}
               <code className={code}>collected connect canvas</code>. Or paste a session cookie under <Link to="/settings/sources" className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">Sources</Link>.
             </div>
           </div>
@@ -40,7 +40,7 @@ function FirstRun() {
             <div className="mt-1 text-sub">Import them from your Canvas enrollments, or add them by hand.</div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button asChild>
-                <Link to="/settings/courses">Import from Canvas</Link>
+                <Link to="/settings/courses?import=1">Import from Canvas</Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/settings/sources">Connect other sources</Link>

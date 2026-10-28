@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { format } from 'date-fns';
-import { Check, CircleArrowUp, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
+import { Check, CircleArrowUp, LogOut, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, type Layouts, type Source } from '@collected/shared';
+import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -13,6 +14,7 @@ import { useGlass, useLiquid } from '@/lib/liquid';
 import { qk, useCourses, useItems, useMe, useSettings, useSources, useSyncAll, useUpsertWidget } from '@/lib/queries';
 import { ACCENTS, useTheme } from '@/lib/theme';
 import { relative } from '@/lib/time';
+import { useSignOut } from '@/lib/useSignOut';
 import { cn } from '@/lib/utils';
 import { meetingExceptions, windowFromNow } from '@/widgets/shared';
 import { AddTray } from './AddTray';
@@ -422,6 +424,7 @@ function ProfileMenu({ buildLine, updateDot, onOpenUpdate }: { buildLine: string
   const photo = user?.picture && !photoFailed ? user.picture : null;
   const { theme, setTheme, accent, setAccent } = useTheme();
   const liquid = useLiquid();
+  const { signOut, available: canSignOut } = useSignOut();
   const initials = String(settings.data?.['profile.initials'] ?? '').trim().slice(0, 3).toUpperCase();
   // Opening the update popover from here waits for the menu to finish closing, or the focus it hands back to the
   // avatar would count as a click outside the popover and shut it again.
@@ -469,32 +472,39 @@ function ProfileMenu({ buildLine, updateDot, onOpenUpdate }: { buildLine: string
         <DropdownMenuItem asChild>
           <Link to="/settings"><Settings className="size-4" /> Settings</Link>
         </DropdownMenuItem>
+        {canSignOut && (
+          <DropdownMenuItem onSelect={signOut}>
+            <LogOut className="size-4" /> Sign out
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <div className="px-2.5 pb-2 pt-1.5">
           <p className="label">Appearance</p>
-          <div className="seg mt-2 flex w-full" role="group" aria-label="Theme" ref={liquid}>
+          {/* Radio items, not plain buttons: a Radix menu only lets the arrow keys reach its own items. Choosing one
+              keeps the menu open (preventDefault on select) so the theme and accent can be tried in turn. */}
+          <DropdownMenuPrimitive.RadioGroup ref={liquid} value={theme} onValueChange={(v) => setTheme(v as typeof theme)} aria-label="Theme" className="seg mt-2 flex w-full">
             {(['system', 'light', 'dark'] as const).map((t) => (
-              <button key={t} className={cn('flex-1 capitalize', theme === t && 'seg-on')} aria-pressed={theme === t} onClick={() => setTheme(t)}>
+              <DropdownMenuPrimitive.RadioItem key={t} value={t} onSelect={(e) => e.preventDefault()} className={cn('flex-1 text-center capitalize outline-none data-[highlighted]:text-ink data-[highlighted]:shadow-[var(--focus-ring)]', theme === t && 'seg-on')}>
                 {t === 'system' ? 'Auto' : t}
-              </button>
+              </DropdownMenuPrimitive.RadioItem>
             ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between" role="group" aria-label="Accent">
+          </DropdownMenuPrimitive.RadioGroup>
+          <DropdownMenuPrimitive.RadioGroup value={accent} onValueChange={(v) => setAccent(v as typeof accent)} aria-label="Accent" className="mt-3 flex items-center justify-between">
             {ACCENTS.map((a) => (
-              <button
+              <DropdownMenuPrimitive.RadioItem
                 key={a.id}
+                value={a.id}
                 aria-label={`${a.label} accent`}
-                aria-pressed={accent === a.id}
                 title={a.label}
-                onClick={() => setAccent(a.id)}
-                className={cn('grid size-9 place-items-center rounded-full transition-[box-shadow] duration-150', accent === a.id ? 'shadow-[inset_0_0_0_2px_var(--ink)]' : 'hover:shadow-[inset_0_0_0_2px_var(--line-mid)]')}
+                onSelect={(e) => e.preventDefault()}
+                className={cn('grid size-9 cursor-pointer place-items-center rounded-full outline-none transition-[box-shadow] duration-150 data-[highlighted]:shadow-[var(--focus-ring)]', accent === a.id ? 'shadow-[inset_0_0_0_2px_var(--ink)]' : 'hover:shadow-[inset_0_0_0_2px_var(--line-mid)]')}
               >
                 <span data-accent-swatch={a.id} className="grid size-6 place-items-center rounded-full">
                   {accent === a.id && <Check className="size-3.5" strokeWidth={2.4} />}
                 </span>
-              </button>
+              </DropdownMenuPrimitive.RadioItem>
             ))}
-          </div>
+          </DropdownMenuPrimitive.RadioGroup>
           {buildLine &&
             (updateDot ? (
               <DropdownMenuItem

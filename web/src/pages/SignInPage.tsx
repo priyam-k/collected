@@ -61,7 +61,9 @@ export function SignInPage() {
         </div>
         <p className="label mt-6">Sign in</p>
         <h1 className="mt-2.5">
-          <Logo size={30} />
+          <Link to="/" aria-label="collected home" className="inline-flex rounded-xl">
+            <Logo size={30} />
+          </Link>
         </h1>
         <p className="mt-1.5 text-[14px] text-sub">Your courses, calendar, tasks and jobs on one board.</p>
         {error && ERRORS[error] && (
@@ -85,6 +87,9 @@ export function SignInPage() {
           )}
         </div>
       </div>
+      <Link to="/" className="mt-5 text-[13.5px] font-medium text-sub transition-colors hover:text-ink">
+        ← Back to the home page
+      </Link>
     </main>
   );
 }

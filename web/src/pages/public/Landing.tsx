@@ -189,7 +189,7 @@ function SelfHost() {
     <section className="px-5 py-24 sm:py-28">
       <SectionHead id="self-host" eyebrow="Yours to run" title="One container. One SQLite file. Your domain." sub="Run it on a small server you control, or ask for an invite to the hosted instance." />
       <div className="mx-auto mt-14 grid max-w-6xl gap-4 lg:grid-cols-3">
-        <Reveal className="surface flex flex-col rounded-[26px] p-7 lg:col-span-2">
+        <Reveal className="surface flex min-w-0 flex-col rounded-[26px] p-7 lg:col-span-2">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-full bg-well">
               <Server className="size-[18px]" strokeWidth={1.7} />
@@ -208,7 +208,7 @@ function SelfHost() {
             Read the self-host guide <ArrowRight className="size-3.5" />
           </a>
         </Reveal>
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <Reveal delay={80} className="surface rounded-[26px] p-7">
             <div className="flex items-center gap-2.5">
               <span className="grid size-9 place-items-center rounded-full bg-well">

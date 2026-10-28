@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router';
+import { isSignedIn, useMe } from '@/lib/queries';
 import { DemoBoard } from '@/demo/DemoBoard';
 import { PublicLayout } from './PublicLayout';
 
@@ -8,6 +9,7 @@ import { PublicLayout } from './PublicLayout';
  */
 export function DemoPage() {
   const [params] = useSearchParams();
+  const signedIn = isSignedIn(useMe().data);
   if (params.has('bare')) {
     return (
       <div className="mx-auto max-w-[1600px] px-1 sm:px-3">
@@ -22,8 +24,8 @@ export function DemoPage() {
           <span>
             <span className="font-semibold">Live demo.</span> A made-up semester on the real dashboard. Press Edit to rearrange; nothing is saved.
           </span>
-          <Link to="/signin" className="font-semibold underline underline-offset-[3px]">
-            Sign in to use your own
+          <Link to={signedIn ? '/' : '/signin'} className="font-semibold underline underline-offset-[3px]">
+            {signedIn ? 'Back to your board' : 'Sign in to use your own'}
           </Link>
         </div>
         <DemoBoard height="auto" />

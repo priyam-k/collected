@@ -4,6 +4,7 @@ import { Moon, Sun, SunMoon } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useGlass, useLiquid } from '@/lib/liquid';
+import { isSignedIn, useMe } from '@/lib/queries';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +59,7 @@ export function PublicLayout({ children, wide, nav = 'pages' }: { children: Reac
   const glass = useGlass<HTMLDivElement>();
   const liquid = useLiquid<HTMLElement>();
   const { pathname } = useLocation();
+  const signedIn = isSignedIn(useMe().data);
   // On the home page the logo is "back to the top": the route is already '/', so scroll there and drop any #section.
   const toTop = (e: React.MouseEvent) => {
     if (pathname !== '/') return;
@@ -95,7 +97,8 @@ export function PublicLayout({ children, wide, nav = 'pages' }: { children: Reac
             </a>
             <ThemeButton />
             <Button asChild>
-              <Link to="/signin">Sign in</Link>
+              {/* Someone already signed in, reading the demo or the legal pages, gets their board instead. */}
+              <Link to={signedIn ? '/' : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
             </Button>
           </nav>
         </div>

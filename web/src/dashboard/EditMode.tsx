@@ -17,6 +17,8 @@ export function EditModeProvider({ children }: { children: ReactNode }) {
     const onKey = (ev: KeyboardEvent) => {
       const t = ev.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      // Keys pressed inside an open pane, dialog or menu belong to it, not to the board behind.
+      if (t?.closest?.('[role=dialog], [role=menu], [role=alertdialog]')) return;
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       if (ev.key === 'e') {
         ev.preventDefault();

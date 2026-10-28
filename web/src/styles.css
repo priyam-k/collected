@@ -224,6 +224,8 @@
   html, body, #root {
     height: 100%;
   }
+  /* Reserve the scrollbar's room even on short pages, so content does not shift sideways between pages. */
+  html { scrollbar-gutter: stable; }
   body {
     @apply text-foreground antialiased;
     /* a little light from above so the ground is not a flat sheet */

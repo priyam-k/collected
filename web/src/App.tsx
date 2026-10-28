@@ -46,6 +46,8 @@ export default function App() {
             </Gate>
           }
         />
+        {/* Anything else goes home rather than rendering a blank page. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </PaneProvider>
   );
