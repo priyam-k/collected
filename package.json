@@ -20,7 +20,7 @@
     "agent": "pnpm --filter collected-cli dev"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "typescript": "~5.9.3"
   }
 }
