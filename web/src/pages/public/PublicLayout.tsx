@@ -72,7 +72,9 @@ export function PublicLayout({ children, wide, nav = 'pages' }: { children: Reac
     <div className="flex min-h-full flex-col text-foreground">
       <header className="pointer-events-none sticky top-0 z-30 px-3 pt-3 sm:px-6 sm:pt-4">
         <div ref={glass} className="glass pointer-events-auto mx-auto flex h-[52px] w-full max-w-6xl items-center gap-2 p-1.5 pl-4">
-          <Link to="/" className="rounded-full" aria-label="collected home" onClick={toTop}>
+          {/* flex, not a plain block: a block gives the inline-flex logo a text line, whose descender space below
+              it sat the logo 3px above the pill's centre. */}
+          <Link to="/" className="flex rounded-full" aria-label="collected home" onClick={toTop}>
             <Brand />
           </Link>
           {nav === 'sections' ? (

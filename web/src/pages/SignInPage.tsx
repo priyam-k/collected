@@ -62,7 +62,7 @@ export function SignInPage() {
           <AsciiOrb className="h-[120px] w-[200px]" />
         </div>
         <p className="label mt-6">Sign in</p>
-        <h1 className="mt-2.5">
+        <h1 className="mt-2.5 flex">
           <Link to="/" aria-label="collected home" className="inline-flex rounded-xl">
             <Logo size={30} />
           </Link>
