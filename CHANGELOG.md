@@ -9,8 +9,8 @@ break); `optional` means it is nice to have.
 ## Unreleased
 
 - Assignments can be pushed into Google Tasks as well as Todoist: Settings → To-do apps → Google Tasks picks a list (created if missing) and whether the course code prefixes the title; the due day is the assignment's day in your timezone and the time is in the notes. Same rules as the Todoist push: never reopens, never writes back to Canvas or Gradescope, deletes are fused. `GET /api/todo/status` reports both apps for the settings page.
-
 - CLI: `collected task add` goes to the default to-do app (or `--to todoist|gtasks`, with `--due` for Google Tasks); `task done` closes tasks in either app; `cli demo gtasks` loads Google Tasks fixtures.
+
 ## 0.1.0 — 2026-10-28 · recommended
 
 - Sign in with Google from the app itself; Cloudflare Access in front becomes optional. Sessions can be ended from Settings → Account.
