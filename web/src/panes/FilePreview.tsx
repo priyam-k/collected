@@ -82,7 +82,7 @@ export function FilePreview({ file, onClose }: { file: PreviewFile | null; onClo
             </div>
           )}
           {file && kind === 'pdf' && (
-            <iframe key={file.fileId} title={file.title} src={src} sandbox="allow-scripts allow-same-origin allow-downloads" referrerPolicy="no-referrer" className={cn('h-full w-full border-0', !loaded && 'opacity-0')} onLoad={() => setState('loaded')} onError={() => setState('failed')} />
+            <iframe key={file.fileId} title={file.title} src={src} referrerPolicy="no-referrer" className={cn('h-full w-full border-0', !loaded && 'opacity-0')} onLoad={() => setState('loaded')} onError={() => setState('failed')} />
           )}
           {file && kind === 'image' && state !== 'failed' && (
             <div className="flex h-full items-center justify-center overflow-auto p-4">
