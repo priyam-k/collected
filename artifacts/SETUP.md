@@ -48,7 +48,7 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
 ### Google Cloud (needed the day the calendar ingester is built)
 1. `https://console.cloud.google.com` → New project, name it `collected`.
 2. APIs & Services → Library → enable **Google Calendar API** and **Google Tasks API**.
-3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events`, `.../auth/calendar.readonly` and `.../auth/tasks` (Google Tasks; requested only by its own Connect button, incrementally, DECISIONS 047). Add yourself as a test user.
+3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events`, `.../auth/calendar.readonly` and `.../auth/tasks` (Google Tasks; requested only by its own Connect button, incrementally, DECISIONS 049). Add yourself as a test user.
 4. **Publish the app** (Publishing status → In production). Ignore the "needs verification" notice; unverified is fine for a personal app. This is what stops refresh tokens from expiring after 7 days. You can defer this: in Testing status everything works, but the connection silently dies after 7 days and you reconnect from Settings → Sources. Google may show "ineligible test user" while adding yourself; if your address is listed under Test users afterwards, it took.
 5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs (the app builds the URI from `PUBLIC_URL`, which is the Vite server in dev):
    - `http://localhost:5173/api/google/callback`

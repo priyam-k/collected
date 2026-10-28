@@ -16,7 +16,7 @@ interface GtasksMeta {
 
 /**
  * Add and close from the to-do widget, mirroring the Todoist routes. Nothing here pushes assignments into Google
- * Tasks, and nothing a Google task does reaches Canvas or Gradescope (DECISIONS 047).
+ * Tasks, and nothing a Google task does reaches Canvas or Gradescope (DECISIONS 049).
  */
 export function gtasksRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<GTasksApi> = gtasksApiForCtx) {
   const r = new Hono();
