@@ -41,6 +41,19 @@ const envSchema = z.object({
   MIGRATIONS_DIR: z.string().optional(),
   TZ: z.string().optional(),
   LOG_LEVEL: z.string().default('info'),
+  /** Git short sha baked into the image (Dockerfile ARG GIT_SHA). Empty means: look at server/build-info.json, then git, then "dev". */
+  COLLECTED_COMMIT: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
+  /** "owner/name" on GitHub that the update check compares the running commit against. */
+  UPSTREAM_REPO: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || 'priyam-k/collected')
+    .pipe(z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'UPSTREAM_REPO must be "owner/name"')),
+  /** Switches the GitHub update check off entirely: no outbound request, no banner. */
+  UPDATE_CHECK_DISABLED: bool.default(false),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, 'SECRET_KEY'> & { rootDir: string; SECRET_KEY: string; secretKeySource: 'env' | 'file' };

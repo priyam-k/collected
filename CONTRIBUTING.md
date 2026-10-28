@@ -40,6 +40,10 @@ The ones that trip people up:
 - **Docs**: `artifacts/DECISIONS.md` is append-only (new numbered entry when a decision changes); `artifacts/SETUP.md` and `docs/self-host.md` must stay accurate when env vars or flows change.
 - **Dependencies**: none added casually. Open an issue first if a change needs one.
 
+## Changelog
+
+Every user-visible change adds a bullet to `CHANGELOG.md` under the `## Unreleased` heading, in the same pull request. The file is machine-read by the update check that self-hosters see, so the format is strict: a release heading is `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>` and each change is one `-` bullet under it. Cutting a release means renaming `## Unreleased` to that heading, bumping `version` in the root `package.json`, and adding a fresh `## Unreleased` above it. `server/src/lib/changelog.test.ts` parses the real file, so a malformed heading fails CI.
+
 ## Commits and pull requests
 
 - Plain commit messages that describe the change. No emoji, no trailers other than the sign-off below.

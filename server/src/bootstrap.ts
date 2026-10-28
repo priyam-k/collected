@@ -6,6 +6,7 @@ import { runMigrations } from './db/migrate.js';
 import { loadEnv } from './env.js';
 import { createCrypto } from './lib/crypto.js';
 import { createLogger } from './lib/log.js';
+import { resolveBuildInfo } from './lib/version.js';
 import { seed } from './seed.js';
 
 function readVersion(rootDir: string): string {
@@ -25,7 +26,7 @@ export async function bootstrap(opts: { quiet?: boolean } = {}): Promise<AppCont
   const applied = await runMigrations(db);
   if (applied.length) log.info({ applied: [...applied], snapshot: applied.snapshot }, 'migrations applied');
   else log.debug('schema up to date');
-  const ctx: AppContext = { env, db, log, crypto: createCrypto(env.SECRET_KEY), version: readVersion(env.rootDir) };
+  const ctx: AppContext = { env, db, log, crypto: createCrypto(env.SECRET_KEY), version: readVersion(env.rootDir), build: resolveBuildInfo(env.rootDir, env.COLLECTED_COMMIT) };
   log.debug({ secretKeySource: env.secretKeySource, dataDir: env.DATA_DIR }, 'encryption key loaded');
   await seed(ctx);
   return ctx;

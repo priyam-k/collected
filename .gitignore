@@ -11,6 +11,8 @@ backups/
 .DS_Store
 .pnpm-store/
 coverage/
+# written by the image build (Dockerfile ARG GIT_SHA); dev reads git instead
+server/build-info.json
 __pycache__/
 .claude/
 

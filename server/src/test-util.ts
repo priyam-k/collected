@@ -23,6 +23,8 @@ export async function testContext(): Promise<AppContext> {
       PUBLIC_URL: 'http://localhost:5173',
       SCHEDULER_DISABLED: true,
       LOG_LEVEL: 'silent',
+      UPSTREAM_REPO: 'priyam-k/collected',
+      UPDATE_CHECK_DISABLED: false,
       SEED_CONFIG_PATH: '/nonexistent/seed.json',
       rootDir: '/nonexistent',
     } as AppContext['env'],
@@ -30,6 +32,7 @@ export async function testContext(): Promise<AppContext> {
     log: pino({ level: 'silent' }),
     crypto: createCrypto('c'.repeat(64)),
     version: 'test',
+    build: { commit: 'dev', builtAt: null },
   };
   await seed(ctx);
   return ctx;

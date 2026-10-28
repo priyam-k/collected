@@ -6,6 +6,7 @@ import { etag } from 'hono/etag';
 import { accessAuth, verifyAccess, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { MB } from '../lib/http.js';
+import { createUpdateChecker, type UpdateChecker } from '../lib/updates.js';
 import { authRoutes } from './auth.js';
 import { calendarRoutes } from './calendar.js';
 import { canvasRoutes } from './canvas.js';
@@ -21,6 +22,7 @@ import { layoutRoutes, widgetRoutes } from './layout.js';
 import { onboardingRoutes } from './onboarding.js';
 import { settingsRoutes } from './settings.js';
 import { sourcesRoutes } from './sources.js';
+import { systemRoutes } from './system.js';
 import { todoistRoutes } from './todoist.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -41,6 +43,7 @@ export function identityAllows(user: string, method: string, path: string): bool
   if (p.startsWith('/api/google') || p.startsWith('/api/layout') || p.startsWith('/api/widgets')) return false;
   if (p === '/api/sources/canvas/cookie') return false;
   if (MUTATING.has(method)) {
+    if (p.startsWith('/api/system')) return false;
     if (p.startsWith('/api/settings')) return false;
     if (/^\/api\/sources\/[^/]+\/(config|enabled|meta)$/.test(p)) return false;
     if (method === 'DELETE') return false;
@@ -59,7 +62,8 @@ export function crossSite(headers: { origin?: string; secFetchSite?: string }, p
   }
 }
 
-export function createApi(ctx: AppContext) {
+export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {}) {
+  const updates = deps.updates ?? createUpdateChecker(ctx);
   const api = new Hono<{ Variables: AuthVariables }>();
 
   // Two paths skip Access: the Canvas cookie drop-off authenticates itself (helper key or Access), and the health
@@ -115,6 +119,7 @@ export function createApi(ctx: AppContext) {
   api.use('*', etag());
 
   api.route('/health', healthRoutes(ctx));
+  api.route('/system', systemRoutes(ctx, updates));
   api.route('/auth', authRoutes(ctx));
   api.route('/sources', sourcesRoutes(ctx));
   api.route('/courses', coursesRoutes(ctx));

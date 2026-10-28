@@ -1,7 +1,8 @@
+# Runs the prebuilt image from GHCR (.github/workflows/image.yml publishes it on every push to main). To build locally
+# instead: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 services:
   app:
-    build: .
-    image: collected:latest
+    image: ghcr.io/priyam-k/collected:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"

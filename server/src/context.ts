@@ -10,4 +10,11 @@ export interface AppContext {
   log: Logger;
   crypto: Crypto;
   version: string;
+  /** Git short sha and build time of the running code (lib/version.ts); commit is "dev" when neither is known. */
+  build: BuildInfo;
+}
+
+export interface BuildInfo {
+  commit: string;
+  builtAt: string | null;
 }

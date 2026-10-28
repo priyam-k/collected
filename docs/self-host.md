@@ -44,12 +44,20 @@ The rest of `.env.example` is commented inline. `LOCAL_HELPER_KEY` is only for t
 ## 3. Start it
 
 ```sh
-docker compose up -d --build
+docker compose pull              # fetches ghcr.io/priyam-k/collected:latest (~110 MB)
+docker compose up -d
 docker compose logs -f app       # wait for "listening"
 docker compose ps                # "healthy" within about a minute
 ```
 
-`--build` builds the image on the box the first time. On a very small VM (1 GB, shared CPU) the Vite build can take several minutes; if it is too slow, build on another machine with `docker build -t collected:latest .`, ship it with `docker save collected:latest | gzip > collected.tar.gz`, `docker load` it on the box, and run `docker compose up -d` without `--build`.
+The compose file runs the prebuilt image that `.github/workflows/image.yml` publishes on every push to `main`, so nothing is compiled on your box. The image is `linux/amd64`; on an arm64 host (or if you changed the code) build it locally with the override file, which needs about 500 MB of free memory for the web build:
+
+```sh
+GIT_SHA=$(git rev-parse --short HEAD) BUILT_AT=$(date -u +%FT%TZ) \
+  docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+If you run your own fork and publish your own image, change `image:` in `docker-compose.yml` to `ghcr.io/<you>/collected:latest` and set `UPSTREAM_REPO=<you>/collected` in `.env`. GHCR packages start out private: after the first workflow run, open your GitHub profile → Packages → `collected` → Package settings → Change visibility → Public, or `docker compose pull` will be refused with "denied".
 
 The container listens on `127.0.0.1:3000` **only** (see `ports:` in `docker-compose.yml`). Nothing on the network can reach it until you put TLS in front, which is the next step.
 
@@ -141,15 +149,20 @@ The app writes `data/backups/pre-<migration>-<timestamp>.db` before applying a m
 
 ## 9. Updating
 
+The app checks for updates itself: thirty seconds after boot and every six hours it asks GitHub how far upstream `main` is ahead of the commit it is running (one unauthenticated request to `api.github.com`, carrying nothing but the commit sha). When something changed that affects the running app, a banner on the board names the new changelog entries and these commands:
+
 ```sh
 cd /srv/collected
-git pull
-docker compose build
+git pull --ff-only
+docker compose pull
 docker compose up -d
-docker compose logs -f app   # "migrations applied" names any pre-migration snapshot it wrote
 ```
 
-Compose replaces the container in place; the `data/` volume carries over. If the new version fails its health check, `docker compose logs app` says why; the previous image is still local (`docker images`), so `docker tag <old image id> collected:latest && docker compose up -d` is the rollback. `scripts/deploy.sh` automates this (backup, load a new image, promote, health check, roll back on failure) for setups that build the image elsewhere.
+`git pull` brings the compose file and scripts up to date, `pull` fetches the new image, `up -d` replaces the container in place; the `data/` volume carries over. `docker compose logs -f app` afterwards: "migrations applied" names any pre-migration snapshot it wrote. Changes that only touch documentation do not raise the banner. Settings → About shows the running version and commit, the last check, and a button to check now; `curl -s http://127.0.0.1:3000/api/health` on the box prints the version without signing in.
+
+`UPDATE_CHECK_DISABLED=true` in `.env` switches the check off entirely (no request is made). `UPSTREAM_REPO=<you>/collected` points it at your fork. An image built locally without `GIT_SHA` reports the commit `dev` and the check says it has nothing to compare.
+
+If the new version fails its health check, `docker compose logs app` says why. The previous image is still local (`docker images`): `docker tag <old image id> ghcr.io/priyam-k/collected:latest && docker compose up -d --pull never` is the rollback. `scripts/deploy.sh` automates this (backup, load a new image, promote, health check, roll back on failure) for setups that build the image elsewhere.
 
 ## 10. The CLI
 

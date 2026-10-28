@@ -1,0 +1,73 @@
+# Publishes the production image to GHCR on every push to main and on version tags, so a self-hoster runs
+# `docker compose pull` instead of building (docs/self-host.md). Tags: `latest` (main), `sha-<short>`, and the version
+# from the root package.json. GIT_SHA/BUILT_AT are baked in for /api/system/version and the update check.
+#
+# Any fork may run this: it pushes to ghcr.io/<that fork>, under the fork owner's packages, with the workflow's own
+# GITHUB_TOKEN. Pull requests never run it (no secrets, no push). deploy.yml (the maintainer's box) is separate and
+# still ships a tarball over SSH. Every action is pinned to a commit; Dependabot proposes bumps. On the first publish
+# the package is private: make it public once under <you> → Packages → collected → Package settings.
+name: image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Belt and braces: only pushes build and push an image, never a pull_request event from a fork.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # No third-party login or metadata action: a `docker login` with the job's token and a few lines of shell.
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Image tags and build args
+        id: meta
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"            # GHCR wants lowercase
+          sha="$(git rev-parse --short HEAD)"
+          version="$(node -p "require('./package.json').version")"
+          tags="$image:sha-$sha,$image:$version"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then tags="$tags,$image:latest"; fi
+          {
+            echo "tags=$tags"
+            echo "sha=$sha"
+            echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+          echo "publishing $tags"
+
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          # amd64 only: the Vite build under QEMU for arm64 takes far longer than the job is worth. An arm64 host builds
+          # its own with docker-compose.build.yml. Add `linux/arm64` here plus docker/setup-qemu-action to change that.
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            GIT_SHA=${{ steps.meta.outputs.sha }}
+            BUILT_AT=${{ steps.meta.outputs.built }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
