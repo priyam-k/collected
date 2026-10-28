@@ -50,7 +50,7 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
           <div className="truncate font-medium">{job.company}</div>
           <div className="truncate text-xs text-muted-foreground" title={job.title}>{job.title}</div>
         </div>
-        {showStage && <span className={cn('shrink-0 font-mono text-[10px] uppercase tracking-[0.08em]', STAGE_TONE[job.state])}>{JOB_STATE_LABELS[job.state]}</span>}
+        {showStage && <span className={cn('label shrink-0 !text-[10px]', STAGE_TONE[job.state])}>{JOB_STATE_LABELS[job.state]}</span>}
       </div>
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         {m.urgent && <CalendarClock className="size-3 text-caution" />}

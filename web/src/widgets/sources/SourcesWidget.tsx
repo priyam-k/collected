@@ -99,7 +99,7 @@ export function SourcesWidget({ size }: WidgetProps) {
               {s.status === 'error' || s.status === 'needs_auth' ? (
                 <span className={cn('truncate text-xs', s.status === 'error' ? 'text-coral' : 'text-amber')} title={s.lastError ?? undefined}>{STATUS_LABEL[s.status]}</span>
               ) : (
-                <span className="font-mono text-[11px] text-ter">{standby ? 'standby' : shortAgo(s.lastSuccessAt)}</span>
+                <span className="text-xs text-ter">{standby ? 'standby' : shortAgo(s.lastSuccessAt)}</span>
               )}
               <button
                 type="button"

@@ -92,7 +92,7 @@ export function ProgressWidget({ size }: WidgetProps) {
       <button className="flex items-center gap-1.5 text-[12.5px] transition-colors hover:text-ink" title={`${g.label}: ${g.done} of ${g.total} done`} onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
         <span className="size-2 rounded-full" style={{ background: g.color }} />
         <span className="font-medium">{g.label}</span>
-        <span className="font-mono text-[11px] tabular-nums text-ter">{g.done}/{g.total}</span>
+        <span className="text-xs text-ter">{g.done}/{g.total}</span>
       </button>
     </li>
   );
@@ -137,7 +137,7 @@ export function ProgressWidget({ size }: WidgetProps) {
                       <span className="size-2 shrink-0 rounded-full" style={{ background: g.color }} />
                       <span className="w-20 shrink-0 truncate font-medium">{g.label}</span>
                       <Meter className="min-w-0 flex-1" value={g.total ? (g.done / g.total) * 100 : 0} color={g.color} height={12} />
-                      <span className="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-sub">{g.done}/{g.total}</span>
+                      <span className="w-10 shrink-0 text-right text-xs text-sub">{g.done}/{g.total}</span>
                     </button>
                   </li>
                 ))}

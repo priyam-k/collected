@@ -60,7 +60,7 @@ export function AddTray({ open, onOpenChange, instances, courses, onAdd }: Props
                   {e.presets.map((p) => (
                     <Button key={p.label} size="sm" variant="outline" onClick={() => onAdd({ id: e.id, type: e.type, config: e.config }, p)}>
                       <Plus className="size-3.5" /> {p.label}
-                      <span className="font-mono text-[10.5px] text-ter">
+                      <span className="text-[11.5px] font-normal text-ter">
                         {p.w}×{p.h}
                       </span>
                     </Button>

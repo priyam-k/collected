@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type Ref } from 'react';
 import { Responsive as ResponsiveGridLayout, useContainerWidth, verticalCompactor, type Layout, type ResponsiveLayouts } from 'react-grid-layout';
 import type { Breakpoint, Layouts, Source, WidgetInstance } from '@collected/shared';
 import { BREAKPOINTS, COLS, MARGIN, ROW_HEIGHT } from './defaults';
@@ -14,6 +14,17 @@ interface Props {
   onLayoutsChange(next: Layouts): void;
   onHide(id: string): void;
   onBreakpointChange?(bp: Breakpoint): void;
+}
+
+/** The resize grip: a thick stroke along the card's rounded bottom-right corner (22px radius, inset 6px). */
+function resizeHandle(_axis: string, ref: Ref<HTMLElement>) {
+  return (
+    <span ref={ref as Ref<HTMLSpanElement>} className="widget-resize" aria-hidden>
+      <svg viewBox="0 0 34 34" width="34" height="34" fill="none">
+        <path d="M28 13 A15 15 0 0 1 13 28" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
 }
 
 export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, onHide, onBreakpointChange }: Props) {
@@ -47,7 +58,7 @@ export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, o
           containerPadding={[0, 0]}
           compactor={verticalCompactor}
           dragConfig={{ enabled: editMode, handle: '.widget-drag-handle', threshold: 3 }}
-          resizeConfig={{ enabled: editMode, handles: ['se'] }}
+          resizeConfig={{ enabled: editMode, handles: ['se'], handleComponent: resizeHandle }}
           onLayoutChange={handleLayoutChange}
           onBreakpointChange={(bp) => {
             setBp(bp as Breakpoint);

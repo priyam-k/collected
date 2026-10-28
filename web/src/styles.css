@@ -16,6 +16,7 @@
   font-family: "Mona Sans";
   src: url("/fonts/MonaSans-Variable.woff2") format("woff2");
   font-weight: 200 900;
+  font-stretch: 75% 125%;
   font-style: normal;
   font-display: swap;
 }
@@ -166,6 +167,7 @@
   --color-critical: var(--critical);
   --color-caution: var(--caution);
   --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
   --color-sub: var(--sub);
   --color-ter: var(--ter);
   --color-well: var(--well);
@@ -244,13 +246,14 @@
 }
 
 @layer components {
-  /* Mono eyebrow: the only uppercase text. */
+  /* Eyebrow: small semibold caps, a touch wide. The only uppercase text. */
   .label {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: 11px;
     line-height: 16px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
+    font-weight: 620;
+    font-stretch: 112%;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--ink-muted);
   }
@@ -446,26 +449,36 @@
 [data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] { color: var(--brand); }
 [data-sonner-toaster] [data-sonner-toast] [data-description] { color: var(--ink-muted); }
 
-/* react-grid-layout: the drop target is a well with a still accent ring; the dragged card lifts. */
+/* react-grid-layout: the drop target is a soft well under everything; the card being moved or resized lifts above it. */
 .react-grid-item.react-grid-placeholder {
-  background: color-mix(in srgb, var(--brand) 10%, transparent) !important;
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 45%, transparent);
+  z-index: 1;
+  background: color-mix(in srgb, var(--well) 70%, transparent) !important;
+  outline: 1.5px dashed color-mix(in srgb, var(--brand) 45%, transparent);
+  outline-offset: -1.5px;
   opacity: 1 !important;
   border-radius: 22px;
   transition-duration: 120ms;
 }
-.react-grid-item > .react-resizable-handle {
-  opacity: 0.6;
-  bottom: 6px !important;
-  right: 6px !important;
-}
-.react-grid-item > .react-resizable-handle::after {
-  border-color: var(--ink-muted) !important;
-}
-.react-grid-item.react-draggable-dragging {
+.react-grid-item.react-draggable-dragging,
+.react-grid-item.resizing {
   z-index: 30;
   box-shadow: var(--shadow-lift);
 }
+/* The resize grip: a curved stroke that follows the card's bottom-right corner. */
+.widget-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: 34px;
+  height: 34px;
+  cursor: se-resize;
+  color: var(--ink-muted);
+  opacity: 0.75;
+  transition: opacity 140ms var(--ease), color 140ms var(--ease);
+  touch-action: none;
+}
+.widget-resize:hover, .react-grid-item.resizing .widget-resize { opacity: 1; color: var(--brand); }
 .react-grid-item.cssTransforms {
   transition-timing-function: var(--ease);
 }

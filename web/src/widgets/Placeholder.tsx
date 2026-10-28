@@ -30,7 +30,12 @@ export function ComingSoon({ what }: { what: string }) {
 }
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-full items-center justify-center p-3 text-center text-sm text-muted-foreground">{children}</div>;
+  // children go in a paragraph: as direct flex items, text and a following link would lose the space between them
+  return (
+    <div className="flex h-full items-center justify-center p-3 text-center text-sm text-muted-foreground">
+      <p>{children}</p>
+    </div>
+  );
 }
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {

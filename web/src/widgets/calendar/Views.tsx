@@ -104,7 +104,7 @@ function DayHead({ d }: { d: Date }) {
   const today = isToday(d);
   return (
     <div className="py-0.5 text-center">
-      <div className={cn('font-mono text-[10.5px] uppercase tracking-[0.08em]', today ? 'font-semibold text-brand-ink' : 'text-ter')}>{format(d, 'EEE')}</div>
+      <div className={cn('label !text-[10.5px]', today ? '!text-brand-ink' : '!text-ter')}>{format(d, 'EEE')}</div>
       {today ? (
         <div className="mx-auto mt-0.5 grid size-[26px] place-items-center rounded-full bg-brand text-sm font-semibold text-on-brand">{format(d, 'd')}</div>
       ) : (
@@ -160,7 +160,7 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
         {dayList.map((d) => <DayHead key={dayKey(d)} d={d} />)}
       </div>
       <div className={cn('grid shrink-0 px-2.5 pb-1 pt-0.5', col)}>
-        <div className="pr-2.5 pt-1.5 text-right font-mono text-[10px] uppercase tracking-[0.06em] text-ter">all day</div>
+        <div className="pr-2.5 pt-1.5 text-right text-[11px] text-ter">all day</div>
         {dayList.map((d) => {
           const allDay = (grouped.get(dayKey(d)) ?? []).filter((i) => i.allDay || i.kind !== 'event');
           return (
@@ -174,7 +174,7 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
         <div className={cn('grid', col)} style={{ height: (hours.length - 1) * PX_PER_HOUR + 8 }}>
           <div className="relative">
             {hours.map((h) => (
-              <span key={h} className="absolute right-2.5 -translate-y-1/2 font-mono text-[10.5px] tabular-nums text-ter" style={{ top: (h - HOUR_START) * PX_PER_HOUR }}>
+              <span key={h} className="absolute right-2.5 -translate-y-1/2 text-[11px] text-ter" style={{ top: (h - HOUR_START) * PX_PER_HOUR }}>
                 {h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`}
               </span>
             ))}
@@ -235,7 +235,7 @@ export function Month({ items, from, to, anchor }: { items: EffectiveItem[]; fro
   const weeks = Math.ceil(dayList.length / 7);
   return (
     <div className="flex h-full flex-col overflow-hidden px-2.5 pb-2 pt-1">
-      <div className="grid shrink-0 grid-cols-7 text-center font-mono text-[10.5px] uppercase tracking-[0.08em] text-ter">
+      <div className="label grid shrink-0 grid-cols-7 text-center !text-[10.5px] !text-ter">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d} className="py-1">{d}</div>)}
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-7 gap-1" style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}>

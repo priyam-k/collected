@@ -77,7 +77,7 @@ export function LayoutPage() {
         <Button variant="outline" onClick={showAll}>Show all core widgets</Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Tip: press <kbd className="rounded-md bg-well px-1.5 py-px font-mono text-[11px]">e</kbd> on the dashboard to enter edit mode.
+        Tip: press <kbd className="rounded-md bg-well px-1.5 py-px text-[12px] font-semibold">e</kbd> on the dashboard to enter edit mode.
       </p>
     </div>
   );

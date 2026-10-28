@@ -126,19 +126,15 @@ export function Dashboard() {
         </div>
       </header>
 
-      {editMode && (
-        <p className="-mt-2 px-0.5 text-[13px] text-sub">
-          Drag a card by its title, resize from the corner, hide with the eye. <kbd className="rounded-md bg-well px-1.5 py-px font-mono text-[11px]">Esc</kbd> when done.
-        </p>
-      )}
-
-      {/* Floating toolbar: liquid glass over the board. Top right on wide screens, bottom centre on phones. */}
+      {/* Floating toolbar: liquid glass over the board. Top right on wide screens, bottom centre on phones. It is
+          fixed, so swapping its contents for edit mode never moves the board. */}
       <div
         ref={glass}
         className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1.5rem,calc((100vw-1600px)/2+1.5rem))] sm:top-6"
       >
         {editMode ? (
           <>
+            <span className="hidden pl-3.5 pr-2 text-[13px] text-sub lg:inline">Drag a title to move · Esc to finish</span>
             <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setTrayOpen(true)}>
               <Plus className="size-4" /> Add widget
             </button>
