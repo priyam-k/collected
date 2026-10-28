@@ -23,6 +23,9 @@ import type {
   UpdateStatus,
   TodoApp,
   WidgetInstance,
+  TodoAppStatus,
+  TodoStatus,
+  GtasksPushConfig,
 } from '@collected/shared';
 import { api } from './api';
 
@@ -446,23 +449,6 @@ export function useTodoistPush() {
   });
 }
 
-// TODO(shared): move these to @collected/shared once the server branch lands them there.
-export interface TodoAppStatus {
-  connected: boolean;
-  enabled: boolean;
-  pushEnabled: boolean;
-  lastPushAt: string | null;
-}
-export interface TodoStatus {
-  todoist: TodoAppStatus;
-  gtasks: TodoAppStatus;
-  defaultApp: TodoApp | null;
-}
-export interface GtasksPushConfig {
-  enabled: boolean;
-  listName: string;
-  titlePrefix: 'course' | 'none';
-}
 export const GTASKS_PUSH_DEFAULTS: GtasksPushConfig = { enabled: false, listName: 'School', titlePrefix: 'course' };
 export type PushResult = { plan: PushPlan; done?: Record<string, number>; errors?: { error: string }[] };
 

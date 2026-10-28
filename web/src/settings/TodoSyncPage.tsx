@@ -19,11 +19,10 @@ import {
   useSources,
   useTodoStatus,
   useTodoistPush,
-  type GtasksPushConfig,
   type PushPlan,
   type PushResult,
-  type TodoAppStatus,
 } from '@/lib/queries';
+import type { GtasksPushConfig, TodoAppStatus } from '@collected/shared';
 import { Field, PageTitle, Section, StatusTag } from './ui';
 
 const OP_VARIANT = { create: 'default', update: 'secondary', close: 'outline', delete: 'destructive' } as const;
