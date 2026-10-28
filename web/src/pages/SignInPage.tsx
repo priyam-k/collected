@@ -37,9 +37,9 @@ export function SignInPage() {
   const google = me.data?.signIn.google ?? true;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
-      {/* The notice sits behind the card like the next card in a stack: its lower part tucks under the card. */}
+      {/* The notice sits behind the card like the next card in a stack. It tucks 56px under, past both cards' 22px corners, so its own bottom curves never show in the card's corner notches. */}
       {INVITE_ONLY_NOTICE && (
-        <p className="flex w-full max-w-sm gap-2.5 rounded-[22px] bg-brand-soft px-5 pb-[38px] pt-2.5 text-[13.5px] leading-relaxed text-brand-ink">
+        <p className="flex w-full max-w-sm gap-2.5 rounded-[22px] bg-brand-soft px-5 pb-[66px] pt-2.5 text-[13.5px] leading-relaxed text-brand-ink">
           <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-brand" />
           <span>
             Hosted collected is an invite-only beta for now. In the meantime,{' '}
@@ -54,7 +54,7 @@ export function SignInPage() {
           </span>
         </p>
       )}
-      <div className={cn('surface relative z-10 w-full max-w-sm p-7', INVITE_ONLY_NOTICE && '-mt-7')}>
+      <div className={cn('surface relative z-10 w-full max-w-sm p-7', INVITE_ONLY_NOTICE && '-mt-14')}>
         <div className="grid h-[132px] place-items-center overflow-hidden rounded-[16px] bg-well">
           <AsciiOrb className="h-[120px] w-[200px]" />
         </div>
