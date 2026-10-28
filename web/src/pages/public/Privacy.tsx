@@ -4,7 +4,7 @@ export const PRIVACY_UPDATED = 'October 26, 2026';
 
 /**
  * Privacy policy for a hosted deployment. Written in plain language on purpose: the person reading it is a student
- * deciding whether to paste a Canvas cookie into someone else's server. `{{OPERATOR_EMAIL}}` is filled in by the operator.
+ * deciding whether to paste a Canvas cookie into someone else's server. `OPERATOR_EMAIL` is set by the operator in PublicLayout.tsx.
  */
 export function Privacy() {
   return (
