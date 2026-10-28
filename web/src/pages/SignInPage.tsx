@@ -39,7 +39,7 @@ export function SignInPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       {/* The notice sits behind the card like the next card in a stack: its lower part tucks under the card. */}
       {INVITE_ONLY_NOTICE && (
-        <p className="flex w-full max-w-sm gap-2.5 rounded-[22px] bg-brand-soft px-5 pb-11 pt-3.5 text-[13.5px] leading-relaxed text-brand-ink">
+        <p className="flex w-full max-w-sm gap-2.5 rounded-[22px] bg-brand-soft px-5 pb-[38px] pt-2.5 text-[13.5px] leading-relaxed text-brand-ink">
           <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-brand" />
           <span>
             Hosted collected is an invite-only beta for now. In the meantime,{' '}
