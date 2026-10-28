@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { jobsFilterSchema, todoistPushConfigSchema } from '@collected/shared';
+import { jobsFilterSchema, todoDefaultAppSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { allSettings, getSetting, setSetting } from '../lib/settings.js';
 import { bad, parseBody } from './util.js';
@@ -10,6 +10,7 @@ const KNOWN: Record<string, z.ZodTypeAny> = {
   'jobs.filter': jobsFilterSchema,
   'todoist.push': todoistPushConfigSchema,
   'todo.sections': z.array(z.string()),
+  'todo.defaultApp': todoDefaultAppSchema,
   timezone: z.string().min(1),
 };
 

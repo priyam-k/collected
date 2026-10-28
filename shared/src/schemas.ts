@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERVED_TARGETS, FILE_SYNC_SKIP, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS } from './types.js';
+import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERVED_TARGETS, FILE_SYNC_SKIP, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS, TODO_APPS } from './types.js';
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
@@ -164,6 +164,15 @@ export const todoistPushConfigSchema = z.object({
   courseLabels: z.boolean().default(true),
 });
 
+/** `todo.defaultApp`: where the dashboard's add-task box sends new tasks. Unset means "whichever is connected, Todoist first". */
+export const todoDefaultAppSchema = z.enum(TODO_APPS);
+
+/** POST /api/gtasks/tasks/quick. Google Tasks has no natural-language parser; the due date is a plain day. */
+export const gtasksQuickAddSchema = z.object({
+  content: text(500).trim().min(1),
+  due: isoDay.optional(),
+});
+
 /** artifacts/seed-config.json */
 export const seedConfigSchema = z.object({
   term: z.string(),
@@ -279,5 +288,7 @@ export const sourceConfigSchemas = {
   /** The "Secret address in iCal format" of one Google calendar; read-only, no OAuth client needed. */
   gcal_ical: z.object({ url: outboundUrlSchema }),
   todoist: z.object({ token: z.string().min(1) }),
+  /** Refresh token from the separate "Connect Google Tasks" consent (tasks scope, granted incrementally). */
+  gtasks: z.object({ refreshToken: z.string().min(1) }),
   jobs: z.object({ sources: z.array(z.object({ id: z.string().regex(/^(?!manual$)[a-z0-9][a-z0-9_-]{0,39}$/, 'lowercase id; "manual" is reserved'), url: outboundUrlSchema })).max(20).default([]) }),
 } as const;

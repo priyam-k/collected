@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { todoistPushConfigSchema, type TodoistPushConfig } from '@collected/shared';
+import { SOURCE_LABELS, TODO_APPS, resolveTodoApp, todoistPushConfigSchema, type TodoApp, type TodoistPushConfig } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { useLiquid } from '@/lib/liquid';
+import { cn } from '@/lib/utils';
 import { useSaveSetting, useSettings, useSources, useTodoistPush, type PushPlan } from '@/lib/queries';
 import { Field, PageTitle } from './ui';
 
@@ -127,6 +129,8 @@ export function TodoistPage() {
         )}
       </section>
 
+      <ToDoApps />
+
       <section className="space-y-2">
         <Field label="To-do widget sections" hint="Comma-separated Todoist labels, in display order. The homework section is always first.">
           <div className="flex gap-2">
@@ -137,5 +141,41 @@ export function TodoistPage() {
         {meta.labels?.length ? <p className="text-xs text-muted-foreground">Your labels: {meta.labels.join(', ')}</p> : null}
       </section>
     </div>
+  );
+}
+
+/** Which app the to-do widget's add-task box sends to. Only connected apps can be picked. */
+function ToDoApps() {
+  const settings = useSettings();
+  const sources = useSources();
+  const save = useSaveSetting();
+  const liquid = useLiquid();
+  const connected = Object.fromEntries(TODO_APPS.map((a) => [a, sources.data?.find((s) => s.id === a)?.status === 'connected'])) as Record<TodoApp, boolean>;
+  const current = resolveTodoApp(settings.data?.['todo.defaultApp'], connected);
+  const pick = (app: TodoApp) => save.mutate({ key: 'todo.defaultApp', value: app }, { onError: (e) => toast.error(e.message) });
+  return (
+    <section className="space-y-2">
+      <h3 className="label">To-do apps</h3>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span>Add new tasks to:</span>
+        <div className="seg" role="group" aria-label="Add new tasks to" ref={liquid}>
+          {TODO_APPS.map((a) => (
+            <button
+              key={a}
+              className={cn('min-w-[6rem] disabled:cursor-not-allowed disabled:opacity-40', current === a && 'seg-on')}
+              aria-pressed={current === a}
+              disabled={!connected[a] || save.isPending}
+              title={connected[a] ? undefined : `Connect ${SOURCE_LABELS[a]} under Sources first`}
+              onClick={() => pick(a)}
+            >
+              {SOURCE_LABELS[a]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Tasks from every connected app show in the to-do widget and close in the app they came from. Assignments are pushed to Todoist only.
+      </p>
+    </section>
   );
 }
