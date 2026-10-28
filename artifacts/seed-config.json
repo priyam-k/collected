@@ -1,34 +1,6 @@
 {
   "term": "2026-fall",
-  "courses": [
-    {
-      "code": "CS101",
-      "section": "0101",
-      "name": "Introduction to Programming",
-      "role": "student",
-      "submits_via": "both",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {
-        "lecture": [
-          { "day": "mon", "start": "10:00", "end": "10:50" },
-          { "day": "wed", "start": "10:00", "end": "10:50" }
-        ]
-      }
-    },
-    {
-      "code": "MATH201",
-      "section": "0201",
-      "name": "Linear Algebra",
-      "role": "student",
-      "submits_via": "canvas",
-      "gradescope_course_id": null,
-      "canvas_course_id": null,
-      "links": [],
-      "schedule": {}
-    }
-  ],
+  "courses": [],
   "todoist": {
     "project_name": "School",
     "common_label": "homework",
@@ -44,8 +16,14 @@
     "filter": {
       "require_active": true,
       "require_visible": true,
-      "categories_include": ["Software", "Software Engineering", "AI/ML/Data"],
-      "terms_include": ["Summer 2027"],
+      "categories_include": [
+        "Software",
+        "Software Engineering",
+        "AI/ML/Data"
+      ],
+      "terms_include": [
+        "Summer 2027"
+      ],
       "title_include": "software|\\bswe\\b|\\bsde\\b|developer|robotic|machine learning|\\bml\\b|\\bai\\b|backend|back-end|frontend|front-end|full[- ]stack|data engineer|engineer(ing)? intern",
       "title_exclude": "hardware|electrical|mechanical|marketing|sales|finance|accounting|product manag|recruit|legal",
       "locations_include": ", [A-Z]{2}$|United States|\\bUSA?\\b|Remote in USA|Remote - US",
