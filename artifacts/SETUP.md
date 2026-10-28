@@ -54,8 +54,8 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
 
 ### Google Cloud (needed the day the calendar ingester is built)
 1. `https://console.cloud.google.com` → New project, name it `collected`.
-2. APIs & Services → Library → enable **Google Calendar API**.
-3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events` and `.../auth/calendar.readonly`. Add yourself as a test user.
+2. APIs & Services → Library → enable **Google Calendar API** and **Google Tasks API**.
+3. APIs & Services → OAuth consent screen → External. App name `collected`, your email for support and developer contact. Scopes: add `.../auth/calendar.events`, `.../auth/calendar.readonly` and `.../auth/tasks` (Google Tasks; requested only by its own Connect button, incrementally, DECISIONS 049). Add yourself as a test user.
 4. **Publish the app** (Publishing status → In production). Ignore the "needs verification" notice; unverified is fine for a personal app. This is what stops refresh tokens from expiring after 7 days. You can defer this: in Testing status everything works, but the connection silently dies after 7 days and you reconnect from Settings → Sources. Google may show "ineligible test user" while adding yourself; if your address is listed under Test users afterwards, it took.
 5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs (the app builds the URI from `PUBLIC_URL`, which is the Vite server in dev):
    - `http://localhost:5173/api/google/callback`
@@ -64,6 +64,7 @@ Email + password into Settings → Sources → Gradescope. Then in Settings → 
    and the same three with `/api/auth/google/callback` (sign-in; identity only, no Calendar scopes). The consent screen's publishing status must be **In production**: in Testing, Google expires refresh tokens after seven days, which silently disconnects the calendar.
 6. Copy client id + secret into `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 7. Restart `pnpm dev` so the server picks up the new `.env`. In the app: Settings → Sources → Google Calendar → Connect. Click through the "unverified app" warning (Advanced → Go to collected). Pick which calendars to show and which one new events go to.
+8. Google Tasks (optional): Settings → Sources → Google Tasks → Connect Google Tasks. Same client and callback URI; the consent screen asks for the tasks scope only. A 403 "Google Tasks API has not been used in project …" on the card means step 2's Tasks API is not enabled yet. Then Settings → Todoist sync → "Add new tasks to" picks which app the to-do widget's add box uses.
 
 ### Jobs
 Nothing. Public GitHub files.
@@ -206,7 +207,7 @@ If you claim the GitHub Student Developer Pack, DigitalOcean credit makes a 2 GB
 5. Login methods: one-time PIN to your email works with zero setup and is the fallback. To add Google: Settings → Authentication → Login methods → Add → Google. It needs an OAuth client; reuse the `collected` client from Phase 1 and add `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback` as another redirect URI. Then in the Access application, enable Google as an allowed identity provider.
 
 ### Google (prod)
-The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings → Sources → Google Calendar → Connect on the prod site once. The refresh token is stored in the prod DB, separate from local.
+The prod redirect URI was added in Phase 1 step 5. After deploy, go to Settings → Sources → Google Calendar → Connect on the prod site once (and Google Tasks → Connect Google Tasks, if used). The refresh token is stored in the prod DB, separate from local.
 
 ## Sign-in (DECISIONS 044)
 

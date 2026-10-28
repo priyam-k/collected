@@ -2,11 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Check, ExternalLink, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { COURSE_EVENT_LABELS, SOURCE_LABELS, type EffectiveItem, type ManualEventRaw } from '@collected/shared';
+import { COURSE_EVENT_LABELS, SOURCE_LABELS, isTodoApp, type EffectiveItem, type ManualEventRaw } from '@collected/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useCloseTodoistTask, useSetOverride } from '@/lib/queries';
+import { useCloseTask, useSetOverride } from '@/lib/queries';
 import { usePane } from '@/panes/PaneContext';
 import { friendlyDate } from '@/lib/time';
 import { safeColor } from '@/lib/color';
@@ -58,7 +58,7 @@ function when(item: EffectiveItem): string {
 
 export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: () => void }) {
   const setOverride = useSetOverride();
-  const closeTask = useCloseTodoistTask();
+  const closeTask = useCloseTask();
   const pane = usePane();
   const raw = item.raw as { location?: string | null; calendarName?: string | null; projectName?: string | null; sectionName?: string | null; statusText?: string | null; parentId?: string | null };
   const manual = item.source === 'manual' ? (item.raw as unknown as ManualEventRaw) : null;
@@ -69,7 +69,7 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
       toast.success('Marked done');
       onClose?.();
     };
-    if (item.source === 'todoist') closeTask.mutate(item.externalId, { onSuccess: done, onError: (e) => toast.error(e.message) });
+    if (isTodoApp(item.source)) closeTask.mutate({ source: item.source, externalId: item.externalId }, { onSuccess: done, onError: (e) => toast.error(e.message) });
     else setOverride.mutate({ id: item.id, done: true }, { onSuccess: done, onError: (e) => toast.error(e.message) });
   };
   return (
@@ -116,7 +116,7 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
           </Button>
         )}
         {canComplete && (
-          <Button size="sm" variant="ghost" onClick={complete} title={item.source === 'todoist' ? 'Complete in Todoist' : 'Mark done here only; the source is never changed'}>
+          <Button size="sm" variant="ghost" onClick={complete} title={isTodoApp(item.source) ? `Complete in ${SOURCE_LABELS[item.source]}` : 'Mark done here only; the source is never changed'}>
             <Check className="size-3.5" /> Done
           </Button>
         )}

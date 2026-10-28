@@ -1,7 +1,7 @@
 // Vocabulary shared by server and web. Keep in sync with artifacts/DESIGN.md.
 
 /** Sources with an ingester and a row in `sources`. */
-export const INGESTED_SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'jobs'] as const;
+export const INGESTED_SOURCE_IDS = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'gtasks', 'jobs'] as const;
 export type IngestedSourceId = (typeof INGESTED_SOURCE_IDS)[number];
 /** Every value `items.source` can take. `manual` is you: exam dates, cancelled sessions, notes. */
 export const SOURCE_IDS = [...INGESTED_SOURCE_IDS, 'manual'] as const;
@@ -14,9 +14,28 @@ export const SOURCE_LABELS: Record<SourceId, string> = {
   gcal: 'Google Calendar',
   gcal_ical: 'Google Calendar (iCal)',
   todoist: 'Todoist',
+  gtasks: 'Google Tasks',
   jobs: 'Job feed',
   manual: 'Manual',
 };
+
+/** Sources a to-do can be added to from the dashboard. Setting `todo.defaultApp` picks one. */
+export const TODO_APPS = ['todoist', 'gtasks'] as const;
+export type TodoApp = (typeof TODO_APPS)[number];
+
+/** Whether a row came from a to-do app the dashboard can close tasks in. */
+export function isTodoApp(source: string): source is TodoApp {
+  return (TODO_APPS as readonly string[]).includes(source);
+}
+
+/**
+ * Which app the add-task box sends to: the `todo.defaultApp` setting when that app is connected, otherwise
+ * whichever is connected (Todoist first), otherwise none.
+ */
+export function resolveTodoApp(setting: unknown, connected: Partial<Record<TodoApp, boolean>>): TodoApp | null {
+  if ((TODO_APPS as readonly unknown[]).includes(setting) && connected[setting as TodoApp]) return setting as TodoApp;
+  return TODO_APPS.find((a) => connected[a]) ?? null;
+}
 
 /** What a hand-entered course date is. Cancelled/virtual attach to a scheduled session; the rest are dates in their own right. */
 export const COURSE_EVENT_KINDS = ['exam', 'quiz', 'final', 'cancelled', 'virtual', 'other'] as const;

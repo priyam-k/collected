@@ -23,6 +23,8 @@ describe('identityAllows', () => {
       ['PUT', '/api/courses/x'],
       ['POST', '/api/items/x/override'],
       ['POST', '/api/todoist/tasks/quick'],
+      ['POST', '/api/gtasks/tasks/quick'],
+      ['POST', '/api/gtasks/tasks/L1:T1/close'],
       ['POST', '/api/sources/canvas/sync'],
       ['PATCH', '/api/jobs/x/state'],
     ] as const)
@@ -40,6 +42,8 @@ describe('identityAllows', () => {
       ['GET', '/api/google/start'],
       ['GET', '/api/todoist/connect'],
       ['POST', '/api/todoist/disconnect'],
+      ['GET', '/api/google/start?source=gtasks'],
+      ['PUT', '/api/settings/todo.defaultApp'],
       ['POST', '/api/sources/canvas/cookie'],
     ] as const)
       expect(identityAllows(svc, m, p), `${m} ${p}`).toBe(false);

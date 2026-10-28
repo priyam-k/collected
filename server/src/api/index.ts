@@ -15,6 +15,7 @@ import { googleRoutes } from './google.js';
 import { exportRoutes } from './export.js';
 import { fileSyncRoutes } from './file-sync.js';
 import { gradesRoutes } from './grades.js';
+import { gtasksRoutes } from './gtasks.js';
 import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
 import { jobsRoutes } from './jobs.js';
@@ -135,6 +136,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {
   api.route('/canvas', canvasRoutes(ctx));
   api.route('/grades', gradesRoutes(ctx));
   api.route('/todoist', todoistRoutes(ctx));
+  api.route('/gtasks', gtasksRoutes(ctx));
   api.route('/file-sync', fileSyncRoutes(ctx));
   api.route('/', exportRoutes(ctx));
 

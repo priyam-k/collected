@@ -51,6 +51,11 @@ export function SourcesPage() {
       >
         <TodoistForm source={by.todoist} />
       </SourceCard>
+      {by.gtasks && (
+        <SourceCard source={by.gtasks} description="OAuth connect with the tasks scope, asked for separately from Calendar. Same Google client; the Tasks API must be enabled in the Google Cloud project (artifacts/SETUP.md).">
+          <GTasksForm source={by.gtasks} />
+        </SourceCard>
+      )}
       <SourceCard source={by.jobs} description="Public listings from SimplifyJobs on GitHub. No credentials.">
         <p className="text-sm text-muted-foreground">
           Runs hourly. Tune what counts as a match under <span className="font-medium">Jobs</span>.
@@ -420,11 +425,13 @@ function GoogleForm({ source }: { source: Source }) {
   useEffect(() => {
     const g = params.get('google');
     if (!g) return;
-    if (g === 'connected') toast.success('Google Calendar connected');
+    if (g === 'connected') toast.success(params.get('source') === 'gtasks' ? 'Google Tasks connected' : 'Google Calendar connected');
     else if (g === 'unconfigured') toast.error('Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env first');
+    else if (params.get('source') === 'gtasks' && params.get('reason') === 'unknown') toast.error('Google Tasks: the first sync failed, see the Google Tasks card (is the Tasks API enabled?)');
     else toast.error(GOOGLE_ERRORS[params.get('reason') ?? ''] ?? GOOGLE_ERRORS.unknown);
     params.delete('google');
     params.delete('reason');
+    params.delete('source');
     setParams(params, { replace: true });
   }, [params, setParams]);
 
@@ -467,6 +474,32 @@ function GoogleForm({ source }: { source: Source }) {
             </label>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Google Tasks: its own consent (tasks scope only, incremental), so connecting it never touches the Calendar grant. */
+function GTasksForm({ source }: { source: Source }) {
+  const meta = (source.meta ?? {}) as { lists?: { id: string; title: string }[]; defaultListId?: string | null };
+  const clear = useClearSourceConfig();
+  const lists = meta.lists ?? [];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <a href="/api/google/start?source=gtasks">{source.hasConfig ? 'Reconnect Google Tasks' : 'Connect Google Tasks'}</a>
+        </Button>
+        {source.hasConfig && (
+          <Button size="sm" variant="ghost" onClick={() => clear.mutate('gtasks', { onSuccess: () => toast.success('Disconnected') })}>
+            Disconnect
+          </Button>
+        )}
+      </div>
+      {source.hasConfig && lists.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {lists.length} {lists.length === 1 ? 'list' : 'lists'}: {lists.map((l) => l.title).join(', ')} · new tasks go to {lists.find((l) => l.id === meta.defaultListId)?.title ?? lists[0]!.title}
+        </p>
       )}
     </div>
   );

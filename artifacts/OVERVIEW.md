@@ -4,7 +4,7 @@ _The landscape, readable in ten minutes. For why, see DECISIONS.md._
 
 ## The mental model
 
-The app **copies, it never owns.** Canvas is the truth about assignments, Gradescope about submissions, Google about events, Todoist about tasks, a GitHub JSON file about internships. The server's job is to keep a local copy of all of that in one SQLite file, layer *your* decisions on top (done-here-only, hidden, "these two rows are the same homework"), and answer the browser's questions fast from that copy. It almost never talks to a source while you're looking at the page; syncing happens on timers in the background.
+The app **copies, it never owns.** Canvas is the truth about assignments, Gradescope about submissions, Google about events, Todoist and Google Tasks about tasks, a GitHub JSON file about internships. The server's job is to keep a local copy of all of that in one SQLite file, layer *your* decisions on top (done-here-only, hidden, "these two rows are the same homework"), and answer the browser's questions fast from that copy. It almost never talks to a source while you're looking at the page; syncing happens on timers in the background.
 
 Everything else follows from that.
 
@@ -13,7 +13,7 @@ Everything else follows from that.
 One Node process. Inside it, three things share one SQLite file:
 
 - **Hono HTTP server** on port 3000: the `/api/*` JSON routes plus the built React app as static files.
-- **Scheduler** (croner): one cron entry per ingester, each on its own interval (Canvas 15 min, Gradescope 30, Google/Todoist 5, iCal/jobs 60), staggered so they don't fire together. Five seconds after boot it runs everything once so a fresh deploy isn't empty.
+- **Scheduler** (croner): one cron entry per ingester, each on its own interval (Canvas 15 min, Gradescope 30, Google Calendar/Google Tasks/Todoist 5, iCal/jobs 60), staggered so they don't fire together. Five seconds after boot it runs everything once so a fresh deploy isn't empty.
 - **SQLite** via `@libsql/client` + Drizzle, WAL mode, `synchronous=NORMAL`. No queue, no worker, no cache layer.
 
 One thing runs *off* the box: `collected-agent` (the `agent` workspace) on the laptop under launchd. It pulls a manifest of course files and decisions, downloads from the Canvas CDN into local folders, writes a per-course index plus assignments/announcements/syllabus files from the API, and reports back. The server never touches file bytes.
@@ -56,7 +56,7 @@ Every source has a folder under `server/src/ingest/<source>/` with roughly the s
 The **runner** (`ingest/runner.ts`) is what makes them uniform. It wraps every run with: a per-source mutex (skip if already running), the `enabled` check, a timeout that aborts the fetches, and status writing. It classifies failures by error type: `NotConfiguredError` → `disconnected`, quietly; `NeedsAuthError` or an undecryptable config → `needs_auth` with a message; anything else → `error`. The runner never throws. That's why the Sources widget can always show something true, and a dead scraper degrades one panel, never the app.
 
 Two shared writers in `lib/items.ts` do all the row work:
-- `upsertItems(source, rows, scope)` — insert-or-update by id, clear `deleted_at`, then **soft-delete everything of that source inside `scope` that wasn't in this batch**. The scope is the key subtlety: Canvas passes "assignments in tracked courses," Google passes "events in the synced window," Todoist passes nothing (open tasks are authoritative; whatever disappeared was completed).
+- `upsertItems(source, rows, scope)` — insert-or-update by id, clear `deleted_at`, then **soft-delete everything of that source inside `scope` that wasn't in this batch**. The scope is the key subtlety: Canvas passes "assignments in tracked courses," Google passes "events in the synced window," Todoist passes nothing (open tasks are authoritative; whatever disappeared was completed). Google Tasks passes one list at a time, and only for a list whose fetch succeeded and was not cut off at the 500-task cap.
 - `replaceCourseContent(courseId, kinds, rows)` — hard replace per course and kind.
 
 After a successful Canvas or Gradescope run, the runner fires two **after-hooks**: dedup, then (if enabled) the Todoist push. Failures there are logged, never propagated.

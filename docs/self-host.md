@@ -92,18 +92,19 @@ Set `PUBLIC_URL=https://<that hostname>` in `.env` and restart (`docker compose 
 
 ## 6. Google OAuth client
 
-Needed for Google sign-in and for the OAuth Google Calendar source. Skip it if you will use the iCal calendar address and another sign-in method.
+Needed for Google sign-in, the OAuth Google Calendar source and Google Tasks. Skip it if you will use the iCal calendar address and another sign-in method.
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → New project (any name, e.g. `collected`).
-2. APIs & Services → Library → enable **Google Calendar API**.
+2. APIs & Services → Library → enable **Google Calendar API**, and **Google Tasks API** if you will connect Google Tasks.
 3. APIs & Services → OAuth consent screen (Google now calls it "Google Auth Platform → Branding/Audience"): User type **External**. App name, your email as support and developer contact. Scopes → Add:
    - `openid`, `email`, `profile` (sign-in)
    - `https://www.googleapis.com/auth/calendar.readonly` (list calendars, read events)
    - `https://www.googleapis.com/auth/calendar.events` (create events from the dashboard's quick-add)
+   - `https://www.googleapis.com/auth/tasks` (Google Tasks: read your lists, add and complete tasks). Asked for only when you click Connect Google Tasks, as a separate consent; connecting Calendar never asks for it.
 4. **Publishing status must be "In production".** In "Testing" status Google expires every refresh token after seven days, and the Calendar connection silently dies until you reconnect. Click Publish app; you do not need to complete verification for a personal instance. Google will show a "this app isn't verified" screen the first time each user connects: Advanced → Go to collected. That warning appears once per user, not on every sign-in.
 5. Credentials → Create credentials → OAuth client ID → Web application. Authorized redirect URIs, with your real domain:
    - `https://<your-domain>/api/auth/google/callback` (sign-in)
-   - `https://<your-domain>/api/google/callback` (Google Calendar connect)
+   - `https://<your-domain>/api/google/callback` (Google Calendar and Google Tasks connect; one URI for both)
    For local development add the same two paths on `http://localhost:5173`.
 6. Copy the client id and secret into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then `docker compose up -d` to restart with the new environment.
 
@@ -120,12 +121,13 @@ Sign in, then open Settings → Sources. Every source can be enabled, disabled, 
   - *Connect Todoist* (OAuth, optional): register a Todoist app once at `https://developer.todoist.com/appconsole.html` (free; no organisation or paid plan). Create a new app, name it `collected`, and set its **OAuth redirect URL** to `https://<your-domain>/api/todoist/callback`. Copy the Client ID and Client secret into `.env` as `TODOIST_CLIENT_ID` and `TODOIST_CLIENT_SECRET`, `docker compose up -d`, and the Todoist card shows Connect Todoist. The consent screen asks for `data:read_write,data:delete`; delete is needed so the push sync can remove a task it created when the assignment disappears at the source. Disconnect clears the token here and revokes it at Todoist. The paste form stays available under "or paste an API token".
 
   Push sync (creating Todoist tasks for assignments) is off by default and configured under Settings → Todoist, whichever way you connected.
+- **Google Tasks**: with the client from step 6 configured and the Tasks API enabled, click Connect Google Tasks. It is its own consent screen asking only for the tasks scope, so a Calendar connection is untouched. Every list is read; tasks from both Todoist and Google Tasks appear in the to-do widget, and Settings → Todoist sync → "Add new tasks to" picks where the add-task box sends. Assignments are never pushed into Google Tasks.
 - **Google Calendar**, two ways:
   - *OAuth* (read and write): with the client from step 6 configured, click Connect Google Calendar, pick which calendars to show and which one new events go to.
   - *Secret iCal address* (read-only, no Google Cloud project): in Google Calendar on the web, Settings (gear) → the calendar under "Settings for my calendars" → Integrate calendar → **Secret address in iCal format**. Paste it into the "Google Calendar (iCal)" card. It refreshes every 30 minutes, covers two weeks back and sixty days ahead, and expands recurring events. One address per calendar; treat the URL like a password (anyone holding it can read that calendar), which is why it is stored encrypted and never shown again.
 - **Job feed**: public JSON listings, no credentials. Tune the filter under Settings → Jobs.
 
-Each source runs on its own timer (Canvas 15 min, Gradescope 30, Google and Todoist 5, iCal and jobs 60). A failed fetch marks that one source `error` or `needs auth` on the board and never deletes what was already pulled.
+Each source runs on its own timer (Canvas 15 min, Gradescope 30, Google Calendar, Google Tasks and Todoist 5, iCal and jobs 60). A failed fetch marks that one source `error` or `needs auth` on the board and never deletes what was already pulled.
 
 ## 8. Backups
 

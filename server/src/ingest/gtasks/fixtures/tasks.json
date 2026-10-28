@@ -1,0 +1,19 @@
+{
+  "lists": [
+    { "id": "MDE2NTk0Njg2", "title": "My Tasks", "updated": "2026-10-20T12:00:00.000Z" },
+    { "id": "Z3JvY2VyeQ", "title": "Grocery", "updated": "2026-10-21T12:00:00.000Z" }
+  ],
+  "tasks": {
+    "MDE2NTk0Njg2": [
+      { "id": "dGFzazE", "title": "Email advisor about spring schedule", "status": "needsAction", "due": "2026-10-30T00:00:00.000Z", "notes": "ask about CMSC434", "webViewLink": "https://tasks.google.com/task/dGFzazE", "position": "00000000000000000001" },
+      { "id": "dGFzazI", "title": "Renew library books", "status": "needsAction", "position": "00000000000000000002" },
+      { "id": "c3ViMQ", "title": "Find the receipts", "status": "needsAction", "parent": "dGFzazI", "position": "00000000000000000000" },
+      { "id": "ZG9uZTE", "title": "Submit housing form", "status": "completed", "completed": "2026-10-25T15:00:00.000Z", "hidden": true, "position": "00000000000000000003" },
+      { "id": "b2xkZG9uZQ", "title": "Something from last spring", "status": "completed", "completed": "2026-03-01T15:00:00.000Z", "hidden": true },
+      { "id": "ZGVsZXRlZA", "title": "Deleted one", "status": "needsAction", "deleted": true }
+    ],
+    "Z3JvY2VyeQ": [
+      { "id": "bWlsaw", "title": "Oat milk", "status": "needsAction" }
+    ]
+  }
+}

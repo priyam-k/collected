@@ -21,6 +21,7 @@ import type {
   SourceId,
   SystemVersion,
   UpdateStatus,
+  TodoApp,
   WidgetInstance,
 } from '@collected/shared';
 import { api } from './api';
@@ -445,18 +446,21 @@ export function useTodoistPush() {
   });
 }
 
-export function useCloseTodoistTask() {
+/** Close a task in the app it came from (Todoist or Google Tasks). `externalId` is the item's external id. */
+export function useCloseTask() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: (taskId: string) => api(`/todoist/tasks/${encodeURIComponent(taskId)}/close`, { method: 'POST' }),
+    mutationFn: ({ source, externalId }: { source: TodoApp; externalId: string }) => api(`/${source}/tasks/${encodeURIComponent(externalId)}/close`, { method: 'POST' }),
     onSettled: () => inv(['items']),
   });
 }
 
+/** Add a task to the default to-do app. Todoist parses dates and labels out of the text; Google Tasks takes it as the title. */
 export function useQuickAddTask() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: (text: string) => api<EffectiveItem>('/todoist/tasks/quick', { method: 'POST', json: { text } }),
+    mutationFn: ({ app, text }: { app: TodoApp; text: string }) =>
+      app === 'gtasks' ? api<EffectiveItem>('/gtasks/tasks/quick', { method: 'POST', json: { content: text } }) : api<EffectiveItem>('/todoist/tasks/quick', { method: 'POST', json: { text } }),
     onSettled: () => inv(['items']),
   });
 }

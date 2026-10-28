@@ -78,10 +78,18 @@ export function authUrl(env: Env, state: string): string {
   return oauthClient(env).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: SCOPES, state, include_granted_scopes: true });
 }
 
-export async function exchangeCode(env: Env, code: string): Promise<{ refreshToken: string | null }> {
+/**
+ * Consent for one more scope on the same client (incremental authorization). Used by Google Tasks, so connecting
+ * Tasks never changes what the Calendar connect asks for and the Calendar consent never asks for Tasks.
+ */
+export function incrementalAuthUrl(env: Env, state: string, scopes: string[]): string {
+  return oauthClient(env).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, state, include_granted_scopes: true });
+}
+
+export async function exchangeCode(env: Env, code: string): Promise<{ refreshToken: string | null; scopes: string[] }> {
   const client = oauthClient(env);
   const { tokens } = await client.getToken(code);
-  return { refreshToken: tokens.refresh_token ?? null };
+  return { refreshToken: tokens.refresh_token ?? null, scopes: (tokens.scope ?? '').split(/\s+/).filter(Boolean) };
 }
 
 function classify(err: unknown): Error {

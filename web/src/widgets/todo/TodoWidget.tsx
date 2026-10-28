@@ -2,9 +2,9 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { Check, CornerDownRight, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { SOURCE_LABELS, todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
+import { SOURCE_LABELS, isTodoApp, resolveTodoApp, todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
-import { useCloseTodoistTask, useItems, useQuickAddTask, useSetOverride, useSettings, useSources } from '@/lib/queries';
+import { useCloseTask, useItems, useQuickAddTask, useSetOverride, useSettings, useSources } from '@/lib/queries';
 import { friendlyDate, isPast } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
@@ -24,7 +24,14 @@ interface Section {
   rows: Row[];
 }
 
-const parentIdOf = (it: EffectiveItem): string | null => (it.source === 'todoist' ? ((it.raw as { parentId?: string | null }).parentId ?? null) : null);
+/** The item id of a subtask's parent (Todoist and Google Tasks both nest), or null. */
+function parentIdOf(it: EffectiveItem): string | null {
+  const raw = it.raw as { parentId?: string | null; listId?: string };
+  if (!raw.parentId) return null;
+  if (it.source === 'todoist') return `todoist:${raw.parentId}`;
+  if (it.source === 'gtasks' && raw.listId) return `gtasks:${raw.listId}:${raw.parentId}`;
+  return null;
+}
 
 /** Overdue first (most overdue first), then by due date, undated last. */
 function byUrgency(a: EffectiveItem, b: EffectiveItem): number {
@@ -33,21 +40,21 @@ function byUrgency(a: EffectiveItem, b: EffectiveItem): number {
   return da - db;
 }
 
-/** Orders items so Todoist subtasks follow their parent (indented). Orphans (parent not shown) stay top-level. */
+/** Orders items so subtasks follow their parent (indented). Orphans (parent not shown) stay top-level. */
 function nest(items: EffectiveItem[]): Row[] {
-  const byTodoistId = new Map(items.filter((i) => i.source === 'todoist').map((i) => [i.externalId, i]));
+  const byId = new Map(items.map((i) => [i.id, i]));
   const children = new Map<string, EffectiveItem[]>();
   const top: EffectiveItem[] = [];
   for (const it of items) {
     const pid = parentIdOf(it);
-    if (pid && byTodoistId.has(pid)) children.set(pid, [...(children.get(pid) ?? []), it]);
+    if (pid && byId.has(pid)) children.set(pid, [...(children.get(pid) ?? []), it]);
     else top.push(it);
   }
   top.sort(byUrgency);
   const out: Row[] = [];
   const walk = (it: EffectiveItem, depth: number) => {
     out.push({ item: it, depth });
-    for (const c of (children.get(it.externalId) ?? []).sort(byUrgency)) if (it.source === 'todoist') walk(c, depth + 1);
+    for (const c of (children.get(it.id) ?? []).sort(byUrgency)) walk(c, depth + 1);
   };
   for (const it of top) walk(it, 0);
   return out;
@@ -63,13 +70,13 @@ function buildSections(items: EffectiveItem[], order: string[], homeworkLabel: s
   if (!labels.includes(homeworkLabel)) labels.unshift(homeworkLabel);
   const buckets = new Map<string, EffectiveItem[]>(labels.map((l) => [l, []]));
   const other: EffectiveItem[] = [];
-  const byTodoistId = new Map(items.filter((i) => i.source === 'todoist').map((i) => [i.externalId, i]));
+  const byId = new Map(items.map((i) => [i.id, i]));
   const sectionOf = (it: EffectiveItem, seen = new Set<string>()): string => {
     if (it.kind === 'assignment') return homeworkLabel;
     const pid = parentIdOf(it);
-    if (pid && byTodoistId.has(pid) && !seen.has(pid)) {
+    if (pid && byId.has(pid) && !seen.has(pid)) {
       seen.add(pid);
-      return sectionOf(byTodoistId.get(pid)!, seen);
+      return sectionOf(byId.get(pid)!, seen);
     }
     const hit = labels.find((l) => it.labels.map((x) => x.toLowerCase()).includes(l.toLowerCase()));
     return hit ?? '__other';
@@ -93,7 +100,7 @@ export function TodoWidget({ size }: WidgetProps) {
   const dated = useItems({ kind: ['assignment', 'task'], to: win.to, limit: 500 });
   const undated = useItems({ kind: ['task'], limit: 200 });
   const setOverride = useSetOverride();
-  const closeTask = useCloseTodoistTask();
+  const closeTask = useCloseTask();
   const quickAdd = useQuickAddTask();
   const [text, setText] = useState('');
   const [tab, setTab] = useState<string>('__all');
@@ -103,6 +110,10 @@ export function TodoWidget({ size }: WidgetProps) {
   const order = (settings.data?.['todo.sections'] as string[] | undefined) ?? [];
   const todoist = sources.data?.find((s) => s.id === 'todoist');
   const todoistOn = !!todoist && todoist.status === 'connected';
+  const gtasks = sources.data?.find((s) => s.id === 'gtasks');
+  const gtasksOn = !!gtasks && gtasks.status === 'connected';
+  // Where the add-task box sends: Settings → Todoist sync → "Add new tasks to", else whichever app is connected.
+  const app = resolveTodoApp(settings.data?.['todo.defaultApp'], { todoist: todoistOn, gtasks: gtasksOn });
 
   const merged = useMemo(() => {
     const seen = new Set<string>();
@@ -126,13 +137,14 @@ export function TodoWidget({ size }: WidgetProps) {
   const active = tabs.find((s) => s.key === tab) ?? all;
 
   const complete = (it: EffectiveItem) => {
-    if (it.source === 'todoist') closeTask.mutate(it.externalId, { onError: (e) => toast.error(e.message) });
+    if (isTodoApp(it.source)) closeTask.mutate({ source: it.source, externalId: it.externalId }, { onError: (e) => toast.error(e.message) });
     else setOverride.mutate({ id: it.id, done: true }, { onError: (e) => toast.error(e.message) });
   };
   const submitQuickAdd = (e: FormEvent) => {
     e.preventDefault();
     if (!text.trim()) return;
-    quickAdd.mutate(text.trim(), { onSuccess: () => setText(''), onError: (err) => toast.error(err.message) });
+    if (!app) return;
+    quickAdd.mutate({ app, text: text.trim() }, { onSuccess: () => setText(''), onError: (err) => toast.error(err.message) });
   };
 
   const list = (s: Section) =>
@@ -147,7 +159,7 @@ export function TodoWidget({ size }: WidgetProps) {
               <button
                 type="button"
                 aria-label={`Complete ${it.title}`}
-                title={it.source === 'todoist' ? 'Complete this task in Todoist' : 'Mark done here only. Canvas / Gradescope are never changed.'}
+                title={isTodoApp(it.source) ? `Complete this task in ${SOURCE_LABELS[it.source]}` : 'Mark done here only. Canvas / Gradescope are never changed.'}
                 onClick={() => complete(it)}
                 onMouseDown={(e) => e.stopPropagation()}
                 className={cn('mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-surface transition-colors', late ? 'border-critical hover:bg-critical' : it.course ? 'hover:bg-[var(--c)]' : 'border-line-strong hover:bg-ink')}
@@ -162,7 +174,7 @@ export function TodoWidget({ size }: WidgetProps) {
                 <div className="mt-1 flex items-center gap-2 text-[11.5px]">
                   {it.dueAt ? <span className={cn('font-medium', late ? 'text-coral' : 'text-sub')}>{friendlyDate(it.dueAt, { withTime: true, allDay: it.allDay })}</span> : <span className="text-ter">no date</span>}
                   {it.course && <span className="font-medium" style={{ color: safeColor(it.course.color) ?? 'var(--sub)' }}>{it.course.code}</span>}
-                  {it.source === 'todoist' && raw.projectName && <span className="text-ter">{raw.projectName}</span>}
+                  {isTodoApp(it.source) && raw.projectName && <span className="text-ter">{raw.projectName}</span>}
                   <span className="flex-1" />
                   <span className="text-ter" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>{sourceTag(it)}</span>
                 </div>
@@ -213,7 +225,7 @@ export function TodoWidget({ size }: WidgetProps) {
           <div className="m-2 h-16 animate-pulse rounded-xl bg-well" />
         ) : !merged.length ? (
           <EmptyState>
-            Nothing to do. {!todoistOn && <Link to="/settings/sources" className="underline">Connect Todoist</Link>}
+            Nothing to do. {!app && <Link to="/settings/sources" className="underline">Connect Todoist</Link>}
           </EmptyState>
         ) : columns ? (
           <div className="grid h-full gap-3 px-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(sections.length, size.tier === 'lg' ? 4 : 3)}, minmax(0, 1fr))` }}>
@@ -230,10 +242,10 @@ export function TodoWidget({ size }: WidgetProps) {
           list(active)
         )}
       </div>
-      {todoistOn && size.tier !== 'xs' && (
+      {app && size.tier !== 'xs' && (
         <form onSubmit={submitQuickAdd} className="mx-3 mb-3 mt-1.5 flex h-[40px] shrink-0 items-center gap-2.5 rounded-full bg-well pl-4 pr-1 transition-shadow focus-within:shadow-[var(--focus-ring)]">
-          <input className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ter" placeholder="Add a task… tomorrow 5pm @grocery #Home" value={text} onChange={(e) => setText(e.target.value)} />
-          <button type="submit" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title="Add to Todoist using its natural-language parser (dates, @labels, #project)" className="grid size-8 place-items-center rounded-full bg-brand text-on-brand transition-[opacity,transform] active:scale-95 disabled:opacity-35">
+          <input className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ter" placeholder={app === 'gtasks' ? 'Add a task to Google Tasks…' : 'Add a task… tomorrow 5pm @grocery #Home'} value={text} onChange={(e) => setText(e.target.value)} />
+          <button type="submit" disabled={!text.trim() || quickAdd.isPending} aria-label="Add task" title={app === 'gtasks' ? 'Add to your default Google Tasks list' : 'Add to Todoist using its natural-language parser (dates, @labels, #project)'} className="grid size-8 place-items-center rounded-full bg-brand text-on-brand transition-[opacity,transform] active:scale-95 disabled:opacity-35">
             <Plus className="size-4" />
           </button>
         </form>
