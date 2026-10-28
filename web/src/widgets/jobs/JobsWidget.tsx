@@ -94,7 +94,7 @@ function Orb({ on, tone, label, onClick, children }: { on?: boolean; tone: strin
   );
 }
 
-function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; refCb: (el: HTMLElement | null) => void | (() => void) }) {
+function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; tall?: boolean; refCb: (el: HTMLElement | null) => void | (() => void) }) {
   const { open } = usePane();
   const tracked = job.state !== 'new' && job.state !== 'starred' && job.state !== 'hidden';
   return (
@@ -119,9 +119,10 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
         )}
         <span className="shrink-0 text-[11px] text-ter">{friendlyDate(job.postedAt)}</span>
       </div>
-      <div className={cn('text-[12.5px] leading-[1.4] text-sub', compact ? 'truncate' : 'line-clamp-2')} title={job.title}>{job.title}</div>
+      <div className={cn('text-[12.5px] leading-[1.4] text-sub', compact ? 'truncate' : tall ? 'line-clamp-3' : 'line-clamp-2')} title={job.title}>{job.title}</div>
       {!compact && <div className="truncate text-xs text-ter">{job.locations.slice(0, 2).join(' · ')}{job.locations.length > 2 ? ` +${job.locations.length - 2}` : ''}</div>}
-      <div className={cn('flex items-center gap-1.5', compact ? 'mt-0.5' : 'mt-1.5')}>
+      {/* Pinned to the card's foot: a tape card fills the widget's height, and grid cards stretch to their row, so the actions line up across cards instead of leaving a gap under them. */}
+      <div className={cn('mt-auto flex items-center gap-1.5', compact ? 'pt-0.5' : 'pt-1.5')}>
         <Orb on={job.state === 'starred'} tone="var(--caution)" label={job.state === 'starred' ? 'Remove star' : 'Star: keep this one in the Starred list'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
           <Star className={cn('size-3.5', job.state === 'starred' && 'fill-current')} />
         </Orb>
@@ -152,6 +153,7 @@ export function JobsWidget({ size }: WidgetProps) {
   const refCb = useMarkSeenWhenVisible(q.data ?? []);
   const tape = size.aspect === 'wide' && size.height < 340;
   const compact = tape && size.height < 165;
+  const tall = tape && size.height >= 200;
 
   const onState = (job: Job, state: Job['state']) =>
     patch.mutate({ id: job.id, state }, { onError: (e) => toast.error(e.message), onSuccess: () => state === 'applied' && toast.success(`Marked ${job.company} as applied`) });
@@ -195,7 +197,7 @@ export function JobsWidget({ size }: WidgetProps) {
           </EmptyState>
         ) : tape ? (
           <div className="flex h-full items-stretch gap-2 px-3 py-2.5">
-            {shown.map((j) => <Card key={j.id} job={j} tape compact={compact} onState={(s) => onState(j, s)} refCb={refCb} />)}
+            {shown.map((j) => <Card key={j.id} job={j} tape compact={compact} tall={tall} onState={(s) => onState(j, s)} refCb={refCb} />)}
             {rest > 0 && (
               <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => setVisible((v) => v + 2 * PAGE)} className="grid w-[120px] shrink-0 place-items-center rounded-2xl bg-well p-3.5 text-center transition-colors hover:bg-well2">
                 <span>
