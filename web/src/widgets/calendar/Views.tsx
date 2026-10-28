@@ -202,7 +202,7 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
                   const color = itemColor(i);
                   const loc = (i.raw as { location?: string | null }).location;
                   return (
-                    <div key={i.id} className="absolute inset-x-[2px]" style={{ top: top + 1, height }}>
+                    <div key={i.id} className="absolute inset-x-1" style={{ top: top + 1, height }}>
                       <ItemPopover item={i} side="right" className="h-full">
                         <div
                           className={cn('relative h-full overflow-hidden rounded-[6px] py-[6px] pl-[13px] pr-2 text-left leading-tight transition-[filter] hover:brightness-[1.04]', i.effectiveDone && 'opacity-60')}
