@@ -57,6 +57,11 @@ const envSchema = z.object({
     .pipe(z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'UPSTREAM_REPO must be "owner/name"')),
   /** Switches the GitHub update check off entirely: no outbound request, no banner. */
   UPDATE_CHECK_DISABLED: bool.default(false),
+  /** Optional GitHub token (fine-grained, Contents: read) so the check can read a private upstream. */
+  UPDATE_CHECK_TOKEN: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, 'SECRET_KEY'> & { rootDir: string; SECRET_KEY: string; secretKeySource: 'env' | 'file' };

@@ -60,8 +60,8 @@ describe('createUpdateChecker', () => {
       fetch: fakeFetch(
         {
           '/compare/abc1234...main': { status: 200, body: compareBody() },
-          '/main/package.json': { status: 200, body: JSON.stringify({ version: '0.2.0' }) },
-          '/main/CHANGELOG.md': { status: 200, body: CHANGELOG },
+          '/contents/package.json?ref=main': { status: 200, body: JSON.stringify({ version: '0.2.0' }) },
+          '/contents/CHANGELOG.md?ref=main': { status: 200, body: CHANGELOG },
         },
         calls,
       ),
@@ -94,8 +94,8 @@ describe('createUpdateChecker', () => {
     const checker = createUpdateChecker(ctx, {
       fetch: fakeFetch({
         '/compare/': { status: 200, body: compareBody({ files: [{ filename: 'docs/self-host.md' }, { filename: 'server/src/lib/updates.ts' }] }) },
-        '/main/package.json': { status: 200, body: JSON.stringify({ version: '0.1.0' }) },
-        '/main/CHANGELOG.md': { status: 404, body: '' },
+        '/contents/package.json?ref=main': { status: 200, body: JSON.stringify({ version: '0.1.0' }) },
+        '/contents/CHANGELOG.md?ref=main': { status: 404, body: '' },
       }),
     });
     const s = await checker.check();

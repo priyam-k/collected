@@ -167,7 +167,7 @@ docker compose up -d
 
 `git pull` brings the compose file and scripts up to date, `pull` fetches the new image, `up -d` replaces the container in place; the `data/` volume carries over. `docker compose logs -f app` afterwards: "migrations applied" names any pre-migration snapshot it wrote. Changes that only touch documentation do not raise the banner. Settings → About shows the running version and commit, the last check, and a button to check now; `curl -s http://127.0.0.1:3000/api/health` on the box prints the version without signing in.
 
-`UPDATE_CHECK_DISABLED=true` in `.env` switches the check off entirely (no request is made). `UPSTREAM_REPO=<you>/collected` points it at your fork. An image built locally without `GIT_SHA` reports the commit `dev` and the check says it has nothing to compare.
+`UPDATE_CHECK_DISABLED=true` in `.env` switches the check off entirely (no request is made). `UPSTREAM_REPO=<you>/collected` points it at your fork; if that fork is private, add `UPDATE_CHECK_TOKEN=<fine-grained token with Contents: read>` or the check reports the commit as unknown. An image built locally without `GIT_SHA` reports the commit `dev` and the check says it has nothing to compare.
 
 If the new version fails its health check, `docker compose logs app` says why. The previous image is still local (`docker images`): `docker tag <old image id> ghcr.io/priyam-k/collected:latest && docker compose up -d --pull never` is the rollback. `scripts/deploy.sh` automates this (backup, load a new image, promote, health check, roll back on failure) for setups that build the image elsewhere.
 

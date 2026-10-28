@@ -99,7 +99,11 @@ export function createUpdateChecker(ctx: AppContext, deps: UpdateCheckerDeps = {
 
   async function getText(url: string, accept: string): Promise<{ status: number; text: string }> {
     const res = await doFetch(url, {
-      headers: { accept, 'user-agent': `collected/${ctx.version} (+https://github.com/${repo})` },
+      headers: {
+        accept,
+        'user-agent': `collected/${ctx.version} (+https://github.com/${repo})`,
+        ...(ctx.env.UPDATE_CHECK_TOKEN ? { authorization: `Bearer ${ctx.env.UPDATE_CHECK_TOKEN}` } : {}),
+      },
       redirect: 'error',
       signal: withTimeout(undefined, FETCH_TIMEOUT_MS),
     });
@@ -117,7 +121,7 @@ export function createUpdateChecker(ctx: AppContext, deps: UpdateCheckerDeps = {
     try {
       const r = await getText(`https://api.github.com/repos/${repo}/compare/${encodeURIComponent(commit)}...main`, 'application/vnd.github+json');
       if (r.status === 404) {
-        return toStatus(await persisted(prev, { upstream: null, error: `commit ${commit} is not on github.com/${repo}; this build has local commits or a different upstream (UPSTREAM_REPO)`, checkedAt }));
+        return toStatus(await persisted(prev, { upstream: null, error: `commit ${commit} is not on github.com/${repo}, or the repository is private (set UPDATE_CHECK_TOKEN); this build may have local commits or a different upstream (UPSTREAM_REPO)`, checkedAt }));
       }
       if (r.status !== 200) throw new Error(`GitHub compare answered ${r.status}${r.status === 403 ? ' (rate limited?)' : ''}`);
       compare = JSON.parse(r.text) as CompareResponse;
@@ -138,12 +142,12 @@ export function createUpdateChecker(ctx: AppContext, deps: UpdateCheckerDeps = {
     let version: string | null = prev.upstream?.version ?? null;
     let changelog = prev.changelog;
     try {
-      const pkg = await getText(`https://raw.githubusercontent.com/${repo}/main/package.json`, 'application/json');
+      const pkg = await getText(`https://api.github.com/repos/${repo}/contents/package.json?ref=main`, 'application/vnd.github.raw+json');
       if (pkg.status === 200) {
         const v = (JSON.parse(pkg.text) as { version?: unknown }).version;
         version = typeof v === 'string' ? v : null;
       }
-      const log = await getText(`https://raw.githubusercontent.com/${repo}/main/CHANGELOG.md`, 'text/plain');
+      const log = await getText(`https://api.github.com/repos/${repo}/contents/CHANGELOG.md?ref=main`, 'application/vnd.github.raw+json');
       if (log.status === 200) changelog = entriesNewerThan(parseChangelog(log.text), ctx.version);
       else if (log.status === 404) changelog = [];
     } catch (err) {
