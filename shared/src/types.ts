@@ -494,3 +494,43 @@ export interface HealthResponse {
   now: string;
   authDisabled: boolean;
 }
+
+// --- system: version and updates (self-host) -------------------------------------------------------------------------
+
+/** What this running build is. `commit` is the short git sha baked at build time ("dev" when unknown). */
+export interface SystemVersion {
+  version: string;
+  commit: string;
+  builtAt: string | null;
+  /** "owner/name" of the upstream GitHub repository the update check compares against. */
+  repo: string;
+}
+
+/** One CHANGELOG.md section. `level` says whether pulling it is worth a self-hoster's time. */
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  level: 'recommended' | 'optional';
+  notes: string[];
+}
+
+/** Result of comparing the running commit with upstream main. `upstream` is null when the check has not run or failed. */
+export interface UpdateStatus {
+  current: SystemVersion;
+  upstream: {
+    commit: string;
+    version: string | null;
+    /** Commits on upstream main that this build does not have. */
+    ahead: number;
+    /** True when at least one of those commits touched a file that changes the running app (not docs). */
+    matters: boolean;
+    checkedAt: string;
+    /** Link to the GitHub compare view. */
+    url: string;
+  } | null;
+  /** Changelog sections newer than the running version, newest first. */
+  changelog: ChangelogEntry[];
+  /** Shell steps for the operator to run, in order. */
+  steps: string[];
+  error: string | null;
+}
