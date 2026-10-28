@@ -13,7 +13,7 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 ### Phase 1 — Security review and end-to-end tests
 - [x] Full security review, seven surfaces, every finding verified (`SECURITY-REVIEW.md`, 2026-10-23).
 - [x] Tier 1 and 2 fixes landed (DECISIONS 043, commit 4f22fca): fail-closed ingest, scoped credentials, outbound URL policy, CSRF and headers, agent containment, hardened deploy, pre-migration snapshots, dependency bumps.
-- [ ] Manual steps the fixes created (SETUP.md steps 9 and 10): deploy secrets, `production` environment, branch protection, Dependabot alerts, backup cron on the box, the Access cookie's SameSite check in Zero Trust.
+- [x] Manual steps the fixes created (SETUP.md steps 9 and 10): deploy secrets, `production` environment, branch protection, Dependabot alerts, backup cron on the box, the Access cookie's SameSite check in Zero Trust. (2026-10-26; nightly dump verified on the box 2026-10-27.)
 - [x] End-to-end tests (`e2e/`, 2026-10-26): Playwright over a fixture-seeded server, 23 specs covering the dashboard, course pane, overrides, dates, settings, export/import, layout, the CLI and the file-sync manifest/report; `pnpm e2e`, and the `e2e` job in `ci.yml`. Not covered: file bytes (need a live Canvas), Todoist writes (need a token), OAuth.
 
 ### Phase 2 — The shared prerequisite (sign-in, tokens, onboarding)
@@ -30,7 +30,7 @@ Where this is going after v1, in the order the pieces depend on each other. Set 
 - [ ] A landing page; a first-run flow in the web UI.
 - [x] CI running typecheck, tests and `pnpm audit` on pull requests (`ci.yml`).
 - [x] Secrets scan of the whole git history (clean, 2026-10-23; repeat right before flipping to public).
-- [ ] Self-host path in SETUP.md that works without Cloudflare (needs Phase 2's sign-in).
+- [x] Self-host path that works without Cloudflare: `docs/self-host.md`, sign-in merged and deployed 2026-10-26.
 - [ ] Flip the repo to public.
 
 ### Phase 4 — Hosted, invite-only first
@@ -69,9 +69,9 @@ All three pass typecheck, unit tests and the e2e suite.
   - [x] GitHub Actions deploy on push to `main` (2026-09-24): `.github/workflows/deploy.yml`. Pending by hand: the deploy keypair into instance metadata, `DEPLOY_SSH_KEY` secret, `DEPLOY_HOST` / `DEPLOY_USER` variables.
   - [x] Ops Agent on the box is inactive and disabled (checked 2026-09-24).
   - [ ] Connect the sources on prod: every source except jobs is `disconnected` there. Canvas cookie, Gradescope login, Todoist token, Google Calendar connect — all in Settings → Sources on the prod site.
-  - [ ] Backup cron on the box (`scripts/backup.sh`, SETUP.md step 10). **Do this next**: the 2026-10-01 incident had nothing to restore from; the pre-migration snapshot now covers schema changes only.
+  - [x] Backup cron on the box (`scripts/backup.sh`, SETUP.md step 10). Runs 04:10 daily; first good dump 2026-10-27 after the container fallback fix. The off-box copy (`backup.yml`) needs the host-key fix from 2026-10-27 pushed.
   - [x] Security review (`SECURITY-REVIEW.md`, 2026-10-23): Tiers 1 and 2 fixed (DECISIONS 043). Left: license, fixture scrubbing, `previous.txt`, and the dashboard checks (Access cookie SameSite, GCP snapshots).
-  - [ ] Post-fix manual steps (SETUP.md 9 and 10): `gh secret set DEPLOY_HOST/DEPLOY_USER`, create the `production` environment with a required reviewer, protect `main`, enable Dependabot alerts, add the backup cron on the box and verify a dump; keep GCP snapshots until then.
+  - [x] Post-fix manual steps (SETUP.md 9 and 10): done 2026-10-26.
 - [ ] **M10 — Live for two weeks.** Fix whatever the first real semester week exposes before adding anything new.
 
 ## Post-run checklist (needs you)
