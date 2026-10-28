@@ -1,6 +1,6 @@
 {
   "name": "collected-cli",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": false,
   "type": "module",
   "description": "Command-line client for collected, the self-hosted student dashboard: read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders.",

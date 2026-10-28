@@ -8,11 +8,20 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
-- The board moves to `/dashboard`; `/` is always the home page, with Open dashboard when you are signed in. Signing in and newly installed apps land on the board. A bookmark of the root, or an app installed before this, opens the home page; re-bookmark `/dashboard` or reinstall to go straight to the board. Signing out now goes straight to the home page.
-- Assignments can be pushed into Google Tasks as well as Todoist: Settings → To-do apps → Google Tasks picks a list (created if missing) and whether the course code prefixes the title; the due day is the assignment's day in your timezone and the time is in the notes. Same rules as the Todoist push: never reopens, never writes back to Canvas or Gradescope, deletes are fused. `GET /api/todo/status` reports both apps for the settings page.
-- CLI: `collected task add` goes to the default to-do app (or `--to todoist|gtasks`, with `--due` for Google Tasks); `task done` closes tasks in either app; `cli demo gtasks` loads Google Tasks fixtures.
+## 1.1.0 — 2026-10-28 · recommended
 
-## 0.1.0 — 2026-10-28 · recommended
+- New logo and wordmark ("collected."), a landing page built around a live demo of the real dashboard, and a `/demo` page.
+- The board moves to `/dashboard`; `/` is always the home page, with Open dashboard when you are signed in. Signing in and newly installed apps land on the board. A bookmark of the root, or an app installed before this, opens the home page; re-bookmark `/dashboard` or reinstall to go straight to the board. Signing out now goes straight to the home page.
+- Google Tasks as a second to-do source: its own Connect under Sources asking only for the tasks scope, tasks shown next to Todoist's in the to-do widget, and Settings → To-do sync → "Add new tasks to" picks where the add box sends.
+- Assignments can be pushed into Google Tasks as well as Todoist: Settings → To-do sync → Google Tasks picks a list (created if missing) and whether the course code prefixes the title; the due day is the assignment's day in your timezone and the time is in the notes. Same rules as the Todoist push: never reopens, never writes back to Canvas or Gradescope, deletes are fused. Both pushes share one core; `GET /api/todo/status` reports both apps.
+- Todoist connects with OAuth when the operator registered a Todoist app (`TODOIST_CLIENT_ID` / `TODOIST_CLIENT_SECRET`); pasting an API token still works.
+- CLI: `collected task add` goes to the default to-do app (or `--to todoist|gtasks`, with `--due` for Google Tasks); `task done` closes tasks in either app; `cli demo gtasks` loads Google Tasks fixtures.
+- Settings → About: version, commit, update status and project links; the profile menu shows the running build.
+- The prod deploy bakes the commit into the image, so the update check has something to compare; `UPDATE_CHECK_TOKEN` lets a private upstream be checked.
+- Many small UX fixes: confirmations before removals and imports, Escape returns to the board from Settings, scrolling lists instead of capped ones, overlapping week events side by side, loading and error states everywhere, phone layouts.
+- Privacy policy and terms cover Google Tasks, Todoist sign-in and the assignment push.
+
+## 1.0.0 — 2026-10-26 · recommended
 
 - Sign in with Google from the app itself; Cloudflare Access in front becomes optional. Sessions can be ended from Settings → Account.
 - API tokens for the CLI (`collected login`), created and revoked under Settings → Account; a token can read the dashboard and make small edits but never touch credentials, settings or the layout.
