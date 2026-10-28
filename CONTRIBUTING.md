@@ -10,7 +10,7 @@ Five commands, assuming Node 22 or newer:
 npm i -g pnpm
 pnpm install --frozen-lockfile
 cp .env.example .env            # then set AUTH_DISABLED=true; leave SECRET_KEY empty
-pnpm cli demo canvas            # fixture data so the widgets are not empty (also: gradescope, gcal, todoist)
+pnpm cli demo canvas            # fixture data so the widgets are not empty (also: gradescope, gcal, todoist, gtasks)
 pnpm dev                        # server on :3000, web on :5173
 ```
 

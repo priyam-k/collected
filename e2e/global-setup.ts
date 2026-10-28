@@ -9,7 +9,7 @@ import { AGENT_CLI, BASE_URL, PORT, ROOT, SEED_CONFIG, WEB_DIST } from './env.js
  * Boots one real server against a throwaway database with every external source replaced by fixtures:
  *   1. temp DATA_DIR + env (auth off, scheduler off, a helper key for the CLI, the e2e seed file)
  *   2. web/dist (built once when missing) and agent/dist (always rebuilt: tsup takes well under a second)
- *   3. `cli demo canvas|gradescope|gcal|todoist` loads the fixture clients / mock APIs into that database
+ *   3. `cli demo canvas|gradescope|gcal|todoist|gtasks` loads the fixture clients / mock APIs into that database
  *   4. `tsx src/index.ts` on PORT, wait for /api/health
  * Everything the specs need is handed over through process.env (Playwright copies it into the workers).
  */
@@ -77,7 +77,7 @@ export default async function globalSetup(): Promise<void> {
   run(PNPM, ['--filter', 'collected-cli', 'build'], { cwd: ROOT, env, what: 'agent build' });
   if (!existsSync(AGENT_CLI)) throw new Error(`agent build produced no ${AGENT_CLI}`);
 
-  for (const source of ['canvas', 'gradescope', 'gcal', 'todoist']) {
+  for (const source of ['canvas', 'gradescope', 'gcal', 'todoist', 'gtasks']) {
     console.log(`[e2e] loading demo ${source}`);
     run(TSX, ['src/cli.ts', 'demo', source], { cwd: SERVER_DIR, env, what: `cli demo ${source}` });
   }

@@ -12,7 +12,7 @@ function usage(): never {
   cli sync <source|all>    run an ingester now, ignoring the enabled flag
   cli export               print config export JSON
   cli import <file>        import config JSON (courses, settings, widgets, layouts)
-  cli demo <canvas|gradescope|gcal|todoist>  load fixtures into this database (UI development without a session)
+  cli demo <canvas|gradescope|gcal|todoist|gtasks>  load fixtures into this database (UI development without a session)
   cli demo clear           remove everything the demo loaders created
   cli push [todoist|gtasks] [--dry-run]  run the assignment push into that app now (default todoist; ignores the enabled flag)
   cli dedup                re-run Canvas/Gradescope assignment linking`);
@@ -99,8 +99,29 @@ switch (cmd) {
       await mergeSourceMeta(ctx, 'todoist', { projects: api.projects.map((p) => ({ id: p.id, name: p.name })), labels: api.labels.map((l) => l.name), demo: true });
       await setSourceStatus(ctx, 'todoist', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
       console.log(JSON.stringify(counts));
+    } else if (rest[0] === 'gtasks') {
+      const { MockGTasksApi } = await import('./ingest/gtasks/mock-api.js');
+      const { syncGtasks } = await import('./ingest/gtasks/ingest.js');
+      const { setSourceStatus, mergeSourceMeta } = await import('./lib/sources.js');
+      const day = (d: number) => {
+        const x = new Date();
+        x.setDate(x.getDate() + d);
+        return `${x.toISOString().slice(0, 10)}T00:00:00.000Z`;
+      };
+      const t = (id: string, title: string, due: string | null, extra: Partial<import('./ingest/gtasks/api.js').GTask> = {}) => ({ id, title, notes: null, due, status: 'needsAction', selfLink: `https://www.googleapis.com/tasks/v1/lists/x/tasks/${id}`, ...extra });
+      const api = new MockGTasksApi({
+        lists: [{ id: 'g-school', title: 'School' }, { id: 'g-life', title: 'Life' }],
+        tasks: {
+          'g-school': [t('g1', 'Outline STAT410 project', day(2)), t('g2', 'Office hours: ask about problem 4', day(1)), t('g3', 'Reread lecture 12 notes', null)],
+          'g-life': [t('g4', 'Book dentist', day(5)), t('g5', 'Return library books', day(0)), t('g6', 'Pay electric bill', day(3), { status: 'completed', completed: new Date().toISOString() })],
+        },
+      });
+      const { counts, lists } = await syncGtasks(ctx, api);
+      await mergeSourceMeta(ctx, 'gtasks', { lists: lists.map((l) => ({ id: l.id, title: l.title })), demo: true });
+      await setSourceStatus(ctx, 'gtasks', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
+      console.log(JSON.stringify(counts));
     } else usage();
-    const sourceOf: Record<string, string> = { canvas: 'canvas', gradescope: 'gradescope', gcal: 'gcal', todoist: 'todoist' };
+    const sourceOf: Record<string, string> = { canvas: 'canvas', gradescope: 'gradescope', gcal: 'gcal', todoist: 'todoist', gtasks: 'gtasks' };
     const tagged = await tagDemoRows(ctx, sourceOf[rest[0]!]!, demoStartedAt);
     const { runDedup } = await import('./sync/dedup.js');
     console.log(JSON.stringify({ tagged, dedup: await runDedup(ctx), hint: 'remove with: cli demo clear (or Settings → Export / import → Remove demo data)' }));

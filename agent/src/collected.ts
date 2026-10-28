@@ -25,12 +25,12 @@ export const HELP = `collected: your classes, assignments and calendar from the 
     grades [course]                           current grade per course, or one course's categories
     announcements [--course C] [--limit 5]
     dates [--course C]                        exams, quizzes, finals, cancelled or virtual sessions
-    sources                                   sync status of Canvas, Gradescope, Google Calendar, Todoist, jobs
+    sources                                   sync status of Canvas, Gradescope, Google Calendar, Todoist, Google Tasks, jobs
     jobs [--state applied,screen] [--limit 20]    the applications tracker (default: everything tracked)
 
   Change
-    task add "<text>"                         a Todoist task, natural language ("essay draft fri 5pm #School")
-    task done <task-id>                       close a Todoist task
+    task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]   a task in the default to-do app (Todoist parses "fri 5pm #School" itself)
+    task done <task-id>                       close a Todoist or Google Tasks task (ids from "todo --json")
     done <item-id> [--undo]                   mark an assignment done on the dashboard only
     link add <course> <label> <url>           a course hotlink;  link rm <course> <label>
     schedule set <course> <kind> "<days> <start>-<end> [@ room]" [...]   e.g. schedule set enme480 lecture "mon,wed 14:00-14:50 @ CHE 2110"
@@ -39,7 +39,7 @@ export const HELP = `collected: your classes, assignments and calendar from the 
     date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N --session lecture]
     date rm <id>
     jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
-    resync [canvas|gradescope|gcal|todoist|jobs|all]   run a sync now and wait for it
+    resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]   run a sync now and wait for it
 
   Canvas (read-only)
     canvas ls <course> [modules|files|pages|assignments|announcements]
@@ -205,19 +205,42 @@ async function jobs(api: Api, args: string[]): Promise<Out> {
 
 /* ---------- writes ---------- */
 
+type TodoApp = 'todoist' | 'gtasks';
+
+/** Where `task add` goes: `--to`, else the dashboard's default app (Settings → To-do sync), else Todoist. */
+async function defaultTodoApp(api: Api): Promise<TodoApp> {
+  try {
+    const st = await api.get<{ defaultApp: TodoApp | null }>('/api/todo/status');
+    return st.defaultApp ?? 'todoist';
+  } catch {
+    return 'todoist';
+  }
+}
+
 async function task(api: Api, args: string[]): Promise<Out> {
   if (args[0] === 'add') {
-    const text = args.slice(1).join(' ').trim();
-    if (!text) throw new Error('usage: task add "<text>"');
-    const item = await api.send<EffectiveItem>('POST', '/api/todoist/tasks/quick', { text });
-    return { json: item, text: `added: ${item.title}${item.dueAt ? ` · due ${when(item.dueAt)}` : ''} · ${item.id}` };
+    const { values, positionals } = parseArgs({ args: args.slice(1), options: { to: { type: 'string' }, due: { type: 'string' } }, allowPositionals: true });
+    const text = positionals.join(' ').trim();
+    if (!text) throw new Error('usage: task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]');
+    if (values.to && values.to !== 'todoist' && values.to !== 'gtasks') throw new Error(`--to must be todoist or gtasks, not "${values.to}"`);
+    if (values.due && !/^\d{4}-\d{2}-\d{2}$/.test(values.due)) throw new Error('--due must be YYYY-MM-DD');
+    const app = (values.to as TodoApp | undefined) ?? (await defaultTodoApp(api));
+    // Todoist parses dates out of the text itself; Google Tasks takes the title as written plus an optional date.
+    const item =
+      app === 'gtasks'
+        ? await api.send<EffectiveItem>('POST', '/api/gtasks/tasks/quick', { content: text, ...(values.due ? { due: values.due } : {}) })
+        : await api.send<EffectiveItem>('POST', '/api/todoist/tasks/quick', { text: values.due ? `${text} ${values.due}` : text });
+    return { json: item, text: `added to ${app === 'gtasks' ? 'Google Tasks' : 'Todoist'}: ${item.title}${item.dueAt ? ` · due ${when(item.dueAt)}` : ''} · ${item.id}` };
   }
   if (args[0] === 'done' && args[1]) {
-    const id = args[1].replace(/^todoist:/, '');
-    await api.send('POST', `/api/todoist/tasks/${encodeURIComponent(id)}/close`);
-    return { json: { ok: true, id }, text: `closed todoist:${id}` };
+    // Ids come from `todo --json`: "todoist:<id>" or "gtasks:<listId>:<taskId>". A bare id is a Todoist id.
+    const raw = args[1];
+    const app: TodoApp = raw.startsWith('gtasks:') ? 'gtasks' : 'todoist';
+    const id = raw.replace(/^(todoist|gtasks):/, '');
+    await api.send('POST', `/api/${app}/tasks/${encodeURIComponent(id)}/close`);
+    return { json: { ok: true, id: `${app}:${id}` }, text: `closed ${app}:${id}` };
   }
-  throw new Error('usage: task add "<text>"  |  task done <task-id>');
+  throw new Error('usage: task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]  |  task done <task-id>');
 }
 
 async function done(api: Api, args: string[]): Promise<Out> {

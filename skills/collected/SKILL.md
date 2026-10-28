@@ -5,7 +5,7 @@ description: Read and update a student's collected dashboard (courses, assignmen
 
 # collected
 
-`collected` is a personal student dashboard (Canvas, Gradescope, Google Calendar, Todoist, a job feed). The `collected` CLI on this machine talks to the user's server with a per-machine token. Every read takes `--json` and prints one JSON value; without it you get a table meant for people. Run commands with Bash. Nothing here needs network access except the user's own server.
+`collected` is a personal student dashboard (Canvas, Gradescope, Google Calendar, Todoist, Google Tasks, a job feed). The `collected` CLI on this machine talks to the user's server with a per-machine token. Every read takes `--json` and prints one JSON value; without it you get a table meant for people. Run commands with Bash. Nothing here needs network access except the user's own server.
 
 If the CLI is missing: `npm i -g collected-cli`, then `collected init <server url>` and `collected login` (the user does the browser step). If a command answers `401` or `redirected to … cloudflareaccess.com`, the token is gone: tell the user to run `collected login`.
 
@@ -17,7 +17,7 @@ If the CLI is missing: `npm i -g collected-cli`, then `collected init <server ur
 | `collected course <course> --json` | one course: `course`, `grade`, `due` (open items), `dates` (exams and other hand-entered dates) |
 | `collected assignments [--course C] [--days 14] [--all] --json` | assignments: `id`, `title`, `course`, `dueAt` (ISO), `status`, `points`, `url`, `effectiveDone` |
 | `collected agenda [--days 7] --json` | events, due dates and tasks grouped by day |
-| `collected todo --json` | open Todoist tasks and open assignments |
+| `collected todo --json` | open Todoist and Google Tasks tasks and open assignments |
 | `collected grades [course] --json` | current grade per course, or one course's categories |
 | `collected announcements [--course C] [--limit 5] --json` | recent announcements with text |
 | `collected dates [--course C] --json` | exams, quizzes, finals, cancelled or virtual sessions |
@@ -37,17 +37,17 @@ The server holds the user's Canvas session; these never write to Canvas.
 
 ## Writes (confirm with the user first, then run)
 
-These change the dashboard or Todoist. Say what you are about to do and wait for a yes unless the user already asked for exactly that change.
+These change the dashboard, Todoist or Google Tasks. Say what you are about to do and wait for a yes unless the user already asked for exactly that change.
 
-- `collected task add "<text>"`: a Todoist task in natural language (`"essay draft fri 5pm #School"`)
-- `collected task done <task-id>`: closes a Todoist task (never reopens)
+- `collected task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]`: a task in the user's default to-do app (Settings → To-do sync). Todoist parses dates from the text (`"essay draft fri 5pm #School"`); Google Tasks takes the text as the title, so pass `--due` for a date.
+- `collected task done <task-id>`: closes a Todoist or Google Tasks task by the id `todo --json` shows (never reopens)
 - `collected done <item-id> [--undo]`: marks an assignment done on the dashboard only, not in Canvas
 - `collected link add <course> <label> <url>` and `collected link rm <course> <label>`
 - `collected schedule set <course> <kind> "<days> <start>-<end> [@ room]"` (e.g. `schedule set enme480 lecture "mon,wed 14:00-14:50 @ CHE 2110"`) and `collected schedule rm <course> <kind>`
 - `collected notes set <course> "<text>"` and `collected notes clear <course>`
 - `collected date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N]` and `collected date rm <id>`
 - `collected jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]`
-- `collected resync [canvas|gradescope|gcal|todoist|jobs|all]`: runs a sync now and waits. Cheap; use it when data looks stale.
+- `collected resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]`: runs a sync now and waits. Cheap; use it when data looks stale.
 
 The CLI's token cannot export the database, change credentials, settings or layout, or delete courses; those live in the web app. If you need one of them, tell the user where to click.
 

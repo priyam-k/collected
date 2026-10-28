@@ -28,6 +28,7 @@ function fakeApi(gets: Record<string, unknown> = {}) {
       if (method === 'PUT' && path.startsWith('/api/courses/')) return { ...COURSES.find((c) => path.endsWith(encodeURIComponent(c.id)))!, ...(body as object) };
       if (path === '/api/items/manual') return { id: 'manual:u1', title: (body as { title: string }).title, startsAt: '2026-10-19T04:00:00.000Z', allDay: true };
       if (path === '/api/todoist/tasks/quick') return { id: 'todoist:9', title: 'essay draft', dueAt: '2026-10-09T21:00:00.000Z' };
+      if (path === '/api/gtasks/tasks/quick') return { id: 'gtasks:L1:t9', title: (body as { content: string }).content, dueAt: (body as { due?: string }).due ? `${(body as { due: string }).due}T04:00:00.000Z` : null };
       return { ok: true };
     },
   } as unknown as Api;
@@ -99,6 +100,26 @@ describe('commands', () => {
     expect(json.id).toBe('todoist:9');
     await runCollected(f.api, 'done', ['canvas:assignment:7', '--undo']);
     expect(f.writes()[3]).toEqual({ method: 'POST', path: '/api/items/canvas%3Aassignment%3A7/override', body: { done: false } });
+  });
+
+  it('routes task add and task done to the right to-do app', async () => {
+    // No /api/todo/status answer: Todoist stays the default.
+    const f = fakeApi();
+    await runCollected(f.api, 'task', ['add', 'buy', 'milk']);
+    expect(f.writes()[0]).toMatchObject({ path: '/api/todoist/tasks/quick', body: { text: 'buy milk' } });
+    const out = await runCollected(f.api, 'task', ['add', 'outline', 'project', '--to', 'gtasks', '--due', '2026-11-02']);
+    expect(f.writes()[1]).toMatchObject({ path: '/api/gtasks/tasks/quick', body: { content: 'outline project', due: '2026-11-02' } });
+    expect(out).toContain('added to Google Tasks: outline project');
+    await expect(runCollected(f.api, 'task', ['add', 'x', '--to', 'notes'])).rejects.toThrow(/--to must be/);
+    await expect(runCollected(f.api, 'task', ['add', 'x', '--due', 'friday'])).rejects.toThrow(/YYYY-MM-DD/);
+    // The dashboard's default app wins when no --to is given.
+    const g = fakeApi({ '/api/todo/status': { defaultApp: 'gtasks' } });
+    await runCollected(g.api, 'task', ['add', 'call', 'mom']);
+    expect(g.writes()[0]).toMatchObject({ path: '/api/gtasks/tasks/quick', body: { content: 'call mom' } });
+    await runCollected(g.api, 'task', ['done', 'gtasks:L1:t9']);
+    expect(g.writes()[1]).toMatchObject({ path: '/api/gtasks/tasks/L1%3At9/close' });
+    await runCollected(g.api, 'task', ['done', 'todoist:d1']);
+    expect(g.writes()[2]).toMatchObject({ path: '/api/todoist/tasks/d1/close' });
   });
 
   it('reads Canvas through the proxy with the path encoded, and shows full text, rubric and linked files', async () => {
