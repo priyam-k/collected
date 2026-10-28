@@ -1,8 +1,45 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { COURSE } from '../env.js';
 import { apiGet, apiSend, openDashboard, pane, widget } from '../helpers.js';
 
+/**
+ * The e2e server runs with auth off, which has no sign-out. These answer /api/auth/me as a signed-in person until
+ * /api/auth/logout is called, then as a visitor; every other request still reaches the real server.
+ */
+async function fakeSession(page: Page) {
+  let signedIn = true;
+  await page.route('**/api/auth/me', (r) =>
+    r.fulfill({
+      json: signedIn
+        ? { identity: 'sam@example.com', user: { email: 'sam@example.com', name: 'Sam', picture: null }, authDisabled: false, signIn: { google: true, access: false } }
+        : { identity: null, user: null, authDisabled: false, signIn: { google: true, access: false } },
+    }),
+  );
+  await page.route('**/api/auth/logout', (r) => {
+    signedIn = false;
+    return r.fulfill({ json: { ok: true } });
+  });
+}
+
 test.describe('flows', () => {
+  for (const from of ['the profile menu', 'Settings → Account']) {
+    test(`signing out from ${from} lands on the landing page straight away`, async ({ page }) => {
+      await fakeSession(page);
+      if (from === 'the profile menu') {
+        await openDashboard(page);
+        await page.getByRole('button', { name: 'Profile and settings' }).click();
+        await page.getByRole('menuitem', { name: 'Sign out' }).click();
+      } else {
+        await page.goto('/settings/account');
+        await page.getByRole('button', { name: 'Sign out' }).click();
+      }
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.getByRole('heading', { name: /Everything you juggle/ })).toBeVisible({ timeout: 3_000 });
+      await expect(page.getByText('Signed out')).toBeVisible();
+      await expect(page.getByText(/couldn.t load|unauthorized/i)).toHaveCount(0);
+    });
+  }
+
   test("the course pane's edit button opens that course's editor and closes the pane", async ({ page }) => {
     await openDashboard(page);
     await widget(page, 'Classes overview').getByRole('button', { name: /CMSC422/ }).click();

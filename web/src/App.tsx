@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { isSignedIn, useMe } from '@/lib/queries';
+import { useSignedOutToast } from '@/lib/useSignOut';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SignInPage } from '@/pages/SignInPage';
@@ -30,6 +31,7 @@ function Home() {
 }
 
 export default function App() {
+  useSignedOutToast();
   return (
     <PaneProvider>
       <Routes>

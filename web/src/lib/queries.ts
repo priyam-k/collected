@@ -580,11 +580,10 @@ export function useRevokeToken() {
   });
 }
 
+/** Ends the session. The cache is left to the caller (lib/useSignOut.ts), which has to leave the page first. */
 export function useLogout() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api<{ ok: true }>('/auth/logout', { method: 'POST', json: {} }),
-    onSuccess: () => qc.clear(),
   });
 }
 
