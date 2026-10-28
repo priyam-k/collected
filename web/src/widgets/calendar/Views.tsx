@@ -103,12 +103,12 @@ export function Agenda({ items, from, days = 7 }: { items: EffectiveItem[]; from
 function DayHead({ d }: { d: Date }) {
   const today = isToday(d);
   return (
-    <div className="py-0.5 text-center">
-      <div className={cn('label !text-[10.5px]', today ? '!text-brand-ink' : '!text-ter')}>{format(d, 'EEE')}</div>
+    <div className="flex h-8 items-center justify-center gap-1.5">
+      <span className={cn('label !text-[10.5px]', today ? '!text-brand-ink' : '!text-ter')}>{format(d, 'EEE')}</span>
       {today ? (
-        <div className="mx-auto mt-0.5 grid size-[26px] place-items-center rounded-full bg-brand text-sm font-semibold text-on-brand">{format(d, 'd')}</div>
+        <span className="grid size-6 place-items-center rounded-full bg-brand text-[13px] font-semibold text-on-brand">{format(d, 'd')}</span>
       ) : (
-        <div className="mt-0.5 text-[15px] font-semibold leading-[26px] text-ink">{format(d, 'd')}</div>
+        <span className="text-[14px] font-semibold text-ink">{format(d, 'd')}</span>
       )}
     </div>
   );
@@ -170,7 +170,8 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
           );
         })}
       </div>
-      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto px-2.5 pb-2">
+      {/* pt keeps the first hour label, centred on its line, from being clipped at the top of the scroller */}
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto px-2.5 pb-2 pt-2.5">
         <div className={cn('grid', col)} style={{ height: (hours.length - 1) * PX_PER_HOUR + 8 }}>
           <div className="relative">
             {hours.map((h) => (
