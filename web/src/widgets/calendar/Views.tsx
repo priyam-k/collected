@@ -6,8 +6,6 @@ import { ItemPopover } from '@/widgets/ItemPopover';
 import { dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, sortItems, timeLabel } from './utils';
 
 const tint = (color: string | null, pct: number) => `color-mix(in srgb, ${color ?? 'var(--ink)'} ${pct}%, var(--surface))`;
-/** The course colour pulled toward ink, so it reads as text on its own tint. */
-const inked = (color: string | null) => (color ? `color-mix(in srgb, ${color} 62%, var(--ink))` : 'var(--ink)');
 
 /** A one-line pill: dot, optional time, title. Done items dim and strike through. */
 function Chip({ item, dense }: { item: EffectiveItem; dense?: boolean }) {
@@ -211,7 +209,7 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
                           style={{ background: tint(color, 16), boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color ?? 'var(--ink)'} 22%, transparent)` }}
                           title={`${i.title} · ${timeLabel(i)}`}
                         >
-                          <div className="truncate text-xs font-semibold" style={{ color: inked(color) }}>{i.course?.code ?? i.title}</div>
+                          <div className="truncate text-xs font-semibold text-ink">{i.course?.code ?? i.title}</div>
                           {height > 34 && <div className="mt-0.5 truncate text-[11px] text-sub">{i.course ? `${format(s, 'h:mm')} – ${format(e, 'h:mm')}` : timeLabel(i)}</div>}
                           {height > 62 && i.course && <div className="mt-1 truncate text-[11px] text-sub">{i.title.replace(new RegExp(`^${i.course.code}\\s*\\(\\d+\\)\\s*-\\s*`), '')}{loc ? ` · ${loc}` : ''}</div>}
                           {height > 62 && !i.course && loc && <div className="mt-1 truncate text-[11px] text-sub">{loc}</div>}
