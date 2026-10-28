@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ArrowUpRight, BookOpen, CircleAlert, CircleArrowUp, CircleCheck, CircleDot, RefreshCw, ScrollText, Server } from 'lucide-react';
 import { toast } from 'sonner';
+import { Wordmark } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
 import { useCheckForUpdates, useSystemVersion, useUpdateStatus } from '@/lib/queries';
@@ -88,7 +89,9 @@ export function AboutPage() {
       <div className="flex items-center gap-4">
         <img src="/icons/icon.svg" alt="" className="size-14 shrink-0 rounded-[16px] shadow-[var(--shadow-card)]" />
         <div className="min-w-0">
-          <h2 className="text-[30px] font-[650] leading-none tracking-[-0.035em]">collected</h2>
+          <h2 className="text-[30px] leading-none">
+            <Wordmark />
+          </h2>
           <p className="mt-2 text-[14.5px] leading-snug text-sub">Canvas, Gradescope, Google Calendar, Todoist and a job feed in one dashboard you host yourself.</p>
         </div>
       </div>

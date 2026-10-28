@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { Briefcase, CalendarDays, ClipboardCheck, FolderSync, GraduationCap, LayoutDashboard, ListChecks, ListTodo, Send, SquareTerminal } from 'lucide-react';
+import { LogoMark, Wordmark } from '@/components/Logo';
 import { cn } from '@/lib/utils';
-import { TickArc } from '@/widgets/instruments';
 import { reducedMotion, useInView } from './motion';
 
 /**
@@ -68,14 +68,11 @@ function Core() {
   return (
     <div ref={ref} className="surface relative rounded-[26px] p-5 shadow-[var(--shadow-lift)]">
       <div className="flex items-center gap-3 px-0.5">
-        <div className="relative grid size-12 shrink-0 place-items-center">
-          <svg viewBox="0 0 48 48" className="hub-spin absolute inset-0" aria-hidden>
-            <TickArc cx={24} cy={24} r={23} len={4} value={0.7} color="var(--brand)" ticks={36} width={1.5} />
-          </svg>
-          <span aria-hidden className="grid size-8 place-items-center rounded-full bg-ink text-[13px] font-semibold text-ground">c</span>
-        </div>
+        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-well">
+          <LogoMark className="size-7" />
+        </span>
         <div className="leading-tight">
-          <div className="text-[17px] font-semibold tracking-[-0.01em]">collected</div>
+          <Wordmark className="block text-[18px]" />
           <div className="text-[12px] text-sub">One SQLite file you own</div>
         </div>
       </div>

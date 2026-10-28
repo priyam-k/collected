@@ -1,5 +1,6 @@
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router';
 import { AsciiOrb } from '@/components/AsciiOrb';
+import { Logo } from '@/components/Logo';
 import { isSignedIn, useMe } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { INVITE_ONLY_NOTICE, OPERATOR_EMAIL } from '@/pages/public/PublicLayout';
@@ -59,7 +60,9 @@ export function SignInPage() {
           <AsciiOrb className="h-[120px] w-[200px]" />
         </div>
         <p className="label mt-6">Sign in</p>
-        <h1 className="mt-1.5 text-[30px] font-[620] leading-tight tracking-[-0.028em]">collected</h1>
+        <h1 className="mt-2.5">
+          <Logo size={30} />
+        </h1>
         <p className="mt-1.5 text-[14px] text-sub">Your courses, calendar, tasks and jobs on one board.</p>
         {error && ERRORS[error] && (
           <p role="alert" className="mt-4 rounded-xl bg-[color-mix(in_srgb,var(--critical)_10%,var(--surface))] px-3.5 py-2.5 text-[13px] text-ink">

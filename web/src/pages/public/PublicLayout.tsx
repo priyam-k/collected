@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { Moon, Sun, SunMoon } from 'lucide-react';
+import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useGlass, useLiquid } from '@/lib/liquid';
 import { useTheme } from '@/lib/theme';
@@ -27,16 +28,9 @@ function ThemeButton() {
   );
 }
 
-/** The small round mark the dashboard header uses, so the public pages read as the same product. */
+/** The logo as the public pages show it: the board mark and "collected.". */
 export function Brand({ className = '' }: { className?: string }) {
-  return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
-      <span aria-hidden className="grid size-7 place-items-center rounded-full bg-ink text-[12px] font-semibold text-ground">
-        c
-      </span>
-      <span className="text-[15px] font-semibold tracking-[-0.01em]">collected</span>
-    </span>
-  );
+  return <Logo size={17} className={className} />;
 }
 
 /** The other public pages, linked from everywhere but the landing page (which links its own sections). */

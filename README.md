@@ -1,4 +1,9 @@
-# collected
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.png">
+    <img src="docs/brand/logo-light.png" alt="collected." width="300">
+  </picture>
+</h1>
 
 One dashboard for everything a student juggles. collected copies your Canvas assignments, Gradescope submissions, Google Calendar, Todoist tasks and a public internship feed into one small server you run yourself, and shows them as a grid of widgets you can rearrange: a week calendar, a to-do list that knows what you have already submitted, one row per class, a job feed with an applications tracker. It never owns the data (Canvas stays the truth about assignments, Google about events) and never writes back except where you ask it to. A companion CLI reads the same data from the terminal and keeps your course files sorted into folders on your laptop.
 

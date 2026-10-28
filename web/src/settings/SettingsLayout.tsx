@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes, Navigate, Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
+import { Logo } from '@/components/Logo';
 import { useLiquid } from '@/lib/liquid';
 import { cn } from '@/lib/utils';
 import { SourcesPage } from './SourcesPage';
@@ -33,7 +34,7 @@ export function SettingsLayout() {
         <Link to="/" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
           <ArrowLeft className="size-4" strokeWidth={1.7} /> Dashboard
         </Link>
-        <p className="label mt-7">collected</p>
+        <Logo size={15} className="mt-7" />
         <h1 className="mt-1.5 text-[38px] font-[620] leading-[1.05] tracking-[-0.03em] sm:text-[44px]">Settings</h1>
       </header>
       <div className="grid gap-6 md:grid-cols-[12rem_1fr] md:gap-8">
