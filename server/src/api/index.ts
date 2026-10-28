@@ -42,6 +42,7 @@ export function identityAllows(user: string, method: string, path: string): bool
   if (p.startsWith('/api/auth/tokens') || p === '/api/auth/logout-all') return false;
   if (p.startsWith('/api/google') || p.startsWith('/api/layout') || p.startsWith('/api/widgets')) return false;
   if (p === '/api/sources/canvas/cookie') return false;
+  if (p === '/api/todoist/connect' || p === '/api/todoist/callback' || p === '/api/todoist/disconnect') return false;
   if (MUTATING.has(method)) {
     if (p.startsWith('/api/system')) return false;
     if (p.startsWith('/api/settings')) return false;

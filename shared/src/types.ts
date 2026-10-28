@@ -333,6 +333,8 @@ export interface Source {
   running: boolean;
   meta: Record<string, unknown>;
   updatedAt: string;
+  /** The operator configured an OAuth app for this source, so the settings card can offer "Connect" instead of a pasted token. */
+  oauthAvailable?: boolean;
 }
 
 export interface Item {

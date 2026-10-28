@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useClearSourceConfig, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
+import { useClearSourceConfig, useDisconnectTodoist, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { friendlyDate } from '@/lib/time';
 import { useSearchParams } from 'react-router';
@@ -45,8 +45,11 @@ export function SourcesPage() {
       <SourceCard source={by.gcal_ical} description="Read-only, no Google Cloud project needed: one calendar's secret iCal address, refreshed every 30 minutes.">
         <GcalIcalForm source={by.gcal_ical} />
       </SourceCard>
-      <SourceCard source={by.todoist} description="API token from Todoist → Settings → Integrations → Developer.">
-        <TokenForm source={by.todoist} field="token" label="API token" />
+      <SourceCard
+        source={by.todoist}
+        description={by.todoist.oauthAvailable ? 'Sign in with Todoist, or paste an API token from Todoist → Settings → Integrations → Developer.' : 'API token from Todoist → Settings → Integrations → Developer. Set TODOIST_CLIENT_ID / TODOIST_CLIENT_SECRET in .env to connect with a click instead (docs/self-host.md).'}
+      >
+        <TodoistForm source={by.todoist} />
       </SourceCard>
       <SourceCard source={by.jobs} description="Public listings from SimplifyJobs on GitHub. No credentials.">
         <p className="text-sm text-muted-foreground">
@@ -339,6 +342,59 @@ function TokenForm({ source, field, label }: { source: Source; field: string; la
   );
 }
 
+/** Fixed messages for the `reason` codes the Todoist OAuth callback redirects with; anything else reads as `unknown`. */
+const TODOIST_ERRORS: Record<string, string> = {
+  denied: 'Todoist connect failed: access was denied on the consent screen',
+  expired: 'Todoist connect failed: the sign-in link expired, try again',
+  exchange: 'Todoist connect failed: Todoist rejected the token exchange',
+  config: 'Todoist connect failed: check TODOIST_CLIENT_ID, TODOIST_CLIENT_SECRET and the redirect URL in the Todoist app console',
+  unknown: 'Todoist connect failed',
+};
+
+/** OAuth connect when the operator registered a Todoist app, with the pasted token folded away as the fallback; the plain token form otherwise. */
+function TodoistForm({ source }: { source: Source }) {
+  const meta = (source.meta ?? {}) as { connectedVia?: 'oauth' | 'token' | null };
+  const disconnect = useDisconnectTodoist();
+  const [showToken, setShowToken] = useState(false);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const t = params.get('todoist');
+    if (!t) return;
+    if (t === 'connected') toast.success('Todoist connected');
+    else toast.error(TODOIST_ERRORS[params.get('reason') ?? ''] ?? TODOIST_ERRORS.unknown);
+    params.delete('todoist');
+    params.delete('reason');
+    setParams(params, { replace: true });
+  }, [params, setParams]);
+
+  if (!source.oauthAvailable) return <TokenForm source={source} field="token" label="API token" />;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <a href="/api/todoist/connect">{source.hasConfig ? 'Reconnect Todoist' : 'Connect Todoist'}</a>
+        </Button>
+        {source.hasConfig && (
+          <Button size="sm" variant="ghost" disabled={disconnect.isPending} onClick={() => disconnect.mutate(undefined, { onSuccess: () => toast.success('Disconnected'), onError: (e) => toast.error(e.message) })}>
+            Disconnect
+          </Button>
+        )}
+        {source.hasConfig && meta.connectedVia && <span className="text-xs text-muted-foreground">{meta.connectedVia === 'oauth' ? 'signed in with Todoist' : 'using a pasted API token'}</span>}
+      </div>
+      <div>
+        <button type="button" className="flex items-center gap-1 text-xs text-muted-foreground hover:underline" onClick={() => setShowToken((v) => !v)}>
+          {showToken ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          or paste an API token
+        </button>
+        {showToken && (
+          <div className="mt-2">
+            <TokenForm source={source} field="token" label="API token" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface GCalMeta {
   calendars?: { id: string; summary: string; primary: boolean; backgroundColor: string | null; accessRole: string | null }[];
