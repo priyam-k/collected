@@ -418,6 +418,38 @@
   .glass-btn:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
   .glass-btn:active { transform: scale(.96); }
   .glass-btn:disabled { opacity: .5; }
+
+  /* A toolbar item that folds away: its column springs to zero while it fades and blurs, like liquid drawing in. */
+  .glass-fold {
+    display: grid;
+    grid-template-columns: 1fr;
+    transition: grid-template-columns 460ms cubic-bezier(.3, 1.25, .45, 1), opacity 260ms var(--ease), filter 260ms var(--ease);
+  }
+  .glass-fold[data-open="false"] {
+    grid-template-columns: 0fr;
+    opacity: 0;
+    filter: blur(5px);
+    transition: grid-template-columns 380ms var(--ease), opacity 180ms var(--ease), filter 180ms var(--ease);
+  }
+  /* The pill squashes against its right edge as it draws in, and bulges as it spreads back out. */
+  .glass-squish-in { animation: glass-squish-in 560ms var(--ease); transform-origin: right center; }
+  .glass-squish-out { animation: glass-squish-out 600ms var(--ease); transform-origin: right center; }
+  @media (max-width: 639px) {
+    .glass-squish-in, .glass-squish-out { transform-origin: center; }
+  }
+}
+
+@keyframes glass-squish-in {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(.93, 1.07); }
+  65% { transform: scale(1.025, .975); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes glass-squish-out {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(1.05, .95); }
+  65% { transform: scale(.985, 1.015); }
+  100% { transform: scale(1, 1); }
 }
 
 /* Mona Sans's tabular figures draw a slashed zero that reads as code, so the sans keeps proportional figures. */
@@ -486,5 +518,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .seg > *, .chip, .orb, .glass-btn { transition: none; }
+  .seg > *, .chip, .orb, .glass-btn, .glass-fold, .glass-fold[data-open="false"] { transition: none; }
+  .glass-squish-in, .glass-squish-out { animation: none; }
 }

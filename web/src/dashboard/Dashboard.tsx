@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { format } from 'date-fns';
 import { Check, Moon, Plus, RefreshCw, Settings, Sun, SunMoon, UserRound } from 'lucide-react';
@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { useGlass, useLiquid } from '@/lib/liquid';
-import { qk, useCourses, useItems, useSettings, useSources, useSyncAll, useUpsertWidget } from '@/lib/queries';
+import { qk, useCourses, useItems, useMe, useSettings, useSources, useSyncAll, useUpsertWidget } from '@/lib/queries';
 import { ACCENTS, useTheme } from '@/lib/theme';
 import { relative } from '@/lib/time';
 import { cn } from '@/lib/utils';
@@ -37,7 +37,11 @@ function termLabel(term: string | undefined): string | null {
 function useScrollbarWidth() {
   useEffect(() => {
     const root = document.documentElement;
-    const update = () => root.style.setProperty('--sbw', `${Math.max(0, window.innerWidth - root.clientWidth)}px`);
+    const update = () => {
+      // a modal's scroll lock hides the scrollbar and pads the body by its width instead: keep the last reading
+      if (document.body.hasAttribute('data-scroll-locked')) return;
+      root.style.setProperty('--sbw', `${Math.max(0, window.innerWidth - root.clientWidth)}px`);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(root);
@@ -48,6 +52,46 @@ function useScrollbarWidth() {
       root.style.removeProperty('--sbw');
     };
   }, []);
+}
+
+/** True after scrolling down past the header, false again on any scroll up or near the top. */
+function useScrollCollapse(active: boolean): boolean {
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setCollapsed(false);
+      return;
+    }
+    let last = window.scrollY;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        const dy = y - last;
+        if (y < 60) setCollapsed(false);
+        else if (dy > 8) setCollapsed(true);
+        else if (dy < -8) setCollapsed(false);
+        if (Math.abs(dy) > 8 || y < 60) last = y;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [active]);
+  return collapsed;
+}
+
+/** Folds a toolbar item away: its column springs to zero width while it fades and blurs out. */
+function Fold({ open, children }: { open: boolean; children: ReactNode }) {
+  return (
+    <div className="glass-fold" data-open={open} inert={!open}>
+      <div className="min-w-0 overflow-hidden">{children}</div>
+    </div>
+  );
 }
 
 /** "2 classes today · 10 overdue · synced 5 min ago" under the date. */
@@ -97,6 +141,17 @@ export function Dashboard() {
   const summary = useSummary();
   const glass = useGlass<HTMLDivElement>();
   useScrollbarWidth();
+  // Scrolled down, the toolbar draws in to sync and the avatar; hovering it or tabbing into it opens it again.
+  const scrolledAway = useScrollCollapse(!editMode);
+  const [reaching, setReaching] = useState(false);
+  const collapsed = scrolledAway && !reaching;
+  // the pill wobbles on each fold and unfold, never on first paint
+  const folded = useRef<boolean | null>(null);
+  const [squishClass, setSquishClass] = useState('');
+  useEffect(() => {
+    if (folded.current !== null && folded.current !== collapsed) setSquishClass(collapsed ? 'glass-squish-in' : 'glass-squish-out');
+    folded.current = collapsed;
+  }, [collapsed]);
 
   const hide = (id: string) => {
     upsert.mutate({ id, hidden: true });
@@ -152,7 +207,13 @@ export function Dashboard() {
           fixed, so swapping its contents for edit mode never moves the board. */}
       <div
         ref={glass}
-        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(calc(1rem-var(--sbw,0px)),calc((100vw-var(--sbw,0px)-1600px)/2+1rem-var(--sbw,0px)))] sm:top-4"
+        role="toolbar"
+        aria-label="Dashboard"
+        onPointerEnter={() => setReaching(true)}
+        onPointerLeave={() => setReaching(false)}
+        onFocus={() => setReaching(true)}
+        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setReaching(false)}
+        className={cn('glass fixed z-40 flex items-center p-1', squishClass) + " max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(calc(1rem-var(--sbw,0px)),calc((100vw-var(--sbw,0px)-1600px)/2+1rem-var(--sbw,0px)))] sm:top-4"}
       >
         {editMode ? (
           <>
@@ -166,16 +227,20 @@ export function Dashboard() {
           </>
         ) : (
           <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setEditMode(true)} aria-label="Edit layout">
-                  Edit
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Rearrange widgets (e)</TooltipContent>
-            </Tooltip>
+            <Fold open={!collapsed}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="glass-btn mr-0.5 px-3.5 text-[14px] font-[560]" onClick={() => setEditMode(true)} aria-label="Edit layout">
+                    Edit
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Rearrange widgets (e)</TooltipContent>
+              </Tooltip>
+            </Fold>
             <RefreshAll />
-            <ThemeToggle />
+            <Fold open={!collapsed}>
+              <ThemeToggle />
+            </Fold>
             <ProfileMenu />
           </>
         )}
@@ -285,20 +350,49 @@ function ThemeToggle() {
   );
 }
 
-/** Your initials on the accent (Settings → Layout); opens settings, the theme, and the accent. */
+/**
+ * Your Google photo, or your initials on the accent (Settings → Layout). Opens your account, settings, the theme and
+ * the accent. Not modal: a modal menu locks page scroll, which hides the scrollbar and nudges the layout.
+ */
 function ProfileMenu() {
   const settings = useSettings();
+  const me = useMe();
+  const user = me.data?.user ?? null;
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photo = user?.picture && !photoFailed ? user.picture : null;
   const { theme, setTheme, accent, setAccent } = useTheme();
   const liquid = useLiquid();
   const initials = String(settings.data?.['profile.initials'] ?? '').trim().slice(0, 3).toUpperCase();
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button aria-label="Profile and settings" className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-semibold tracking-[0.01em] text-on-brand transition-transform active:scale-95">
-          {initials || <UserRound className="size-[18px]" strokeWidth={1.7} />}
+        <button aria-label="Profile and settings" className="ml-0.5 grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-brand text-[13px] font-semibold tracking-[0.01em] text-on-brand transition-transform active:scale-95">
+          {photo ? (
+            <img src={photo} alt="" className="size-full object-cover" referrerPolicy="no-referrer" onError={() => setPhotoFailed(true)} />
+          ) : (
+            initials || <UserRound className="size-[18px]" strokeWidth={1.7} />
+          )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={10} className="w-60">
+      <DropdownMenuContent align="end" sideOffset={10} className="w-64">
+        {user && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/settings/account" className="gap-2.5 py-2">
+                {photo ? (
+                  <img src={photo} alt="" className="size-8 shrink-0 rounded-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand text-[12px] font-semibold text-on-brand">{initials || <UserRound className="size-4 text-on-brand" />}</span>
+                )}
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-[14px] font-semibold">{user.name ?? user.email}</span>
+                  {user.name && <span className="block truncate text-[12px] text-sub">{user.email}</span>}
+                </span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem asChild>
           <Link to="/settings"><Settings className="size-4" /> Settings</Link>
         </DropdownMenuItem>

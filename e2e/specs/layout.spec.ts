@@ -48,6 +48,8 @@ test.describe('layout', () => {
     await frame.scrollIntoViewIfNeeded();
     const boxBefore = (await frame.boundingBox())!;
 
+    // Scrolled down, the toolbar has drawn in to sync and the avatar; hovering it brings Edit back.
+    await page.getByRole('toolbar', { name: 'Dashboard' }).hover();
     await page.getByRole('button', { name: 'Edit layout' }).click();
     const handle = frame.locator('.widget-drag-handle');
     await handle.scrollIntoViewIfNeeded();

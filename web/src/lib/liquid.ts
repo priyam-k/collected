@@ -242,9 +242,15 @@ function attachGlass(el: HTMLElement, scale = 16): () => void {
     el.style.setProperty('-webkit-backdrop-filter', v);
   };
   apply();
-  const ro = new ResizeObserver(apply);
+  // While the pill animates its width, wait for it to settle instead of building a map for every frame.
+  let timer = 0;
+  const ro = new ResizeObserver(() => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(apply, 140);
+  });
   ro.observe(el);
   return () => {
+    window.clearTimeout(timer);
     ro.disconnect();
     el.style.backdropFilter = '';
     el.style.removeProperty('-webkit-backdrop-filter');
