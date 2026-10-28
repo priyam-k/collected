@@ -5,13 +5,14 @@ import { toast } from 'sonner';
 import { SOURCE_LABELS, isTodoApp, resolveTodoApp, todoistPushConfigSchema, type EffectiveItem } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCloseTask, useItems, useQuickAddTask, useSetOverride, useSettings, useSources } from '@/lib/queries';
-import { friendlyDate, isPast } from '@/lib/time';
+import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { ItemPopover } from '@/widgets/ItemPopover';
-import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
 import { windowFromNow } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
+import { useNow } from '@/widgets/useNow';
 
 interface Row {
   item: EffectiveItem;
@@ -105,6 +106,10 @@ export function TodoWidget({ size }: WidgetProps) {
   const [text, setText] = useState('');
   const [tab, setTab] = useState<string>('__all');
   const [flat, setFlat] = useState(false);
+  // ids whose complete request is in flight: the row stays until the list refetches, and a second click would send it again
+  const [completing, setCompleting] = useState<ReadonlySet<string>>(() => new Set());
+  const now = useNow(60_000).getTime();
+  const isLate = (it: EffectiveItem) => !!it.dueAt && new Date(it.dueAt).getTime() < now;
 
   const cfg = todoistPushConfigSchema.parse(settings.data?.['todoist.push'] ?? {});
   const order = (settings.data?.['todo.sections'] as string[] | undefined) ?? [];
@@ -128,17 +133,29 @@ export function TodoWidget({ size }: WidgetProps) {
 
   const sections = useMemo(() => buildSections(merged, order, cfg.commonLabel), [merged, order, cfg.commonLabel]);
   const all: Section = useMemo(() => ({ key: '__all', label: 'All', rows: nest(merged) }), [merged]);
-  const overdue = merged.filter((i) => i.dueAt && isPast(i.dueAt)).length;
+  const overdue = merged.filter(isLate).length;
 
-  if (dated.isError) return <ErrorState error={dated.error} onRetry={() => dated.refetch()} />;
+  const err = dated.error ?? undated.error;
+  if (err) return <ErrorState error={err} onRetry={() => { void dated.refetch(); void undated.refetch(); }} />;
+  const narrow = size.tier === 'xs' || size.tier === 'sm';
 
   const columns = !flat && (size.tier === 'lg' || (size.tier === 'md' && size.aspect !== 'tall'));
   const tabs = [all, ...sections];
   const active = tabs.find((s) => s.key === tab) ?? all;
 
   const complete = (it: EffectiveItem) => {
-    if (isTodoApp(it.source)) closeTask.mutate({ source: it.source, externalId: it.externalId }, { onError: (e) => toast.error(e.message) });
-    else setOverride.mutate({ id: it.id, done: true }, { onError: (e) => toast.error(e.message) });
+    if (completing.has(it.id)) return;
+    setCompleting((prev) => new Set(prev).add(it.id));
+    const run = isTodoApp(it.source) ? closeTask.mutateAsync({ source: it.source, externalId: it.externalId }) : setOverride.mutateAsync({ id: it.id, done: true });
+    run
+      .catch((e: Error) => toast.error(e.message))
+      .finally(() =>
+        setCompleting((prev) => {
+          const next = new Set(prev);
+          next.delete(it.id);
+          return next;
+        }),
+      );
   };
   const submitQuickAdd = (e: FormEvent) => {
     e.preventDefault();
@@ -151,8 +168,10 @@ export function TodoWidget({ size }: WidgetProps) {
     s.rows.length ? (
       <ul className="flex flex-col">
         {s.rows.map(({ item: it, depth }) => {
-          const late = !!it.dueAt && isPast(it.dueAt);
+          const late = isLate(it);
           const raw = it.raw as { projectName?: string };
+          const color = safeColor(it.course?.color);
+          const busy = completing.has(it.id);
           return (
             <li key={it.id} className="group/row flex items-start gap-3 rounded-[14px] px-2.5 py-[9px] transition-colors hover:bg-well" style={{ paddingLeft: 10 + depth * 18 }}>
               {depth > 0 && <CornerDownRight className="mt-1 size-3 shrink-0 text-ter/60" />}
@@ -160,23 +179,32 @@ export function TodoWidget({ size }: WidgetProps) {
                 type="button"
                 aria-label={`Complete ${it.title}`}
                 title={isTodoApp(it.source) ? `Complete this task in ${SOURCE_LABELS[it.source]}` : 'Mark done here only. Canvas / Gradescope are never changed.'}
+                disabled={busy}
+                aria-busy={busy}
                 onClick={() => complete(it)}
                 onMouseDown={(e) => e.stopPropagation()}
-                className={cn('mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-surface transition-colors', late ? 'border-critical hover:bg-critical' : it.course ? 'hover:bg-[var(--c)]' : 'border-line-strong hover:bg-ink')}
-                style={it.course && !late ? ({ borderColor: it.course.color ?? 'var(--ter)', '--c': it.course.color ?? 'var(--ink)' } as React.CSSProperties) : undefined}
+                className={cn('group/check mt-[1px] grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-surface transition-colors disabled:opacity-50', late ? 'border-critical hover:bg-critical' : it.course ? 'hover:bg-[var(--c)]' : 'border-line-strong hover:bg-ink', busy && (late ? 'bg-critical' : it.course ? 'bg-[var(--c)]' : 'bg-ink'))}
+                style={it.course && !late ? ({ borderColor: color ?? 'var(--ter)', '--c': color ?? 'var(--ink)' } as React.CSSProperties) : undefined}
               >
-                <Check className="size-3 opacity-0 transition-opacity group-hover/row:opacity-100" />
+                <Check className={cn('size-3 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/check:opacity-100', busy && 'opacity-100')} />
               </button>
               <div className="min-w-0 flex-1">
                 <ItemPopover item={it}>
                   <span className="block truncate text-[13.5px] font-medium leading-[1.35]">{it.title}</span>
                 </ItemPopover>
-                <div className="mt-1 flex items-center gap-2 text-[11.5px]">
-                  {it.dueAt ? <span className={cn('font-medium', late ? 'text-coral' : 'text-sub')}>{friendlyDate(it.dueAt, { withTime: true, allDay: it.allDay })}</span> : <span className="text-ter">no date</span>}
-                  {it.course && <span className="font-medium" style={{ color: safeColor(it.course.color) ?? 'var(--sub)' }}>{it.course.code}</span>}
-                  {isTodoApp(it.source) && raw.projectName && <span className="text-ter">{raw.projectName}</span>}
+                <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[11.5px]">
+                  {it.dueAt ? (
+                    <span className={cn('shrink-0 font-medium', late ? 'text-critical' : 'text-sub')}>
+                      {friendlyDate(it.dueAt, { withTime: true, allDay: it.allDay })}
+                      {late && ' · overdue'}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-ter">no date</span>
+                  )}
+                  {it.course && <span className="shrink-0 font-medium" style={{ color: color ?? 'var(--sub)' }}>{it.course.code}</span>}
+                  {isTodoApp(it.source) && raw.projectName && <span className="min-w-0 truncate text-ter" title={raw.projectName}>{raw.projectName}</span>}
                   <span className="flex-1" />
-                  <span className="text-ter" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>{sourceTag(it)}</span>
+                  {!narrow && <span className="shrink-0 text-ter" title={`Pulled from ${SOURCE_LABELS[it.source]}${it.linkedIds.length ? ' (linked with the other source)' : ''}`}>{sourceTag(it)}</span>}
                 </div>
               </div>
             </li>
@@ -191,12 +219,12 @@ export function TodoWidget({ size }: WidgetProps) {
     <div className="flex h-full flex-col">
       <WidgetHeader>
         {overdue > 0 && (
-          <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
+          <span className="flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
             <span className="size-1.5 rounded-full bg-critical" />
             {overdue} overdue
           </span>
         )}
-        <span className="grid h-7 place-items-center rounded-full bg-well px-[11px] text-[12.5px] font-medium text-sub">{merged.length} open</span>
+        <span className="grid h-7 shrink-0 place-items-center whitespace-nowrap rounded-full bg-well px-[11px] text-[12.5px] font-medium text-sub">{merged.length} open</span>
       </WidgetHeader>
       <div className="flex shrink-0 flex-wrap gap-1.5 px-3.5 pb-2 pt-1">
         {(!columns ? tabs : [all]).map((s) => (
@@ -222,7 +250,7 @@ export function TodoWidget({ size }: WidgetProps) {
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1.5">
         {dated.isPending ? (
-          <div className="m-2 h-16 animate-pulse rounded-xl bg-well" />
+          <ListSkeleton rows={4} rowHeight={44} />
         ) : !merged.length ? (
           <EmptyState>
             Nothing to do. {!app && <Link to="/settings/sources" className="underline">Connect Todoist</Link>}

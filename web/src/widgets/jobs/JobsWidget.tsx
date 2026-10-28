@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { Check, ExternalLink, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { safeHref } from '@/lib/url';
 import { usePane } from '@/panes/PaneContext';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { HOVER_REVEAL, activateOnKey } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 type Mode = 'new' | 'starred' | 'matches';
@@ -18,37 +19,63 @@ const PAGE = 12;
 
 const shortCategory = (c: string | null) => (c ?? '').replace('AI/ML/Data', 'AI / ML').replace('Software', 'Software');
 
+/**
+ * Marks cards seen once they've been at least 60% on screen, batched every two seconds. One observer lives for the
+ * component's lifetime; `jobs` and `mutate` are read through refs so new data doesn't rebuild it. The ref callback is
+ * stable and returns its own cleanup (React 19), and cards that mount before the observer exists (child refs attach
+ * before the parent's effect runs) are kept in a set and observed when it's created.
+ */
 function useMarkSeenWhenVisible(jobs: Job[]) {
-  const mark = useMarkJobsSeen();
-  const pending = useRef(new Set<string>());
-  const timer = useRef<number | null>(null);
+  const { mutate } = useMarkJobsSeen();
+  const jobsRef = useRef(jobs);
+  const mutateRef = useRef(mutate);
+  useLayoutEffect(() => {
+    jobsRef.current = jobs;
+    mutateRef.current = mutate;
+  });
+  const elements = useRef(new Set<HTMLElement>());
   const observer = useRef<IntersectionObserver | null>(null);
+
   useEffect(() => {
-    observer.current = new IntersectionObserver(
+    const pending = new Set<string>();
+    let timer: number | null = null;
+    const obs = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           const id = (e.target as HTMLElement).dataset.jobId;
           if (!id || !e.isIntersecting) continue;
-          const job = jobs.find((j) => j.id === id);
-          if (!job || job.seenAt) continue;
-          pending.current.add(id);
+          const job = jobsRef.current.find((j) => j.id === id);
+          if (job && !job.seenAt) pending.add(id);
         }
-        if (pending.current.size && !timer.current) {
-          timer.current = window.setTimeout(() => {
-            const ids = [...pending.current];
-            pending.current.clear();
-            timer.current = null;
-            if (ids.length) mark.mutate(ids);
+        if (pending.size && timer === null) {
+          timer = window.setTimeout(() => {
+            timer = null;
+            const ids = [...pending];
+            pending.clear();
+            if (ids.length) mutateRef.current(ids);
           }, 2000);
         }
       },
       { threshold: 0.6 },
     );
-    return () => observer.current?.disconnect();
-  }, [jobs, mark]);
-  return (el: HTMLElement | null) => {
-    if (el) observer.current?.observe(el);
-  };
+    observer.current = obs;
+    for (const el of elements.current) obs.observe(el);
+    return () => {
+      obs.disconnect();
+      observer.current = null;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+
+  return useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    elements.current.add(el);
+    observer.current?.observe(el);
+    return () => {
+      elements.current.delete(el);
+      observer.current?.unobserve(el);
+    };
+  }, []);
 }
 
 function Orb({ on, tone, label, onClick, children }: { on?: boolean; tone: string; label: string; onClick(): void; children: React.ReactNode }) {
@@ -59,17 +86,15 @@ function Orb({ on, tone, label, onClick, children }: { on?: boolean; tone: strin
       title={label}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="orb size-7 text-xs transition-colors"
-      style={{ color: on ? tone : undefined, '--tone': tone } as CSSProperties}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = tone; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = on ? tone : ''; }}
+      className={cn('orb size-7 text-xs transition-colors hover:text-[var(--tone)] focus-visible:text-[var(--tone)]', on && 'text-[var(--tone)]')}
+      style={{ '--tone': tone } as CSSProperties}
     >
       {children}
     </button>
   );
 }
 
-function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; refCb: (el: HTMLElement | null) => void }) {
+function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; refCb: (el: HTMLElement | null) => void | (() => void) }) {
   const { open } = usePane();
   const tracked = job.state !== 'new' && job.state !== 'starred' && job.state !== 'hidden';
   return (
@@ -80,7 +105,7 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
       tabIndex={0}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => open({ kind: 'job', jobId: job.id })}
-      onKeyDown={(e) => e.key === 'Enter' && open({ kind: 'job', jobId: job.id })}
+      onKeyDown={(e) => activateOnKey(e, () => open({ kind: 'job', jobId: job.id }))}
       className={cn('group/card relative flex min-w-0 cursor-pointer flex-col gap-[5px] rounded-[16px] bg-well p-3 text-left transition-colors hover:bg-well2', tape ? 'w-[236px] shrink-0' : 'w-full', job.state === 'starred' && 'bg-[color-mix(in_srgb,var(--caution)_8%,var(--well))]')}
       title="Details and tracking"
     >
@@ -88,7 +113,7 @@ function Card({ job, onState, tape, compact, refCb }: { job: Job; onState: (s: J
         {!job.seenAt && <span className="size-1.5 shrink-0 rounded-full bg-brand" title="New" />}
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{job.company}</span>
         {safeHref(job.url) && (
-          <a href={safeHref(job.url)} target="_blank" rel="noreferrer" className="shrink-0 text-ter opacity-0 transition-opacity hover:text-ink group-hover/card:opacity-100" title="Open the posting" aria-label="Open the posting" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          <a href={safeHref(job.url)} target="_blank" rel="noreferrer" className={cn('shrink-0 text-ter transition-opacity hover:text-ink group-hover/card:opacity-100 group-focus-within/card:opacity-100', HOVER_REVEAL)} title="Open the posting" aria-label="Open the posting" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
             <ExternalLink className="size-3" />
           </a>
         )}
@@ -146,8 +171,8 @@ export function JobsWidget({ size }: WidgetProps) {
       <WidgetHeader>
         {stats.data && (
           <>
-            <span className="text-[15px] font-semibold whitespace-nowrap">{stats.data.unseen} new</span>
-            {size.tier !== 'xs' && <span className="text-[12.5px] text-ter whitespace-nowrap">{stats.data.matched} match · {stats.data.active.toLocaleString()} active</span>}
+            <span className="shrink-0 text-[15px] font-semibold whitespace-nowrap">{stats.data.unseen} new</span>
+            {size.tier !== 'xs' && <span className="min-w-0 truncate text-[12.5px] text-ter">{stats.data.matched} match · {stats.data.active.toLocaleString()} active</span>}
           </>
         )}
         {size.tier !== 'xs' && (
@@ -174,7 +199,7 @@ export function JobsWidget({ size }: WidgetProps) {
             {rest > 0 && (
               <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => setVisible((v) => v + 2 * PAGE)} className="grid w-[120px] shrink-0 place-items-center rounded-2xl bg-well p-3.5 text-center transition-colors hover:bg-well2">
                 <span>
-                  <span className="block text-xl font-bold tracking-[-0.02em]">{rest}</span>
+                  <span className="block text-xl font-[600] tracking-[-0.02em]">{rest}</span>
                   <span className="mt-0.5 block text-xs text-sub">more {mode === 'starred' ? 'starred' : mode === 'new' ? 'new' : 'matches'}</span>
                 </span>
               </button>
@@ -186,7 +211,7 @@ export function JobsWidget({ size }: WidgetProps) {
             {rest > 0 && (
               <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => setVisible((v) => v + 2 * PAGE)} className="grid min-h-[5rem] place-items-center rounded-2xl bg-well p-3.5 text-center transition-colors hover:bg-well2">
                 <span>
-                  <span className="block text-xl font-bold tracking-[-0.02em]">{rest}</span>
+                  <span className="block text-xl font-[600] tracking-[-0.02em]">{rest}</span>
                   <span className="mt-0.5 block text-xs text-sub">more</span>
                 </span>
               </button>

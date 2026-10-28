@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { addDays, differenceInMinutes, format, getHours, getMinutes, isSameMonth } from 'date-fns';
+import { addDays, endOfDay, format, getHours, getMinutes, isSameMonth } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
-import { dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, sortItems, timeLabel } from './utils';
+import { HOUR_END, HOUR_START, MIN_EVENT_PX, PX_PER_HOUR, dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, placeDay, sortItems, timeLabel } from './utils';
 
 const tint = (color: string | null, pct: number) => `color-mix(in srgb, ${color ?? 'var(--ink)'} ${pct}%, var(--surface))`;
 
@@ -36,33 +36,40 @@ function Row({ item }: { item: EffectiveItem }) {
         <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: color ?? 'var(--ter)' }} />
         <span className={cn('min-w-0 flex-1 truncate font-medium', item.effectiveDone && 'text-ter line-through')}>{item.title}</span>
         {item.course && <span className="shrink-0 text-xs font-medium" style={{ color: color ?? 'var(--sub)' }}>{item.course.code}</span>}
-        {item.kind === 'event' && (item.raw as { location?: string | null }).location && <span className="hidden shrink-0 truncate text-xs text-ter sm:inline">{(item.raw as { location?: string }).location}</span>}
+        {/* by the widget's width (the body is a size container), not the viewport's; never more than 40% of the row */}
+        {item.kind === 'event' && (item.raw as { location?: string | null }).location && <span className="hidden min-w-0 max-w-[40%] truncate text-xs text-ter @sm:inline">{(item.raw as { location?: string }).location}</span>}
       </span>
     </ItemPopover>
   );
 }
 
-/* ---------- xs: next few things ---------- */
-export function NextUp({ items, limit = 4 }: { items: EffectiveItem[]; limit?: number }) {
-  const now = Date.now();
+/* ---------- xs: what's next ---------- */
+/** "2:30 PM" today, "Wed 2:30 PM" later; all-day items say so instead of showing midnight. */
+function nextLabel(item: EffectiveItem, t: Date): string {
+  if (item.allDay) return isToday(t) ? 'all day' : `${format(t, 'EEE')} all day`;
+  return isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a');
+}
+
+export function NextUp({ items, now }: { items: EffectiveItem[]; now: Date }) {
   const upcoming = items
     .filter((i) => {
       const t = itemTime(i);
-      const e = itemEnd(i);
-      return t && (e ? e.getTime() : t.getTime()) >= now;
+      if (!t) return false;
+      // an all-day item stays up for its whole day; a timed one until it ends (or, with no end, until it starts)
+      const until = i.allDay ? endOfDay(itemEnd(i) ? addDays(itemEnd(i)!, -1) : t) : (itemEnd(i) ?? t);
+      return until.getTime() >= now.getTime();
     })
-    .sort(sortItems)
-    .slice(0, limit);
+    .sort(sortItems);
   if (!upcoming.length) return <p className="p-3 text-sm text-sub">Nothing coming up.</p>;
   return (
-    <ul className="space-y-0.5 p-1.5">
+    <ul className="h-full space-y-0.5 overflow-auto p-1.5">
       {upcoming.map((i) => {
         const t = itemTime(i)!;
         return (
           <li key={i.id}>
             <ItemPopover item={i}>
               <span className="flex items-baseline gap-2 rounded-lg px-1.5 py-1 text-sm hover:bg-well">
-                <span className="w-16 shrink-0 text-xs text-ter">{isToday(t) ? format(t, 'h:mm a') : format(t, 'EEE h:mm a')}</span>
+                <span className="w-[5.75rem] shrink-0 whitespace-nowrap text-xs tabular-nums text-ter">{nextLabel(i, t)}</span>
                 <span className="inline-block size-2 shrink-0 self-center rounded-full" style={{ background: itemColor(i) ?? 'var(--ter)' }} />
                 <span className="min-w-0 flex-1 truncate">{i.title}</span>
               </span>
@@ -131,15 +138,10 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
 }
 
 /* ---------- lg: week grid with hours ---------- */
-const HOUR_START = 7;
-const HOUR_END = 23;
-const PX_PER_HOUR = 52;
-
-export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }) {
+export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: Date; now: Date }) {
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
-  const now = new Date();
   const nowTop = (getHours(now) + getMinutes(now) / 60 - HOUR_START) * PX_PER_HOUR;
   const scrollRef = useRef<HTMLDivElement>(null);
   // Start the day view a little above "now" (or at 8 AM outside today's week).
@@ -194,18 +196,18 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
                     <div className="absolute -left-[5px] z-10 size-2.5 rounded-full bg-brand shadow-[0_0_0_2px_var(--surface)]" style={{ top: nowTop - 4 }} />
                   </>
                 )}
-                {timed.map((i) => {
-                  const s = itemTime(i)!;
-                  const e = itemEnd(i) ?? new Date(s.getTime() + 30 * 60_000);
-                  const top = (getHours(s) + getMinutes(s) / 60 - HOUR_START) * PX_PER_HOUR;
-                  const height = Math.max(22, (differenceInMinutes(e, s) / 60) * PX_PER_HOUR - 3);
+                {placeDay(timed).map(({ item: i, start: s, end: e, top: topMin, bottom: bottomMin, col: c, cols }) => {
+                  const top = (topMin / 60) * PX_PER_HOUR;
+                  const height = Math.max(MIN_EVENT_PX, ((bottomMin - topMin) / 60) * PX_PER_HOUR - 3);
                   const color = itemColor(i);
                   const loc = (i.raw as { location?: string | null }).location;
+                  // 4px in from each side of the day column, then the column's share; a 2px gutter between neighbours
+                  const pos = { left: `calc(4px + (100% - 8px) * ${c / cols})`, width: `calc((100% - 8px) / ${cols} - ${cols > 1 ? 2 : 0}px)` };
                   return (
-                    <div key={i.id} className="absolute inset-x-1" style={{ top: top + 1, height }}>
+                    <div key={i.id} className="absolute" style={{ top: top + 1, height, ...pos }}>
                       <ItemPopover item={i} side="right" className="h-full">
                         <div
-                          className={cn('relative h-full overflow-hidden rounded-[6px] py-[6px] pl-[13px] pr-2 text-left leading-tight transition-[filter] hover:brightness-[1.04]', i.effectiveDone && 'opacity-60')}
+                          className={cn('relative h-full overflow-hidden rounded-[6px] py-[6px] text-left leading-tight transition-[filter] hover:brightness-[1.04]', cols > 2 ? 'pl-[10px] pr-1' : 'pl-[13px] pr-2', i.effectiveDone && 'opacity-60')}
                           style={{ background: tint(color, 16), boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color ?? 'var(--ink)'} 22%, transparent)` }}
                           title={`${i.title} · ${timeLabel(i)}`}
                         >
@@ -230,7 +232,12 @@ export function WeekGrid({ items, from }: { items: EffectiveItem[]; from: Date }
 }
 
 /* ---------- xl: month ---------- */
-export function Month({ items, from, to, anchor }: { items: EffectiveItem[]; from: Date; to: Date; anchor: Date }) {
+/** Past this many items a day shows its count by the date, since the list below may fade out before the last one. */
+const MONTH_COUNT_AFTER = 2;
+/** The day's list fades out over its last few pixels instead of cutting a chip in half. */
+const MONTH_FADE = 'linear-gradient(to bottom, #000 calc(100% - 14px), transparent)';
+
+export function Month({ items, from, to, anchor, onPickDay }: { items: EffectiveItem[]; from: Date; to: Date; anchor: Date; onPickDay(d: Date): void }) {
   const dayList = daysBetween(from, to);
   const grouped = groupByDay(items, dayList);
   const weeks = Math.ceil(dayList.length / 7);
@@ -246,10 +253,19 @@ export function Month({ items, from, to, anchor }: { items: EffectiveItem[]; fro
           const today = isToday(d);
           return (
             <div key={dayKey(d)} className={cn('flex min-h-0 flex-col overflow-hidden rounded-[10px] p-1', today ? 'bg-brand-soft' : inMonth ? 'bg-well' : 'bg-well/40')}>
-              <div className={cn('px-1 text-[11px] tabular-nums', today ? 'font-bold text-brand-ink' : inMonth ? 'font-semibold text-sub' : 'text-ter/60')}>{format(d, 'd')}</div>
-              <div className="min-h-0 flex-1 space-y-px overflow-hidden">
-                {list.slice(0, 4).map((i) => <Chip key={i.id} item={i} dense />)}
-                {list.length > 4 && <div className="px-1 text-[10px] text-ter">+{list.length - 4} more</div>}
+              <button
+                type="button"
+                className={cn('flex shrink-0 items-baseline justify-between gap-1 rounded-[6px] px-1 text-left text-[11px] tabular-nums transition-colors hover:bg-surface/70', today ? 'font-[620] text-brand-ink' : inMonth ? 'font-semibold text-sub' : 'text-ter/60')}
+                title={`${format(d, 'EEEE, MMMM d')}: ${list.length ? `${list.length} item${list.length === 1 ? '' : 's'}` : 'nothing'}. Open the day.`}
+                aria-label={`Open ${format(d, 'EEEE, MMMM d')} (${list.length} item${list.length === 1 ? '' : 's'})`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={() => onPickDay(d)}
+              >
+                {format(d, 'd')}
+                {list.length > MONTH_COUNT_AFTER && <span className="text-[10px] font-medium text-ter">{list.length}</span>}
+              </button>
+              <div className="min-h-0 flex-1 space-y-px overflow-hidden" style={{ maskImage: MONTH_FADE, WebkitMaskImage: MONTH_FADE }}>
+                {list.map((i) => <Chip key={i.id} item={i} dense />)}
               </div>
             </div>
           );

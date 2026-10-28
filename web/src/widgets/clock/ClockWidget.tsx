@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { format, formatDistanceToNowStrict } from 'date-fns';
+import { useMemo } from 'react';
+import { format, formatDistanceStrict } from 'date-fns';
 import { meetingLabel } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useLiquid } from '@/lib/liquid';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { meetingExceptions, nextMeeting, windowFromNow, type NextMeeting } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
+import { useNow } from '@/widgets/useNow';
 
 type Style = 'auto' | 'analog' | 'digital';
 export interface ClockConfig {
@@ -15,28 +16,31 @@ export interface ClockConfig {
   hour24?: boolean;
 }
 
-function useNow(everyMs: number): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), everyMs);
-    return () => window.clearInterval(id);
-  }, [everyMs]);
-  return now;
-}
-
-/** The soonest scheduled session across every active course, honouring cancellations. */
-function useNextClass(): (NextMeeting & { code: string; color: string | null }) | null {
+/**
+ * The soonest scheduled session across every active course, honouring cancellations; one in progress counts until it
+ * ends. Recomputed each minute of `now`, not each second.
+ */
+function useNextClass(now: Date): (NextMeeting & { code: string; color: string | null }) | null {
   const courses = useCourses();
   const win = useMemo(() => windowFromNow(14), []);
   const manual = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 200 });
+  const minute = Math.floor(now.getTime() / 60_000);
   return useMemo(() => {
+    const at = new Date(minute * 60_000);
     let best: (NextMeeting & { code: string; color: string | null }) | null = null;
     for (const c of (courses.data ?? []).filter((c) => !c.archived)) {
-      const m = nextMeeting(c.schedule, meetingExceptions((manual.data ?? []).filter((it) => it.courseId === c.id)));
+      const m = nextMeeting(c.schedule, meetingExceptions((manual.data ?? []).filter((it) => it.courseId === c.id)), at);
       if (m && (!best || m.when < best.when)) best = { ...m, code: c.code, color: safeColor(c.color) ?? null };
     }
     return best;
-  }, [courses.data, manual.data]);
+  }, [courses.data, manual.data, minute]);
+}
+
+/** "now" for a session that started under a minute ago, "started 12 minutes ago" while it runs, "in 20 minutes", or "Thu 2:00 PM". */
+function whenLabel(when: Date, now: Date): string {
+  const ms = when.getTime() - now.getTime();
+  if (ms <= 0) return -ms < 60_000 ? 'now' : `started ${formatDistanceStrict(when, now)} ago`;
+  return ms < 36e5 * 18 ? `in ${formatDistanceStrict(when, now)}` : format(when, 'EEE h:mm a');
 }
 
 function Analog({ now, size, accent }: { now: Date; size: number; accent: string | null }) {
@@ -68,7 +72,7 @@ export function ClockWidget({ instance, size }: WidgetProps<ClockConfig>) {
   const hour24 = !!instance.config.hour24;
   const now = useNow(1000);
   const liquid = useLiquid();
-  const next = useNextClass();
+  const next = useNextClass(now);
   const setConfig = (patch: Partial<ClockConfig>) => upsert.mutate({ id: instance.id, config: { ...instance.config, ...patch } });
 
   const squarish = size.width / Math.max(1, size.height) > 0.7 && size.width / Math.max(1, size.height) < 1.7;
@@ -79,7 +83,7 @@ export function ClockWidget({ instance, size }: WidgetProps<ClockConfig>) {
     <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-sub" title={next.label}>
       <span className="size-1.5 shrink-0 rounded-full" style={{ background: next.color ?? 'var(--brand)' }} />
       <span className="truncate">
-        <span className="font-medium text-ink">{next.code}</span> {meetingLabel(next.kind).toLowerCase()} {next.when.getTime() - now.getTime() < 36e5 * 18 ? `in ${formatDistanceToNowStrict(next.when)}` : format(next.when, 'EEE h:mm a')}
+        <span className="font-medium text-ink">{next.code}</span> {meetingLabel(next.kind).toLowerCase()} {whenLabel(next.when, now)}
         {next.virtual ? ' · online' : ''}
       </span>
     </div>

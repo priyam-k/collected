@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { usePane } from '@/panes/PaneContext';
 import { StageSelect } from '@/panes/JobPane';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { HOVER_REVEAL, activateOnKey } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 const STAGE_TONE: Partial<Record<JobStateValue, string>> = {
@@ -42,7 +43,7 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
       tabIndex={0}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => open({ kind: 'job', jobId: job.id })}
-      onKeyDown={(e) => e.key === 'Enter' && open({ kind: 'job', jobId: job.id })}
+      onKeyDown={(e) => activateOnKey(e, () => open({ kind: 'job', jobId: job.id }))}
       className="group/card flex min-w-0 cursor-pointer flex-col gap-1 rounded-[16px] bg-well p-3 text-sm transition-colors hover:bg-well2"
     >
       <div className="flex items-start gap-1">
@@ -55,7 +56,7 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         {m.urgent && <CalendarClock className="size-3 text-caution" />}
         <span className={cn('min-w-0 flex-1 truncate', m.urgent && 'font-medium text-caution')}>{m.text}</span>
-        <StageSelect value={job.state} onChange={onStage} className="h-5 shrink-0 px-1 text-[10px] opacity-0 group-hover/card:opacity-100 focus:opacity-100" />
+        <StageSelect value={job.state} onChange={onStage} className={cn('h-5 shrink-0 px-1 text-[10px] transition-opacity group-hover/card:opacity-100 group-focus-within/card:opacity-100', HOVER_REVEAL)} />
       </div>
     </div>
   );
@@ -82,31 +83,43 @@ export function TrackerWidget({ size }: WidgetProps) {
 
   const board = size.tier === 'lg' || (size.tier === 'md' && size.aspect !== 'tall');
   const summary = OPEN_STAGES.map((s) => [s, byStage.get(s)?.length ?? 0] as const).filter(([, n]) => n > 0);
+  const xs = size.tier === 'xs';
 
   return (
     <div className="flex h-full flex-col">
       <WidgetHeader>
-        {summary.length ? (
-          <span className="truncate text-[12.5px] text-sub">
+        {summary.length && xs ? (
+          // no room for the per-stage breakdown: one count, the breakdown in the tooltip
+          <span className="min-w-0 truncate text-[12.5px] text-sub" title={summary.map(([s, n]) => `${n} ${JOB_STATE_LABELS[s].toLowerCase()}`).join(' · ')}>
+            <span className="font-semibold text-ink">{openJobs.length}</span> open
+          </span>
+        ) : summary.length ? (
+          <span className="min-w-0 truncate text-[12.5px] text-sub">
             {summary.map(([s, n], i) => (
               <span key={s}>{i > 0 && ' · '}<span className={cn('font-semibold', STAGE_TONE[s])}>{n}</span> {JOB_STATE_LABELS[s].toLowerCase()}</span>
             ))}
           </span>
         ) : (
-          <span className="text-[12.5px] text-ter">nothing open</span>
+          <span className="min-w-0 truncate text-[12.5px] text-ter">nothing open</span>
         )}
         {closedJobs.length > 0 && (
-          <button title="Rejected, ghosted, withdrawn" className={cn('chip !h-7', showClosed && 'chip-on')} onClick={() => setShowClosed((v) => !v)}>
+          <button title="Rejected, ghosted, withdrawn" aria-pressed={showClosed} className={cn('chip !h-7 shrink-0 whitespace-nowrap', showClosed && 'chip-on')} onMouseDown={(e) => e.stopPropagation()} onClick={() => setShowClosed((v) => !v)}>
             Closed · {closedJobs.length}
           </button>
         )}
-        <Button size="xs" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'job-new' })} title="Add a job that isn't in the feed">
+        <Button size="xs" className="shrink-0" onMouseDown={(e) => e.stopPropagation()} onClick={() => open({ kind: 'job-new' })} title="Add a job that isn't in the feed">
           <Plus className="size-3" /> Add
         </Button>
       </WidgetHeader>
       <div className={cn('min-h-0 flex-1', board ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto')}>
         {q.isPending ? (
           <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
+        ) : !openJobs.length && closedJobs.length && !showClosed ? (
+          <EmptyState>
+            Nothing open; {closedJobs.length} closed.{' '}
+            <button className="underline" onClick={() => setShowClosed(true)}>Show {closedJobs.length === 1 ? 'it' : 'them'}</button>, or{' '}
+            <button className="underline" onClick={() => open({ kind: 'job-new' })}>add one by hand</button>.
+          </EmptyState>
         ) : !openJobs.length && !(showClosed && closedJobs.length) ? (
           <EmptyState>
             Nothing tracked yet. Star or apply from the job feed, or{' '}

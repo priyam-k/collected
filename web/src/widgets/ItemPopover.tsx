@@ -13,15 +13,19 @@ import { safeColor } from '@/lib/color';
 import { safeHref } from '@/lib/url';
 import { cn } from '@/lib/utils';
 
-function stripHtml(s: string): string {
+/** Canvas descriptions are HTML: text with paragraph breaks kept and the common entities decoded. */
+export function stripHtml(s: string): string {
   return s
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|li)>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n: string) => (Number(n) <= 0x10ffff ? String.fromCodePoint(Number(n)) : ''))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

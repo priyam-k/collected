@@ -37,23 +37,31 @@ function groupItems(items: EffectiveItem[]): Group[] {
   return [...map.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
 }
 
-/** Concentric rings of ticks, one per group, outermost first; the centre is the overall figure. */
+/** Radial room for the rings: from the outer edge (48) in to where the centre figure needs its space. */
+const RING_BAND = 36;
+
+/**
+ * Concentric rings of ticks, one per group, outermost first; the centre is the overall figure. Every group gets a
+ * ring, so the rings always agree with the legend: past five, ticks, gaps and strokes shrink to fit the same band.
+ */
 function Rings({ groups, done, total }: { groups: Group[]; done: number; total: number }) {
-  const shown = groups.slice(0, 5);
-  const n = Math.max(1, shown.length);
-  const len = Math.min(6.5, 20 / n);
-  const gap = 3.2;
+  const n = Math.max(1, groups.length);
+  const crowded = n > 5;
+  const pitch = RING_BAND / n;
+  const len = crowded ? pitch * 0.6 : Math.min(6.5, 20 / n);
+  const gap = crowded ? pitch * 0.4 : 3.2;
+  const stroke = crowded ? Math.min(1.6, pitch * 0.32) : 1.6;
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const big = n <= 2 ? 14 : 12;
+  const big = n <= 2 ? 14 : crowded ? 11 : 12;
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" className="h-full w-full" role="img" aria-label={`${pct}% done, ${done} of ${total}`}>
-      {shown.map((g, i) => (
+      {groups.map((g, i) => (
         <g key={g.id}>
           <title>{`${g.label}: ${g.done} of ${g.total}`}</title>
-          <TickArc cx={50} cy={50} r={48 - i * (len + gap)} len={len} value={g.total ? g.done / g.total : 0} color={g.color} width={1.6} />
+          <TickArc cx={50} cy={50} r={48 - i * (len + gap)} len={len} value={g.total ? g.done / g.total : 0} color={g.color} width={stroke} />
         </g>
       ))}
-      {!shown.length && <TickArc cx={50} cy={50} r={48} len={7} value={0} color="var(--brand)" width={1.25} />}
+      {!groups.length && <TickArc cx={50} cy={50} r={48} len={7} value={0} color="var(--brand)" width={1.25} />}
       <text x="50" y="48" textAnchor="middle" dominantBaseline="central" fill="var(--ink)" fontSize={big} fontWeight={560} letterSpacing="-0.5">{total ? `${pct}%` : '–'}</text>
       <text x="50" y="60" textAnchor="middle" fill="var(--sub)" fontSize="5.2" fontWeight={450}>{total ? `${done} of ${total}` : 'nothing due'}</text>
     </svg>
@@ -81,28 +89,63 @@ export function ProgressWidget({ size }: WidgetProps) {
   const total = groups.reduce((s, g) => s + g.total, 0);
   const shift = (dir: 1 | -1) => setAnchor((a) => (period === 'week' ? addWeeks(a, dir) : addMonths(a, dir)));
   const isNow = period === 'week' ? isSameWeek(anchor, new Date(), { weekStartsOn: 0 }) : isSameMonth(anchor, new Date());
-  const label = period === 'month' ? format(anchor, 'MMMM') : `${format(range.from, 'MMM d')} – ${format(range.to, isSameMonth(range.from, range.to) ? 'd' : 'MMM d')}`;
+  const xs = size.tier === 'xs';
+  // at xs the full range ("Oct 25 – 31", ~196px of seg) would be clipped, so the week shows by its first day
+  const label = period === 'month' ? format(anchor, xs ? 'MMM' : 'MMMM') : xs ? format(range.from, 'MMM d') : `${format(range.from, 'MMM d')} – ${format(range.to, isSameMonth(range.from, range.to) ? 'd' : 'MMM d')}`;
 
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  const xs = size.tier === 'xs';
   const wide = size.aspect === 'wide' && size.width >= 380;
 
-  const legendItem = (g: Group) => (
-    <li key={g.id}>
-      <button className="flex items-center gap-1.5 text-[12.5px] transition-colors hover:text-ink" title={`${g.label}: ${g.done} of ${g.total} done`} onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
+  // a course row opens that course; "Tasks" and "Other" have nowhere to go, so they're plain text, not buttons
+  const openCourse = (g: Group) => (g.courseId ? () => open({ kind: 'course', courseId: g.courseId!, tab: 'assignments' }) : undefined);
+  const legendItem = (g: Group) => {
+    const inner = (
+      <>
         <span className="size-2 rounded-full" style={{ background: g.color }} />
         <span className="font-medium">{g.label}</span>
         <span className="text-xs text-ter">{g.done}/{g.total}</span>
-      </button>
-    </li>
-  );
+      </>
+    );
+    const title = `${g.label}: ${g.done} of ${g.total} done`;
+    const onClick = openCourse(g);
+    return (
+      <li key={g.id}>
+        {onClick ? (
+          <button className="flex items-center gap-1.5 text-[12.5px] transition-colors hover:text-ink" title={title} onMouseDown={(e) => e.stopPropagation()} onClick={onClick}>{inner}</button>
+        ) : (
+          <span className="flex items-center gap-1.5 text-[12.5px]" title={title}>{inner}</span>
+        )}
+      </li>
+    );
+  };
+  const wideRow = (g: Group) => {
+    const inner = (
+      <>
+        <span className="size-2 shrink-0 rounded-full" style={{ background: g.color }} />
+        <span className="w-20 shrink-0 truncate font-medium">{g.label}</span>
+        <Meter className="min-w-0 flex-1" value={g.total ? (g.done / g.total) * 100 : 0} color={g.color} height={12} />
+        <span className="w-10 shrink-0 text-right text-xs text-sub">{g.done}/{g.total}</span>
+      </>
+    );
+    const onClick = openCourse(g);
+    const cls = 'flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[13px]';
+    return (
+      <li key={g.id}>
+        {onClick ? (
+          <button className={cn(cls, 'transition-colors hover:bg-well')} onMouseDown={(e) => e.stopPropagation()} onClick={onClick}>{inner}</button>
+        ) : (
+          <div className={cls}>{inner}</div>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col">
       <WidgetHeader>
-        <span className="seg !gap-0.5 !p-0.5">
+        <span className="seg shrink-0 !gap-0.5 !p-0.5">
           <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => shift(-1)}><ChevronLeft className="size-3.5" /></button>
-          <button className={cn('!h-[26px] !min-w-[8.5rem] !px-2 !py-0 !text-center !font-semibold tabular-nums', isNow ? '!text-ink' : '!text-sub')} title={isNow ? `This ${period}` : `Back to this ${period}`} onClick={() => setAnchor(new Date())}>
+          <button className={cn('!h-[26px] !px-2 !py-0 !text-center !font-semibold whitespace-nowrap tabular-nums', !xs && '!min-w-[8.5rem]', isNow ? '!text-ink' : '!text-sub')} title={isNow ? `This ${period}` : `Back to this ${period}`} onClick={() => setAnchor(new Date())}>
             {label}{!isNow && <span className="ml-1 font-normal text-ter">↺</span>}
           </button>
           <button className="!grid !h-[26px] !w-[26px] !place-items-center !p-0" aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => shift(1)}><ChevronRight className="size-3.5" /></button>
@@ -131,16 +174,7 @@ export function ProgressWidget({ size }: WidgetProps) {
           {wide ? (
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 overflow-auto pt-7">
               <ul className="space-y-1">
-                {groups.map((g) => (
-                  <li key={g.id}>
-                    <button className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-well" onMouseDown={(e) => e.stopPropagation()} onClick={() => g.courseId && open({ kind: 'course', courseId: g.courseId, tab: 'assignments' })}>
-                      <span className="size-2 shrink-0 rounded-full" style={{ background: g.color }} />
-                      <span className="w-20 shrink-0 truncate font-medium">{g.label}</span>
-                      <Meter className="min-w-0 flex-1" value={g.total ? (g.done / g.total) * 100 : 0} color={g.color} height={12} />
-                      <span className="w-10 shrink-0 text-right text-xs text-sub">{g.done}/{g.total}</span>
-                    </button>
-                  </li>
-                ))}
+                {groups.map(wideRow)}
               </ul>
             </div>
           ) : (

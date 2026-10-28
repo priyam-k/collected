@@ -51,3 +51,14 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
     </div>
   );
 }
+
+/** Loading rows for a list widget: rounded well bars at row height, so the card doesn't jump when data lands. */
+export function ListSkeleton({ rows = 3, rowHeight = 36 }: { rows?: number; rowHeight?: number }) {
+  return (
+    <div className="flex flex-col gap-1.5 p-1.5" aria-busy aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="animate-pulse rounded-xl bg-well" style={{ height: rowHeight, opacity: Math.max(0.3, 1 - i * 0.18) }} />
+      ))}
+    </div>
+  );
+}

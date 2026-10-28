@@ -4,8 +4,8 @@ import { useItems } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
-import { ItemPopover } from '@/widgets/ItemPopover';
-import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { ItemPopover, stripHtml } from '@/widgets/ItemPopover';
+import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 
 const KEY = 'collected.announcements.read';
@@ -41,6 +41,8 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
   const q = useItems({ kind: ['announcement'], limit: 100 });
   const [read, mark] = useReadSet();
   const rows = useMemo(() => (q.data ?? []).slice().sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? '')), [q.data]);
+  // Canvas sends the body as HTML: the one-line preview is its text, entities decoded
+  const previews = useMemo(() => new Map(rows.map((r) => [r.id, r.description ? stripHtml(r.description).replace(/\s+/g, ' ').slice(0, 160) : ''])), [rows]);
   const unread = rows.filter((r) => !read.has(r.id)).length;
 
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
@@ -51,17 +53,17 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
       <WidgetHeader>
         {unread > 0 ? (
           <>
-            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-brand-ink" style={{ background: 'color-mix(in oklab, var(--brand) 18%, var(--card))' }}>
+            <span className="flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12.5px] font-semibold text-brand-ink" style={{ background: 'color-mix(in srgb, var(--brand) 11%, var(--surface))' }}>
               <span className="size-1.5 rounded-full bg-brand" />{unread} new
             </span>
-            {!xs && <button className="text-xs text-ter hover:text-ink" onClick={() => mark(rows.map((r) => r.id))}>Mark all read</button>}
+            {!xs && <button className="shrink-0 whitespace-nowrap text-xs text-ter hover:text-ink" onMouseDown={(e) => e.stopPropagation()} onClick={() => mark(rows.map((r) => r.id))}>Mark all read</button>}
           </>
         ) : (
           rows.length > 0 && <span className="text-[12.5px] text-sub">all read</span>
         )}
       </WidgetHeader>
       {q.isPending ? (
-        <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
+        <ListSkeleton rows={4} rowHeight={44} />
       ) : !rows.length ? (
         <EmptyState>No announcements in the last month.</EmptyState>
       ) : (
@@ -79,7 +81,7 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
                       <span className="mt-0.5 flex items-center gap-2 text-[11.5px]">
                         {a.course && <span className="font-medium" style={{ color }}>{a.course.code}</span>}
                         <span className="text-ter">{friendlyDate(a.startsAt)}</span>
-                        {!xs && a.description && <span className="min-w-0 flex-1 truncate text-ter">{a.description.replace(/\s+/g, ' ').slice(0, 120)}</span>}
+                        {!xs && previews.get(a.id) && <span className="min-w-0 flex-1 truncate text-ter">{previews.get(a.id)}</span>}
                       </span>
                     </span>
                   </span>

@@ -87,3 +87,65 @@ export function autoView(width: number, height: number): CalView {
   if (width < 820) return height > 620 ? 'month' : 'strip';
   return height > 640 ? 'month' : 'week';
 }
+
+/* ---------- week grid layout ---------- */
+export const HOUR_START = 7;
+export const HOUR_END = 23;
+export const PX_PER_HOUR = 52;
+export const MIN_EVENT_PX = 22;
+
+export interface Placed {
+  item: EffectiveItem;
+  start: Date;
+  end: Date;
+  /** Minutes after HOUR_START, clamped to the grid. */
+  top: number;
+  bottom: number;
+  col: number;
+  cols: number;
+}
+
+/**
+ * Lays out one day's timed events: each is clamped to the 7 AM – 11 PM grid (an event outside it sits at the
+ * edge it's past), then events that overlap, counting the minimum drawn height, are clustered and dealt into
+ * side-by-side columns; every event in a cluster is 1/columns wide.
+ */
+export function placeDay(timed: EffectiveItem[]): Placed[] {
+  const gridMin = (HOUR_END - HOUR_START) * 60;
+  const minDur = (MIN_EVENT_PX / PX_PER_HOUR) * 60;
+  const minuteOf = (d: Date, day: Date) => (d.getTime() - day.getTime()) / 60_000 - HOUR_START * 60;
+  const placed: Placed[] = timed.map((item) => {
+    const start = itemTime(item)!;
+    const end = itemEnd(item) ?? new Date(start.getTime() + 30 * 60_000);
+    const day = new Date(start);
+    day.setHours(0, 0, 0, 0);
+    let top = Math.max(0, minuteOf(start, day));
+    let bottom = Math.min(gridMin, minuteOf(end, day));
+    if (bottom - top < minDur) {
+      // too short to draw, or wholly before 7 AM / after 11 PM: give it the minimum height, kept inside the grid
+      top = Math.min(top, gridMin - minDur);
+      bottom = top + minDur;
+    }
+    return { item, start, end, top, bottom, col: 0, cols: 1 };
+  });
+  placed.sort((a, b) => a.top - b.top || b.bottom - a.bottom);
+  let cluster: Placed[] = [];
+  let colEnds: number[] = [];
+  let clusterEnd = -Infinity;
+  const close = () => {
+    for (const p of cluster) p.cols = colEnds.length;
+    cluster = [];
+    colEnds = [];
+  };
+  for (const p of placed) {
+    if (p.top >= clusterEnd) close();
+    let col = colEnds.findIndex((end) => end <= p.top);
+    if (col === -1) col = colEnds.push(p.bottom) - 1;
+    else colEnds[col] = p.bottom;
+    p.col = col;
+    cluster.push(p);
+    clusterEnd = Math.max(clusterEnd, p.bottom);
+  }
+  close();
+  return placed;
+}

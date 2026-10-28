@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -26,8 +26,18 @@ export function QuickAdd({ defaultDate }: { defaultDate?: Date }) {
   const [calendarId, setCalendarId] = useState<string>('');
   const writable = (meta.calendars ?? []).filter((c) => c.accessRole === 'owner' || c.accessRole === 'writer');
   const connected = gcal?.status === 'connected' && !!gcal.hasConfig;
+  // set synchronously, so Enter pressed twice before the re-render (isPending lags a render) still sends one event
+  const submitting = useRef(false);
+
+  // opening starts on the day the calendar is showing, not the day the widget first mounted
+  const onOpenChange = (next: boolean) => {
+    if (next) setDate(format(defaultDate ?? new Date(), 'yyyy-MM-dd'));
+    setOpen(next);
+  };
 
   const submit = () => {
+    if (submitting.current || create.isPending || !title.trim()) return;
+    submitting.current = true;
     const allDay = !time;
     const start = allDay ? date : new Date(`${date}T${time}:00`).toISOString();
     const end = allDay ? undefined : new Date(new Date(`${date}T${time}:00`).getTime() + Number(duration) * 60_000).toISOString();
@@ -40,19 +50,22 @@ export function QuickAdd({ defaultDate }: { defaultDate?: Date }) {
           setOpen(false);
         },
         onError: (e) => toast.error(e.message),
+        onSettled: () => {
+          submitting.current = false;
+        },
       },
     );
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <button className="orb size-[30px] border border-line text-base disabled:opacity-40" aria-label="Add event" title={connected ? 'Add event' : 'Connect Google Calendar to add events'} disabled={!connected}>
+        <button className="orb size-[30px] shrink-0 border border-line text-base disabled:opacity-40" aria-label="Add event" title={connected ? 'Add event' : 'Connect Google Calendar to add events'} disabled={!connected}>
           <Plus className="size-4" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-2">
-        <Input autoFocus placeholder="Event title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && title.trim() && submit()} />
+        <Input autoFocus placeholder="Event title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
         <div className="flex gap-2">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} placeholder="all day" />
@@ -72,7 +85,7 @@ export function QuickAdd({ defaultDate }: { defaultDate?: Date }) {
           )}
         </div>
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button size="sm" disabled={!title.trim() || create.isPending} onClick={submit}>Add</Button>
         </div>
       </PopoverContent>

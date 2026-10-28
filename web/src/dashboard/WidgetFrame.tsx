@@ -75,8 +75,11 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       <div className={cn('surface-head flex min-h-[50px] shrink-0 items-center gap-2.5 pl-4 pr-3 pt-1.5', editMode && 'widget-drag-handle cursor-grab select-none active:cursor-grabbing')} title={editMode ? 'Drag to move' : undefined}>
         {courseColor && <span className="size-2 shrink-0 rounded-full" style={{ background: courseColor }} />}
-        <h3 className="min-w-0 shrink-0 truncate text-[16px] font-semibold leading-tight tracking-[-0.015em] text-ink">{title}</h3>
-        <div ref={setSlot} className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1.5" />
+        {/* One row, always: the title truncates past 60% of the row (all of it when the slot is empty), and the slot
+            clips rather than wrapping into a second row that would steal height from the body (its padding, cancelled
+            by margin, leaves room for focus rings). Widgets drop or shorten their controls at narrow tiers. */}
+        <h3 className="min-w-0 max-w-[60%] truncate [&:has(+div:empty)]:max-w-none text-[16px] font-semibold leading-tight tracking-[-0.015em] text-ink" title={title}>{title}</h3>
+        <div ref={setSlot} className="-my-1 -mr-1 flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2 overflow-hidden py-1 pr-1" />
       </div>
       <div ref={bodyRef} className="widget-body min-h-0 flex-1" style={{ containerType: 'size' }}>
         <WidgetHeaderSlot.Provider value={slot}>

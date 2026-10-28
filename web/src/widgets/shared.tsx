@@ -8,6 +8,21 @@ import { safeHref } from '@/lib/url';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
 
+/**
+ * For controls that only appear on hover (a row's download or sync button): also shown while focused from the
+ * keyboard and always on touch screens, where there is no hover. Pair with `group-hover/x:opacity-100` and
+ * `group-focus-within/x:opacity-100` on the caller's named group.
+ */
+export const HOVER_REVEAL = 'opacity-0 focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
+
+/** For a div with role="button" (a card): Enter or Space on the card itself activates it; keys pressed on a control inside the card are that control's. */
+export function activateOnKey(e: React.KeyboardEvent, run: () => void) {
+  if (e.target !== e.currentTarget) return;
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  run();
+}
+
 export function CourseDot({ color, className, title }: { color: string | null | undefined; className?: string; title?: string }) {
   return <span className={cn('inline-block size-2 shrink-0 rounded-full', className)} style={{ background: safeColor(color) ?? 'var(--muted-foreground)' }} title={title} />;
 }
@@ -75,9 +90,11 @@ export interface NextMeeting {
   virtual: boolean;
 }
 
-/** The next occurrence of any meeting in the schedule, relative to now, skipping cancelled sessions. */
-export function nextMeeting(schedule: CourseSchedule, exceptions: MeetingException[] = []): NextMeeting | null {
-  const now = new Date();
+/**
+ * The next occurrence of any meeting in the schedule that hasn't ended, skipping cancelled sessions. A session in
+ * progress counts (its `when` is then in the past). Pass `now` from useNow so a caller's memo recomputes as time moves.
+ */
+export function nextMeeting(schedule: CourseSchedule, exceptions: MeetingException[] = [], now: Date = new Date()): NextMeeting | null {
   let best: NextMeeting | null = null;
   const covers = (x: MeetingException, kind: string, d: Date) => x.date === format(d, 'yyyy-MM-dd') && (x.meetingKind === null || x.meetingKind === kind);
   for (const [kind, list] of Object.entries(schedule) as [string, Meeting[] | undefined][]) {

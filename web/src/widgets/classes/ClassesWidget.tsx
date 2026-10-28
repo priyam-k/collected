@@ -5,14 +5,15 @@ import { format } from 'date-fns';
 import { meetingLabel, type Course } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useCourses, useGradesSummary, useItems } from '@/lib/queries';
-import { friendlyDate, isPast } from '@/lib/time';
+import { friendlyDate } from '@/lib/time';
 import { usePane } from '@/panes/PaneContext';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { TickArc } from '@/widgets/instruments';
-import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
 import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { useNow } from '@/widgets/useNow';
 
 /**
  * A dial of ticks with the current grade inside; TA courses show "TA" on a full ring, ungraded ones a dash on an
@@ -45,8 +46,10 @@ export function ClassesWidget({ size }: WidgetProps) {
   const itemsQ = useItems({ kind: ['assignment'], from: win.from, to: win.to, limit: 500 });
   const manualQ = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 200 });
   const gradesQ = useGradesSummary();
+  const now = useNow(60_000);
 
   if (coursesQ.isError) return <ErrorState error={coursesQ.error} onRetry={() => coursesQ.refetch()} />;
+  if (coursesQ.isPending) return <ListSkeleton rows={3} rowHeight={48} />;
   const courses = (coursesQ.data ?? []).filter((c) => !c.archived);
   if (coursesQ.isSuccess && !courses.length)
     return (
@@ -60,28 +63,27 @@ export function ClassesWidget({ size }: WidgetProps) {
     if (!it.courseId) continue;
     byCourse.set(it.courseId, [...(byCourse.get(it.courseId) ?? []), it]);
   }
-  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const todayKey = format(now, 'yyyy-MM-dd');
   const dueToday = (itemsQ.data ?? []).filter((it) => it.dueAt && format(new Date(it.dueAt), 'yyyy-MM-dd') === todayKey && !it.effectiveDone).length;
   const wide = size.tier === 'lg' || (size.tier === 'md' && size.aspect === 'wide');
 
   return (
     <div className="h-full overflow-auto p-1.5">
       <WidgetHeader>
-        <span className="text-[12.5px] text-sub">{itemsQ.isPending ? '' : dueToday ? `${dueToday} due today` : 'nothing due today'}</span>
+        <span className="min-w-0 truncate text-[12.5px] text-sub">{itemsQ.isPending ? '' : dueToday ? `${dueToday} due today` : 'nothing due today'}</span>
       </WidgetHeader>
       <ul className="flex flex-col">
         {courses.map((c) => {
           const list = byCourse.get(c.id) ?? [];
           const next = list[0];
           const isToday = !!next?.dueAt && format(new Date(next.dueAt), 'yyyy-MM-dd') === todayKey;
-          const meeting = nextMeeting(c.schedule, meetingExceptions((manualQ.data ?? []).filter((it) => it.courseId === c.id)));
+          const meeting = nextMeeting(c.schedule, meetingExceptions((manualQ.data ?? []).filter((it) => it.courseId === c.id)), now);
           const grade = gradesQ.data?.[c.id];
           return (
             <li key={c.id}>
               <button
                 type="button"
-                className={cn('flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-well')}
-                style={isToday ? { background: 'var(--brand-soft)' } : undefined}
+                className={cn('flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors', isToday ? 'bg-brand-soft hover:bg-brand-soft/70' : 'hover:bg-well')}
                 title={`Open ${c.code}: assignments, grades, dates, files`}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={() => open({ kind: 'course', courseId: c.id })}
@@ -94,7 +96,7 @@ export function ClassesWidget({ size }: WidgetProps) {
                   </div>
                   {next ? (
                     <div className="mt-px truncate text-xs text-sub">
-                      {next.title} · <span className={cn('font-medium', (isToday || (next.dueAt && isPast(next.dueAt))) ? 'text-critical' : 'text-sub')}>{isToday ? `due ${next.dueAt ? format(new Date(next.dueAt), 'h:mm a') : 'today'}` : friendlyDate(next.dueAt, { withTime: false })}</span>
+                      {next.title} · <span className={cn('font-medium', (isToday || (next.dueAt && new Date(next.dueAt) < now)) ? 'text-critical' : 'text-sub')}>{isToday ? `due ${next.dueAt ? format(new Date(next.dueAt), 'h:mm a') : 'today'}` : friendlyDate(next.dueAt, { withTime: false })}</span>
                     </div>
                   ) : (
                     <div className="mt-px text-xs text-ter">{itemsQ.isPending ? '…' : 'Nothing due in 3 weeks'}</div>

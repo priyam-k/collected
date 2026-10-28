@@ -5,13 +5,15 @@ import { WidgetHeader } from '@/dashboard/WidgetHeader';
 import { useItems } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
-import { usePane } from '@/panes/PaneContext';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
 import { manualRaw } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
+import { useNow } from '@/widgets/useNow';
 
 const EXAMISH = /\b(exam|midterm|final|quiz|test)\b/i;
+/** "Final project", "Test case report", "Midterm essay": titled like an exam but not one. */
+const NOT_EXAM = /\b(project|paper|report|cases?|essay)\b/i;
 const HORIZON_DAYS = 120;
 
 interface Row {
@@ -23,16 +25,20 @@ interface Row {
 
 const toneFor = (k: Row['kind']) => (k === 'quiz' ? 'var(--caution)' : 'var(--critical)');
 
-/** Days-until in one word: "today", "tmrw", or the number; the label below says "days". */
-function countdown(when: Date): { big: string; small: string; urgent: boolean } {
-  const d = differenceInCalendarDays(when, new Date());
-  if (d <= 0) return { big: 'today', small: format(when, 'h:mm a'), urgent: true };
-  if (d === 1) return { big: 'tmrw', small: format(when, 'h:mm a'), urgent: true };
+/** Days-until in one word: "today", "tmrw", or the number; the label below says "days" (or the time, when near). */
+function countdown(when: Date, allDay: boolean, now: Date): { big: string; small: string; urgent: boolean } {
+  const d = differenceInCalendarDays(when, now);
+  const time = allDay ? 'all day' : format(when, 'h:mm a');
+  if (d <= 0) return { big: 'today', small: time, urgent: true };
+  if (d === 1) return { big: 'tmrw', small: time, urgent: true };
   return { big: String(d), small: d === 1 ? 'day' : 'days', urgent: d <= 3 };
 }
 
+/** Same course, same day, same title once case and punctuation are ignored: a hand-entered exam and its Canvas twin. */
+const dupKey = (r: Row) => `${r.item.courseId ?? ''}|${format(r.when, 'yyyy-MM-dd')}|${r.item.title.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
+
 /** Exams, quizzes, and finals across every course: hand-entered dates plus assignments titled like one. */
-export function ExamsWidget({ size }: WidgetProps) {
+export function ExamsWidget(_props: WidgetProps) {
   const win = useMemo(() => {
     const from = new Date();
     from.setHours(0, 0, 0, 0);
@@ -42,7 +48,7 @@ export function ExamsWidget({ size }: WidgetProps) {
   }, []);
   const manual = useItems({ kind: ['event'], source: ['manual'], from: win.from, to: win.to, limit: 300 });
   const assignments = useItems({ kind: ['assignment'], from: win.from, to: win.to, includeDone: true, includeInformational: true, limit: 500 });
-  const { open } = usePane();
+  const now = useNow(60_000);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -51,41 +57,46 @@ export function ExamsWidget({ size }: WidgetProps) {
       if (!r || (r.eventKind !== 'exam' && r.eventKind !== 'quiz' && r.eventKind !== 'final') || !it.startsAt) continue;
       out.push({ item: it, when: new Date(it.startsAt), kind: r.eventKind, location: r.location });
     }
+    // manual rows come first, so a Canvas assignment duplicating one is the one dropped
+    const seen = new Set(out.map(dupKey));
     for (const it of assignments.data ?? []) {
-      if (!it.dueAt || !EXAMISH.test(it.title) || it.informational) continue;
+      if (!it.dueAt || !EXAMISH.test(it.title) || NOT_EXAM.test(it.title) || it.informational) continue;
       const kind: Row['kind'] = /\bquiz\b/i.test(it.title) ? 'quiz' : /\bfinal\b/i.test(it.title) ? 'final' : 'exam';
-      out.push({ item: it, when: new Date(it.dueAt), kind, location: null });
+      const row: Row = { item: it, when: new Date(it.dueAt), kind, location: null };
+      if (seen.has(dupKey(row))) continue;
+      seen.add(dupKey(row));
+      out.push(row);
     }
-    const now = Date.now() - 6 * 3600e3;
-    return out.filter((r) => r.when.getTime() >= now).sort((a, b) => a.when.getTime() - b.when.getTime());
+    return out.sort((a, b) => a.when.getTime() - b.when.getTime());
   }, [manual.data, assignments.data]);
 
-  if (manual.isError) return <ErrorState error={manual.error} onRetry={() => manual.refetch()} />;
-  const xs = size.tier === 'xs';
-  const limit = xs ? 1 : Math.max(2, Math.floor((size.height - 8) / 58));
-  const soon = rows.filter((r) => differenceInCalendarDays(r.when, new Date()) <= 7).length;
+  const err = manual.error ?? assignments.error;
+  if (err) return <ErrorState error={err} onRetry={() => { void manual.refetch(); void assignments.refetch(); }} />;
+  // a timed exam stays listed six hours past its start, an all-day one until its day ends
+  const shown = rows.filter((r) => (r.item.allDay ? r.when.getTime() + 24 * 3600e3 : r.when.getTime() + 6 * 3600e3) >= now.getTime());
+  const soon = shown.filter((r) => differenceInCalendarDays(r.when, now) <= 7).length;
 
   return (
     <div className="flex h-full flex-col">
       <WidgetHeader>
-        {rows.length > 0 && (
+        {shown.length > 0 && (
           soon > 0 ? (
-            <span className="flex h-7 items-center gap-1.5 rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
+            <span className="flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[12.5px] font-semibold text-critical" style={{ background: 'color-mix(in srgb, var(--critical) 11%, var(--surface))' }}>
               <span className="size-1.5 rounded-full bg-critical" />{soon} this week
             </span>
           ) : (
-            <span className="text-[12.5px] text-sub">{rows.length} upcoming</span>
+            <span className="min-w-0 truncate text-[12.5px] text-sub">{shown.length} upcoming</span>
           )
         )}
       </WidgetHeader>
       {manual.isPending || assignments.isPending ? (
         <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
-      ) : !rows.length ? (
+      ) : !shown.length ? (
         <EmptyState>No exams on the calendar. Add dates from a course's Dates tab.</EmptyState>
       ) : (
         <ul className="min-h-0 flex-1 overflow-auto p-1.5">
-          {rows.slice(0, limit).map((r) => {
-            const c = countdown(r.when);
+          {shown.map((r) => {
+            const c = countdown(r.when, r.item.allDay, now);
             const tone = safeColor(r.item.course?.color) ?? toneFor(r.kind);
             return (
               <li key={r.item.id}>
@@ -98,7 +109,8 @@ export function ExamsWidget({ size }: WidgetProps) {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-[11.5px]">
                         <span className="size-1.5 shrink-0 rounded-full" style={{ background: tone }} />
-                        {r.item.course && <button className="font-medium hover:underline" style={{ color: tone }} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); open({ kind: 'course', courseId: r.item.course!.id, tab: 'dates' }); }}>{r.item.course.code}</button>}
+                        {/* plain text: the row is already a button (the popover), and its details link to the course */}
+                        {r.item.course && <span className="font-medium" style={{ color: tone }}>{r.item.course.code}</span>}
                         <span className="label !text-[10px] !text-ter">{r.kind}</span>
                       </span>
                       <span className="block truncate text-[13.5px] font-medium">{r.item.title}</span>
@@ -109,7 +121,6 @@ export function ExamsWidget({ size }: WidgetProps) {
               </li>
             );
           })}
-          {rows.length > limit && <li className="px-3 py-1 text-xs text-ter">+{rows.length - limit} more</li>}
         </ul>
       )}
     </div>

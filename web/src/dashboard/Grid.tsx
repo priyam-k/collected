@@ -19,6 +19,9 @@ interface Props {
   scale?: number;
 }
 
+/** Controls that sit in a drag handle (the widget title row) and must keep their clicks. */
+const DRAG_CANCEL = 'button, a, input, select, textarea, [role=button]';
+
 /** The resize grip: a thick stroke along the card's rounded bottom-right corner (22px radius, inset 6px). */
 function resizeHandle(_axis: string, ref: Ref<HTMLElement>) {
   return (
@@ -62,7 +65,8 @@ export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, o
           containerPadding={[0, 0]}
           compactor={verticalCompactor}
           positionStrategy={positionStrategy}
-          dragConfig={{ enabled: editMode, handle: '.widget-drag-handle', threshold: 3 }}
+          // the title row is the handle and also holds each widget's controls: pressing one of those never starts a drag
+          dragConfig={{ enabled: editMode, handle: '.widget-drag-handle', cancel: DRAG_CANCEL, threshold: 3 }}
           resizeConfig={{ enabled: editMode, handles: editMode ? ['se'] : [], handleComponent: editMode ? resizeHandle : undefined }}
           onLayoutChange={handleLayoutChange}
           onBreakpointChange={(bp) => {
