@@ -27,12 +27,13 @@ test.describe('settings', () => {
     // Exact title match: "Google Calendar" must not also pick up "Google Calendar (iCal)".
     const card = (title: string) => page.locator('[data-slot="card"]').filter({ has: page.locator('[data-slot="card-title"]', { hasText: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 
-    await expect(card('Canvas').getByText(/^(disconnected|not set up)$/)).toBeVisible();
-    await expect(card('Gradescope').getByText(/^(disconnected|not set up)$/)).toBeVisible();
-    await expect(card('Google Calendar').getByText('connected', { exact: true })).toBeVisible();
+    // Statuses read as words for people, not the raw ids.
+    await expect(card('Canvas').getByText('Not connected', { exact: true })).toBeVisible();
+    await expect(card('Gradescope').getByText('Not connected', { exact: true })).toBeVisible();
+    await expect(card('Google Calendar').getByText('Connected', { exact: true })).toBeVisible();
     await expect(card('Google Calendar').getByText('showing demo calendars')).toBeVisible();
-    await expect(card('Todoist').getByText('connected', { exact: true })).toBeVisible();
-    await expect(card('Job feed').getByText(/^(disconnected|not set up)$/)).toBeVisible();
+    await expect(card('Todoist').getByText('Connected', { exact: true })).toBeVisible();
+    await expect(card('Job feed').getByText('Not connected', { exact: true })).toBeVisible();
 
     // The "Data pulled" panel reads the per-course summary for a fixture-backed source.
     await card('Gradescope').getByRole('button', { name: /Data pulled/ }).click();
@@ -55,8 +56,9 @@ test.describe('settings', () => {
     expect(strip(parsed)).toEqual(before);
 
     await page.getByPlaceholder('Paste an export here').fill(text);
-    page.once('dialog', (d) => d.accept()); // the import asks for confirmation
     await page.getByRole('button', { name: 'Import', exact: true }).click();
+    // The import asks first: it overwrites settings and layouts.
+    await page.getByRole('dialog', { name: 'Import this export?' }).getByRole('button', { name: 'Import', exact: true }).click();
     await expect(page.getByText(/^Imported: /)).toBeVisible();
 
     const after = strip(await apiGet<Export>(request, '/export'));

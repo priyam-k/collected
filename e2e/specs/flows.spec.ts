@@ -1,0 +1,152 @@
+import { expect, test } from '@playwright/test';
+import { COURSE } from '../env.js';
+import { apiGet, apiSend, openDashboard, pane, widget } from '../helpers.js';
+
+test.describe('flows', () => {
+  test("the course pane's edit button opens that course's editor and closes the pane", async ({ page }) => {
+    await openDashboard(page);
+    await widget(page, 'Classes overview').getByRole('button', { name: /CMSC422/ }).click();
+    const drawer = pane(page);
+    await expect(drawer.getByText('CMSC422', { exact: true })).toBeVisible();
+
+    await drawer.getByRole('link', { name: 'Edit this course' }).click();
+    await expect(page).toHaveURL(/\/settings\/courses$/); // the ?edit= param is consumed
+    await expect(page.getByRole('dialog', { name: 'Edit CMSC422' })).toBeVisible();
+    await expect(drawer).toBeHidden();
+  });
+
+  test('navigating away closes an open pane', async ({ page }) => {
+    await openDashboard(page);
+    await widget(page, 'Classes overview').getByRole('button', { name: /MATH423/ }).click();
+    await expect(pane(page)).toBeVisible();
+    // The pane takes focus, so the keyboard lands inside it rather than on the board behind.
+    await expect(pane(page)).toBeFocused();
+
+    await page.goto('/settings/sources');
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
+    await expect(pane(page)).toBeHidden();
+  });
+
+  test('an unknown address goes home instead of a blank page', async ({ page }) => {
+    await page.goto('/no/such/page');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
+  });
+
+  test('the profile menu theme and accent are reachable by keyboard and keep the menu open', async ({ page }) => {
+    // Theme and accent live in this test's own browser context, so nothing leaks into the others.
+    await openDashboard(page);
+    await page.getByRole('button', { name: 'Profile and settings' }).click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+
+    await menu.getByRole('menuitemradio', { name: 'dark' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitemradio', { name: 'dark' })).toHaveAttribute('aria-checked', 'true');
+
+    await menu.getByRole('menuitemradio', { name: 'Forest accent' }).focus();
+    await page.keyboard.press('ArrowDown'); // menus move up and down, the swatch row included
+    await expect(menu.getByRole('menuitemradio', { name: 'Royal accent' })).toBeFocused(); // Radix moves focus a tick later
+    await page.keyboard.press('Enter');
+    await expect(menu.getByRole('menuitemradio', { name: 'Royal accent' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('html')).toHaveAttribute('data-accent', 'royal');
+
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+  });
+
+  test('the exams widget lists every upcoming exam in a scrolling list, not the first few', async ({ page, request }) => {
+    const tag = Date.now();
+    const titles = Array.from({ length: 8 }, (_, i) => `Quiz ${i + 1} (e2e ${tag})`);
+    const day = (n: number) => {
+      const d = new Date(Date.now() + n * 86_400_000);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const created: string[] = [];
+    try {
+      for (const [i, title] of titles.entries()) {
+        const row = await apiSend<{ externalId: string }>(request, 'post', '/items/manual', { courseId: COURSE.cmsc422, kind: 'quiz', title, date: day(i + 2), start: '10:00', end: '10:30' });
+        created.push(row.externalId);
+      }
+      await openDashboard(page);
+      await page.getByRole('button', { name: 'Edit layout' }).click();
+      await page.getByRole('button', { name: 'Add widget' }).click();
+      await page.getByRole('dialog', { name: 'Add a widget' }).getByRole('listitem').filter({ hasText: 'Exams' }).getByRole('button', { name: /^List/ }).click();
+      await page.getByRole('button', { name: 'Done' }).click();
+
+      const exams = widget(page, 'Exams');
+      for (const title of titles) await expect(exams.getByText(title)).toHaveCount(1);
+      await expect(exams.getByText(/\+\d+ more/)).toHaveCount(0);
+      // Eight rows do not fit a 6-row widget: the list scrolls instead of being cut off.
+      const last = exams.getByText(titles.at(-1)!);
+      await last.scrollIntoViewIfNeeded();
+      await expect(last).toBeInViewport();
+    } finally {
+      for (const id of created) await apiSend(request, 'delete', `/items/manual/${id}`);
+      await apiSend(request, 'put', '/widgets/exams', { type: 'exams', config: {}, hidden: true });
+    }
+  });
+
+  test('settings: deleting a course and discarding edits both ask first', async ({ page, request }) => {
+    await page.goto('/settings/courses');
+    await page.getByRole('button', { name: 'Delete STAT410' }).click();
+    const ask = page.getByRole('alertdialog').or(page.getByRole('dialog', { name: 'Delete STAT410?' }));
+    await expect(ask).toBeVisible();
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('row', { name: /STAT410/ })).toBeVisible();
+
+    const before = (await apiGet<{ name: string | null }>(request, `/courses/${COURSE.stat410}`)).name;
+    await page.getByRole('button', { name: 'Edit STAT410' }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit STAT410' });
+    await editor.getByLabel('Name', { exact: true }).fill('Not saved');
+    await page.keyboard.press('Escape');
+    const discard = page.getByRole('dialog', { name: 'Discard your changes?' });
+    await expect(discard).toBeVisible();
+    // A destructive question starts on the safe answer, so Enter keeps the edits.
+    await expect(discard.getByRole('button', { name: 'Keep editing' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(discard).toBeHidden();
+    await expect(editor.getByLabel('Name', { exact: true })).toHaveValue('Not saved'); // still editing, nothing lost
+
+    await page.keyboard.press('Escape');
+    await page.getByRole('dialog', { name: 'Discard your changes?' }).getByRole('button', { name: 'Discard' }).click();
+    await expect(editor).toBeHidden();
+    expect((await apiGet<{ name: string | null }>(request, `/courses/${COURSE.stat410}`)).name).toBe(before);
+  });
+
+  test('settings: the jobs filters take commas as typed', async ({ page }) => {
+    await page.goto('/settings/jobs');
+    const cats = page.getByLabel(/^Categories/);
+    await cats.fill('');
+    await cats.pressSequentially('Software, AI/ML');
+    await expect(cats).toHaveValue('Software, AI/ML');
+  });
+
+  test('settings: an unknown section falls back to Sources', async ({ page }) => {
+    await page.goto('/settings/nonsense');
+    await expect(page).toHaveURL(/\/settings\/sources$/);
+    await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
+  });
+
+  test('demo: the board runs on made-up data, its pane stays inside the window and links stay put', async ({ page }) => {
+    await page.goto('/demo');
+    // Signed in (auth is off here), the banner points back to the real board.
+    await expect(page.getByRole('link', { name: 'Back to your board' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open dashboard' })).toBeVisible();
+
+    await widget(page, 'Classes overview').getByRole('button', { name: /CS351/ }).click();
+    const drawer = pane(page);
+    await expect(drawer.getByText('CS351', { exact: true })).toBeVisible();
+    // Non-modal and contained: the page behind still scrolls and the drawer sits within the demo window.
+    const box = await drawer.boundingBox();
+    expect(box && box.width).toBeLessThan(page.viewportSize()!.width);
+
+    const link = drawer.getByRole('link').first();
+    await link.click();
+    await expect(page.getByText('Links are off in the demo')).toBeVisible();
+    await expect(page).toHaveURL(/\/demo$/);
+  });
+});
