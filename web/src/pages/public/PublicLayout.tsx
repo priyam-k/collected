@@ -36,20 +36,35 @@ export function Brand({ className = '' }: { className?: string }) {
   );
 }
 
+const SECTIONS: [string, string][] = [
+  ['Demo', '/#demo'],
+  ['How it works', '/#how'],
+  ['Agents', '/#agents'],
+  ['Features', '/#features'],
+  ['Self-host', '/#self-host'],
+];
+
 /**
- * Chrome for the signed-out pages: a floating glass bar with the product name and a Sign in link, the page, and a
- * footer with Privacy, Terms, and GitHub. Pages wrap themselves in it, so each route is a single element.
+ * Chrome for the signed-out pages: a floating glass bar with the product name, the landing page's sections and a
+ * Sign in link, the page, and a footer. `wide` lets the landing page run full width; legal pages keep a measure.
  */
-export function PublicLayout({ children }: { children: ReactNode }) {
+export function PublicLayout({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const glass = useGlass<HTMLDivElement>();
   return (
     <div className="flex min-h-full flex-col text-foreground">
-      <header className="pointer-events-none sticky top-0 z-20 px-3 pt-3 sm:px-6 sm:pt-4">
-        <div ref={glass} className="glass pointer-events-auto mx-auto flex h-[52px] w-full max-w-5xl items-center gap-2 p-1.5 pl-4">
+      <header className="pointer-events-none sticky top-0 z-30 px-3 pt-3 sm:px-6 sm:pt-4">
+        <div ref={glass} className="glass pointer-events-auto mx-auto flex h-[52px] w-full max-w-6xl items-center gap-2 p-1.5 pl-4">
           <Link to="/" className="rounded-full" aria-label="collected home">
             <Brand />
           </Link>
-          <nav className="ml-auto flex items-center gap-0.5">
+          <nav aria-label="Sections" className="mx-auto hidden items-center gap-0.5 lg:flex">
+            {SECTIONS.map(([label, href]) => (
+              <a key={href} href={href} className="glass-btn px-3.5 text-[14px] font-medium text-sub hover:text-ink">
+                {label}
+              </a>
+            ))}
+          </nav>
+          <nav className="ml-auto flex items-center gap-0.5 lg:ml-0">
             <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="glass-btn hidden px-3.5 text-[14px] font-medium text-sub hover:text-ink sm:inline-flex">
               GitHub
             </a>
@@ -60,10 +75,14 @@ export function PublicLayout({ children }: { children: ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 sm:px-6">{children}</main>
+      <main className={wide ? 'w-full flex-1' : 'mx-auto w-full max-w-5xl flex-1 px-4 sm:px-6'}>{children}</main>
       <footer className="mt-8 border-t border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-6 text-[13px] text-sub sm:px-6">
-          <Brand className="mr-auto opacity-80" />
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-5 py-7 text-[13px] text-sub sm:px-6">
+          <Brand className="opacity-80" />
+          <span className="mr-auto text-ter">© {new Date().getFullYear()} Priyam Kabra</span>
+          <Link to="/demo" className="hover:text-ink">
+            Live demo
+          </Link>
           <Link to="/privacy" className="hover:text-ink">
             Privacy
           </Link>

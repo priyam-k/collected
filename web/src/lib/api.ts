@@ -9,7 +9,22 @@ export class ApiError extends Error {
   }
 }
 
+type ApiOverride = (path: string, init: RequestInit & { json?: unknown }) => Promise<unknown>;
+let override: ApiOverride | null = null;
+
+/**
+ * The live demo answers requests in the browser while it is mounted. An override returns undefined to let a request
+ * through to the server (the demo does that for /auth). Null restores the network for everything.
+ */
+export function setApiOverride(fn: ApiOverride | null): void {
+  override = fn;
+}
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  if (override) {
+    const answered = await override(path, init);
+    if (answered !== undefined) return answered as T;
+  }
   const { json, headers, ...rest } = init;
   const res = await fetch(`/api${path}`, {
     ...rest,

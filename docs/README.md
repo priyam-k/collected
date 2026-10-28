@@ -6,7 +6,7 @@ Documentation for people who run or use collected. The engineering notes (archit
 | --- | --- |
 | [`self-host.md`](self-host.md) | Run your own instance: Docker, TLS with Caddy or a Cloudflare Tunnel, the Google OAuth client, connecting sources, backups, updates, the CLI. Start here. |
 | [`Caddyfile`](Caddyfile) | Reverse proxy with automatic HTTPS for the self-host guide, step 4. |
-| `screenshots/` | Images used by the landing page and the README (`dashboard.png` is the board). |
+| `screenshots/` | Images used by the README (`dashboard.png` is the board, also served by the web app). Retake them all with `SCREENSHOTS=1 pnpm exec playwright test specs/screenshots.spec.ts` from `e2e/`. |
 
 Related, elsewhere in the repo:
 

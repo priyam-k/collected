@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type Ref } from 'react';
 import { Responsive as ResponsiveGridLayout, useContainerWidth, verticalCompactor, type Layout, type ResponsiveLayouts } from 'react-grid-layout';
+import { createScaledStrategy } from 'react-grid-layout/core';
 import type { Breakpoint, Layouts, Source, WidgetInstance } from '@collected/shared';
 import { BREAKPOINTS, COLS, MARGIN, ROW_HEIGHT } from './defaults';
 import { WidgetFrame } from './WidgetFrame';
@@ -14,6 +15,8 @@ interface Props {
   onLayoutsChange(next: Layouts): void;
   onHide(id: string): void;
   onBreakpointChange?(bp: Breakpoint): void;
+  /** The grid is drawn inside a CSS scale() (the landing page's live demo), so drags map back to grid units. */
+  scale?: number;
 }
 
 /** The resize grip: a thick stroke along the card's rounded bottom-right corner (22px radius, inset 6px). */
@@ -27,7 +30,8 @@ function resizeHandle(_axis: string, ref: Ref<HTMLElement>) {
   );
 }
 
-export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, onHide, onBreakpointChange }: Props) {
+export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, onHide, onBreakpointChange, scale }: Props) {
+  const positionStrategy = useMemo(() => (scale && scale !== 1 ? createScaledStrategy(scale) : undefined), [scale]);
   const { width, containerRef, mounted } = useContainerWidth();
   const [, setBp] = useState<Breakpoint>('lg');
   const visible = useMemo(() => instances.filter((w) => !w.hidden), [instances]);
@@ -57,6 +61,7 @@ export function Grid({ instances, layouts, sources, editMode, onLayoutsChange, o
           margin={MARGIN}
           containerPadding={[0, 0]}
           compactor={verticalCompactor}
+          positionStrategy={positionStrategy}
           dragConfig={{ enabled: editMode, handle: '.widget-drag-handle', threshold: 3 }}
           resizeConfig={{ enabled: editMode, handles: editMode ? ['se'] : [], handleComponent: editMode ? resizeHandle : undefined }}
           onLayoutChange={handleLayoutChange}

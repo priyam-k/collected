@@ -4,7 +4,7 @@ import { isSignedIn, useMe } from '@/lib/queries';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SignInPage } from '@/pages/SignInPage';
-import { Landing, Privacy, Terms } from '@/pages/public';
+import { DemoPage, Landing, Privacy, Terms } from '@/pages/public';
 import { PaneProvider } from '@/panes/PaneContext';
 
 function ServerDown() {
@@ -37,6 +37,7 @@ export default function App() {
         <Route path="/signin" element={<SignInPage />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/demo" element={<DemoPage />} />
         <Route
           path="/settings/*"
           element={
