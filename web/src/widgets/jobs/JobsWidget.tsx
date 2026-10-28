@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { safeHref } from '@/lib/url';
 import { usePane } from '@/panes/PaneContext';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
-import { HOVER_REVEAL, activateOnKey } from '@/widgets/shared';
+import { HOVER_REVEAL, activateOnKey, useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 type Mode = 'new' | 'starred' | 'matches';
@@ -144,6 +144,7 @@ function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState:
 }
 
 export function JobsWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const [mode, setMode] = useState<Mode>('new');
   const liquid = useLiquid();
   const [visible, setVisible] = useState(PAGE);
@@ -188,7 +189,7 @@ export function JobsWidget({ size }: WidgetProps) {
         )}
         {size.tier === 'lg' && <Link to="/settings/jobs" title="Edit the match filter" className="text-xs text-ter hover:text-ink">Filter</Link>}
       </WidgetHeader>
-      <div className={cn('min-h-0 flex-1', tape ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto')}>
+      <div ref={fade} className={cn('scroll-fade min-h-0 flex-1', tape ? 'overflow-x-auto overflow-y-hidden [--fade-size:40px]' : 'overflow-auto')}>
         {q.isPending ? (
           <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
         ) : !jobs.length ? (
@@ -196,7 +197,7 @@ export function JobsWidget({ size }: WidgetProps) {
             {mode === 'starred' ? 'No starred jobs yet.' : 'No matching listings yet.'} <Link to="/settings/jobs" className="underline">Adjust the filter.</Link>
           </EmptyState>
         ) : tape ? (
-          <div className="flex h-full items-stretch gap-2 px-3 py-2.5">
+          <div className="flex h-full w-max min-w-full items-stretch gap-2 px-3 py-2.5">
             {shown.map((j) => <Card key={j.id} job={j} tape compact={compact} tall={tall} onState={(s) => onState(j, s)} refCb={refCb} />)}
             {rest > 0 && (
               <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => setVisible((v) => v + 2 * PAGE)} className="grid w-[120px] shrink-0 place-items-center rounded-2xl bg-well p-3.5 text-center transition-colors hover:bg-well2">

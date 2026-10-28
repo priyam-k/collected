@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
-import { manualRaw } from '@/widgets/shared';
+import { manualRaw, useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 import { useNow } from '@/widgets/useNow';
 
@@ -39,6 +39,7 @@ const dupKey = (r: Row) => `${r.item.courseId ?? ''}|${format(r.when, 'yyyy-MM-d
 
 /** Exams, quizzes, and finals across every course: hand-entered dates plus assignments titled like one. */
 export function ExamsWidget(_props: WidgetProps) {
+  const fade = useScrollEdges();
   const win = useMemo(() => {
     const from = new Date();
     from.setHours(0, 0, 0, 0);
@@ -94,7 +95,7 @@ export function ExamsWidget(_props: WidgetProps) {
       ) : !shown.length ? (
         <EmptyState>No exams on the calendar. Add dates from a course's Dates tab.</EmptyState>
       ) : (
-        <ul className="min-h-0 flex-1 overflow-auto p-1.5">
+        <ul ref={fade} className="scroll-fade min-h-0 flex-1 overflow-auto p-1.5">
           {shown.map((r) => {
             const c = countdown(r.when, r.item.allDay, now);
             const tone = safeColor(r.item.course?.color) ?? toneFor(r.kind);

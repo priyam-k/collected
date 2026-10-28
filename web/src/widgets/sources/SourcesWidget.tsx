@@ -8,7 +8,7 @@ import { useSources, useSyncSource } from '@/lib/queries';
 import { relative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { ErrorState, ListSkeleton } from '@/widgets/Placeholder';
-import { HOVER_REVEAL } from '@/widgets/shared';
+import { HOVER_REVEAL, useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 import { useNow } from '@/widgets/useNow';
 
@@ -35,6 +35,7 @@ function Dot({ s, className }: { s: Source; className?: string }) {
 }
 
 export function SourcesWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const q = useSources();
   const sync = useSyncSource();
   const now = useNow(60_000).getTime();
@@ -92,7 +93,7 @@ export function SourcesWidget({ size }: WidgetProps) {
   }
 
   return (
-    <div className="h-full overflow-auto p-1.5">
+    <div ref={fade} className="scroll-fade h-full overflow-auto p-1.5">
       <WidgetHeader>{summary}</WidgetHeader>
       <ul className="flex flex-col">
         {list.map((s) => {

@@ -10,6 +10,7 @@ import { safeColor } from '@/lib/color';
 import { usePane } from '@/panes/PaneContext';
 import { Meter, TickArc } from '@/widgets/instruments';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
+import { useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 type Period = 'week' | 'month';
@@ -73,6 +74,7 @@ function Rings({ groups, done, total }: { groups: Group[]; done: number; total: 
  * The header holds only navigation and the period; the range label and the legend sit in the ring's corners.
  */
 export function ProgressWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const [period, setPeriod] = useState<Period>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const { open } = usePane();
@@ -172,7 +174,7 @@ export function ProgressWidget({ size }: WidgetProps) {
             <EmptyState>Nothing due {period === 'week' ? 'this week' : 'this month'}.</EmptyState>
           )}
           {wide ? (
-            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 overflow-auto pt-7">
+            <div ref={fade} className="scroll-fade flex min-w-0 flex-1 flex-col justify-center gap-1.5 overflow-auto pt-7">
               <ul className="space-y-1">
                 {groups.map(wideRow)}
               </ul>

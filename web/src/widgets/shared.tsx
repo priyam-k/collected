@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { format } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
 import type { CourseEventKind, CourseLink, CourseSchedule, EffectiveItem, ItemStatus, ManualEventRaw, Meeting, MeetingKind } from '@collected/shared';
@@ -14,6 +15,50 @@ import { ItemPopover } from '@/widgets/ItemPopover';
  * `group-focus-within/x:opacity-100` on the caller's named group.
  */
 export const HOVER_REVEAL = 'opacity-0 focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
+
+const SCROLL_EDGES = ['top', 'bottom', 'left', 'right'] as const;
+
+/**
+ * Scroll affordance for a widget's scroller: returns a stable ref callback that keeps `data-scroll-top`,
+ * `data-scroll-bottom`, `data-scroll-left` and `data-scroll-right` on the element while more content lies past that
+ * edge. Pair it with the `scroll-fade` class (styles.css), which fades the content out toward those edges with a mask,
+ * so nothing shifts and it reads the same on either ground. It re-measures on scroll, when the scroller resizes, and
+ * when its children resize or change (data arriving, a row expanding). One callback can be passed to several elements.
+ */
+export function useScrollEdges<T extends HTMLElement = HTMLElement>() {
+  return useCallback((el: T | null) => {
+    if (!el) return;
+    const update = () => {
+      const x = Math.abs(el.scrollLeft);
+      const more = {
+        top: el.scrollTop > 1,
+        bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1,
+        left: x > 1,
+        right: x + el.clientWidth < el.scrollWidth - 1,
+      };
+      for (const edge of SCROLL_EDGES) {
+        const attr = `data-scroll-${edge}`;
+        if (el.hasAttribute(attr) !== more[edge]) el.toggleAttribute(attr, more[edge]);
+      }
+    };
+    const resize = new ResizeObserver(update);
+    const watch = () => {
+      resize.disconnect();
+      resize.observe(el);
+      for (const child of el.children) resize.observe(child);
+      update();
+    };
+    const children = new MutationObserver(watch);
+    children.observe(el, { childList: true });
+    el.addEventListener('scroll', update, { passive: true });
+    watch();
+    return () => {
+      el.removeEventListener('scroll', update);
+      resize.disconnect();
+      children.disconnect();
+    };
+  }, []);
+}
 
 /** For a div with role="button" (a card): Enter or Space on the card itself activates it; keys pressed on a control inside the card are that control's. */
 export function activateOnKey(e: React.KeyboardEvent, run: () => void) {

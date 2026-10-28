@@ -536,6 +536,41 @@
 [data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] { color: var(--brand); }
 [data-sonner-toaster] [data-sonner-toast] [data-description] { color: var(--ink-muted); }
 
+/* Scroll affordance, set by useScrollEdges: while more content lies past a scroller's bottom, left or right edge, its
+   content fades out toward that edge into whatever is behind it, so it reads the same on eggshell and charcoal and no
+   layout moves. The top edge is left crisp (agenda lists keep sticky day headers there). --fade-size sets the depth. */
+@property --fade-b { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+/* In the components layer so a caller's [--fade-size:…] utility wins. */
+@layer components {
+  .scroll-fade {
+    --fade-size: 24px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade-b)), transparent), linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade-b)), transparent), linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+    transition: --fade-b 180ms var(--ease), --fade-l 180ms var(--ease), --fade-r 180ms var(--ease);
+  }
+  .scroll-fade[data-scroll-bottom] { --fade-b: var(--fade-size); }
+  .scroll-fade[data-scroll-left] { --fade-l: var(--fade-size); }
+  .scroll-fade[data-scroll-right] { --fade-r: var(--fade-size); }
+}
+
+/* The widget card's rim, drawn over its content: the edit-mode ring is never painted under a card or list row that
+   reaches the edge. */
+.widget-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow 200ms var(--ease);
+}
+.widget-frame[data-editing]::after { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 40%, transparent); }
+
 /* react-grid-layout: the drop target is a soft well under everything; the card being moved or resized lifts above it. */
 .react-grid-item.react-grid-placeholder {
   z-index: 1;
@@ -573,6 +608,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .seg > *, .chip, .orb, .glass-btn, .glass-fold, .glass-fold[data-open="false"] { transition: none; }
+  .seg > *, .chip, .orb, .glass-btn, .glass-fold, .glass-fold[data-open="false"], .scroll-fade, .widget-frame::after { transition: none; }
   .glass-squish-in, .glass-squish-out { animation: none; }
 }

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { usePane } from '@/panes/PaneContext';
 import { StageSelect } from '@/panes/JobPane';
 import { EmptyState, ErrorState } from '@/widgets/Placeholder';
-import { HOVER_REVEAL, activateOnKey } from '@/widgets/shared';
+import { HOVER_REVEAL, activateOnKey, useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 const STAGE_TONE: Partial<Record<JobStateValue, string>> = {
@@ -64,6 +64,7 @@ function Card({ job, onStage, showStage }: { job: Job; onStage(s: JobStateValue)
 
 /** Every application by stage: a board when there's room, a list otherwise. Add your own entries with +. */
 export function TrackerWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const q = useTrackedJobs();
   const patch = usePatchJobState();
   const { open } = usePane();
@@ -111,7 +112,7 @@ export function TrackerWidget({ size }: WidgetProps) {
           <Plus className="size-3" /> Add
         </Button>
       </WidgetHeader>
-      <div className={cn('min-h-0 flex-1', board ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto')}>
+      <div ref={fade} className={cn('scroll-fade min-h-0 flex-1', board ? 'overflow-x-auto overflow-y-hidden [--fade-size:40px]' : 'overflow-auto')}>
         {q.isPending ? (
           <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
         ) : !openJobs.length && closedJobs.length && !showClosed ? (
@@ -134,7 +135,7 @@ export function TrackerWidget({ size }: WidgetProps) {
                   <h4 className={cn('label mb-1.5 flex items-baseline gap-1.5 px-1', stage === 'closed' ? 'text-ter' : STAGE_TONE[stage])}>
                     {stage === 'closed' ? 'Closed' : JOB_STATE_LABELS[stage]} <span className="text-ter">{list.length}</span>
                   </h4>
-                  <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+                  <div ref={fade} className="scroll-fade min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                     {list.map((j) => <Card key={j.id} job={j} onStage={(s) => onStage(j, s)} showStage={stage === 'closed'} />)}
                     {!list.length && <p className="px-1 text-xs text-muted-foreground/60">—</p>}
                   </div>

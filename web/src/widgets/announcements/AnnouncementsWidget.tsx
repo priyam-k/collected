@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { ItemPopover, stripHtml } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
+import { useScrollEdges } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 
 const KEY = 'collected.announcements.read';
@@ -38,6 +39,7 @@ function useReadSet(): [Set<string>, (ids: string[]) => void] {
 
 /** Every course's announcements, newest first, unread ones marked. Reading one (opening it) clears the mark. */
 export function AnnouncementsWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const q = useItems({ kind: ['announcement'], limit: 100 });
   const [read, mark] = useReadSet();
   const rows = useMemo(() => (q.data ?? []).slice().sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? '')), [q.data]);
@@ -67,7 +69,7 @@ export function AnnouncementsWidget({ size }: WidgetProps) {
       ) : !rows.length ? (
         <EmptyState>No announcements in the last month.</EmptyState>
       ) : (
-        <ul className="min-h-0 flex-1 overflow-auto p-1.5">
+        <ul ref={fade} className="scroll-fade min-h-0 flex-1 overflow-auto p-1.5">
           {rows.map((a) => {
             const isNew = !read.has(a.id);
             const color = safeColor(a.course?.color) ?? 'var(--ter)';

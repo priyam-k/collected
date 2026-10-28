@@ -16,7 +16,7 @@ import { useNow } from '@/widgets/useNow';
 import type { WidgetProps } from '@/widgets/types';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { cn } from '@/lib/utils';
-import { HOVER_REVEAL, HotLinks, ItemRow, meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { HOVER_REVEAL, HotLinks, ItemRow, meetingExceptions, nextMeeting, useScrollEdges, windowFromNow } from '@/widgets/shared';
 
 const FILES_SHOWN = 5;
 const ANNOUNCEMENTS_SHOWN = 3;
@@ -42,6 +42,7 @@ export interface ClassWidgetConfig {
 }
 
 export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) {
+  const fade = useScrollEdges();
   const courseId = instance.config.courseId;
   const { open } = usePane();
   const coursesQ = useCourses();
@@ -73,7 +74,7 @@ export function ClassWidget({ instance, size }: WidgetProps<ClassWidgetConfig>) 
   const showContent = size.tier === 'lg' || size.tier === 'md' || size.aspect === 'tall';
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-auto p-3 text-sm">
+    <div ref={fade} className="scroll-fade flex h-full flex-col gap-3 overflow-auto p-3 text-sm">
       <WidgetHeader>
         {meeting && size.tier !== 'xs' && (
           <span className="min-w-0 truncate text-[12.5px] text-sub" title={meeting.label}>

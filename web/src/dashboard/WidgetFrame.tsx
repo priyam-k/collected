@@ -51,10 +51,10 @@ export const WidgetFrame = forwardRef<HTMLDivElement, Props>(function WidgetFram
       ref={ref}
       style={{ ...style, ...(courseColor ? { '--course': courseColor } : {}) } as CSSProperties}
       className={cn(
-        'surface group relative flex flex-col text-card-foreground transition-shadow duration-200',
-        editMode && 'shadow-[var(--shadow-card),inset_0_0_0_1.5px_color-mix(in_srgb,var(--brand)_40%,transparent)]',
+        'surface widget-frame group relative flex flex-col text-card-foreground',
         className,
       )}
+      data-editing={editMode || undefined}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
       onTouchEnd={onTouchEnd}

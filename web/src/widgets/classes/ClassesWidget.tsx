@@ -12,7 +12,7 @@ import { safeColor } from '@/lib/color';
 import { TickArc } from '@/widgets/instruments';
 import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
 import type { WidgetProps } from '@/widgets/types';
-import { meetingExceptions, nextMeeting, windowFromNow } from '@/widgets/shared';
+import { meetingExceptions, nextMeeting, useScrollEdges, windowFromNow } from '@/widgets/shared';
 import { useNow } from '@/widgets/useNow';
 
 /**
@@ -40,6 +40,7 @@ export function GradeRing({ course, percent, size = 34 }: { course: Pick<Course,
 
 /** One row per course: grade ring, code, what's next, hotlinks on wide tiers. Click opens the course pane. */
 export function ClassesWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const coursesQ = useCourses();
   const { open } = usePane();
   const win = useMemo(() => windowFromNow(21), []);
@@ -68,7 +69,7 @@ export function ClassesWidget({ size }: WidgetProps) {
   const wide = size.tier === 'lg' || (size.tier === 'md' && size.aspect === 'wide');
 
   return (
-    <div className="h-full overflow-auto p-1.5">
+    <div ref={fade} className="scroll-fade h-full overflow-auto p-1.5">
       <WidgetHeader>
         <span className="min-w-0 truncate text-[12.5px] text-sub">{itemsQ.isPending ? '' : dueToday ? `${dueToday} due today` : 'nothing due today'}</span>
       </WidgetHeader>

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { safeColor } from '@/lib/color';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { EmptyState, ErrorState, ListSkeleton } from '@/widgets/Placeholder';
-import { windowFromNow } from '@/widgets/shared';
+import { useScrollEdges, windowFromNow } from '@/widgets/shared';
 import type { WidgetProps } from '@/widgets/types';
 import { useNow } from '@/widgets/useNow';
 
@@ -95,6 +95,7 @@ function buildSections(items: EffectiveItem[], order: string[], homeworkLabel: s
 const sourceTag = (it: EffectiveItem) => (it.source === 'canvas_ical' ? 'Canvas' : SOURCE_LABELS[it.source]);
 
 export function TodoWidget({ size }: WidgetProps) {
+  const fade = useScrollEdges();
   const settings = useSettings();
   const sources = useSources();
   const win = useMemo(() => windowFromNow(60), []);
@@ -248,7 +249,7 @@ export function TodoWidget({ size }: WidgetProps) {
           </button>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-1.5">
+      <div ref={fade} className="scroll-fade min-h-0 flex-1 overflow-auto px-1.5">
         {dated.isPending ? (
           <ListSkeleton rows={4} rowHeight={44} />
         ) : !merged.length ? (

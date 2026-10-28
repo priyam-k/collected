@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { addDays, endOfDay, format, getHours, getMinutes, isSameMonth } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
+import { useScrollEdges } from '@/widgets/shared';
 import { HOUR_END, HOUR_START, MIN_EVENT_PX, PX_PER_HOUR, dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, placeDay, sortItems, timeLabel } from './utils';
 
 const tint = (color: string | null, pct: number) => `color-mix(in srgb, ${color ?? 'var(--ink)'} ${pct}%, var(--surface))`;
@@ -51,6 +52,7 @@ function nextLabel(item: EffectiveItem, t: Date): string {
 }
 
 export function NextUp({ items, now }: { items: EffectiveItem[]; now: Date }) {
+  const fade = useScrollEdges();
   const upcoming = items
     .filter((i) => {
       const t = itemTime(i);
@@ -62,7 +64,7 @@ export function NextUp({ items, now }: { items: EffectiveItem[]; now: Date }) {
     .sort(sortItems);
   if (!upcoming.length) return <p className="p-3 text-sm text-sub">Nothing coming up.</p>;
   return (
-    <ul className="h-full space-y-0.5 overflow-auto p-1.5">
+    <ul ref={fade} className="scroll-fade h-full space-y-0.5 overflow-auto p-1.5">
       {upcoming.map((i) => {
         const t = itemTime(i)!;
         return (
@@ -83,10 +85,11 @@ export function NextUp({ items, now }: { items: EffectiveItem[]; now: Date }) {
 
 /* ---------- sm/tall: agenda by day ---------- */
 export function Agenda({ items, from, days = 7 }: { items: EffectiveItem[]; from: Date; days?: number }) {
+  const fade = useScrollEdges();
   const dayList = daysBetween(from, addDays(from, days - 1));
   const grouped = groupByDay(items, dayList);
   return (
-    <div className="h-full overflow-auto px-2 py-1.5">
+    <div ref={fade} className="scroll-fade h-full overflow-auto px-2 py-1.5">
       {dayList.map((d) => {
         const list = grouped.get(dayKey(d)) ?? [];
         const today = isToday(d);
@@ -121,6 +124,7 @@ function DayHead({ d }: { d: Date }) {
 
 /* ---------- md/wide: 7-day strip ---------- */
 export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date }) {
+  const fade = useScrollEdges();
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
   return (
@@ -128,7 +132,7 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
       {dayList.map((d) => (
         <div key={dayKey(d)} className={cn('flex min-w-0 flex-col overflow-hidden rounded-xl', isToday(d) ? 'bg-brand-soft' : 'bg-well')}>
           <DayHead d={d} />
-          <div className="min-h-0 flex-1 space-y-[3px] overflow-auto p-1">
+          <div ref={fade} className="scroll-fade min-h-0 flex-1 space-y-[3px] overflow-auto p-1 [--fade-size:16px]">
             {(grouped.get(dayKey(d)) ?? []).map((i) => <Chip key={i.id} item={i} />)}
           </div>
         </div>
@@ -139,11 +143,16 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
 
 /* ---------- lg: week grid with hours ---------- */
 export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: Date; now: Date }) {
+  const fade = useScrollEdges();
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
   const nowTop = (getHours(now) + getMinutes(now) / 60 - HOUR_START) * PX_PER_HOUR;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const setScroller = useCallback((el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    return fade(el);
+  }, [fade]);
   // Start the day view a little above "now" (or at 8 AM outside today's week).
   useEffect(() => {
     const el = scrollRef.current;
@@ -164,14 +173,14 @@ export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: D
         {dayList.map((d) => {
           const allDay = (grouped.get(dayKey(d)) ?? []).filter((i) => i.allDay || i.kind !== 'event');
           return (
-            <div key={dayKey(d)} className="flex max-h-[76px] min-h-[30px] min-w-0 flex-col gap-[3px] overflow-auto px-[2px] py-0.5">
+            <div key={dayKey(d)} ref={fade} className="scroll-fade flex max-h-[76px] min-h-[30px] min-w-0 flex-col gap-[3px] overflow-auto px-[2px] py-0.5 [--fade-size:14px]">
               {allDay.map((i) => <Chip key={i.id} item={i} dense />)}
             </div>
           );
         })}
       </div>
       {/* pt keeps the first hour label, centred on its line, from being clipped at the top of the scroller */}
-      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto px-2.5 pb-2 pt-2.5">
+      <div ref={setScroller} className="scroll-fade relative min-h-0 flex-1 overflow-auto px-2.5 pb-2 pt-2.5">
         <div className={cn('grid', col)} style={{ height: (hours.length - 1) * PX_PER_HOUR + 8 }}>
           <div className="relative">
             {hours.map((h) => (
