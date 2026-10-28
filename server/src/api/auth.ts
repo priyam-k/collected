@@ -26,8 +26,8 @@ import { bad, parseBody } from './util.js';
 const pending = new Map<string, { next: string; exp: number }>();
 const STATE_TTL_MS = 10 * 60_000;
 
-/** Only a path on this site may be the post-sign-in destination. */
-const safeNext = (v: string | undefined): string => (v && /^\/(?!\/)/.test(v) && v.length < 500 ? v : '/');
+/** Only a path on this site may be the post-sign-in destination; without one, the board (web/src/lib/routes.ts). */
+const safeNext = (v: string | undefined): string => (v && /^\/(?!\/)/.test(v) && v.length < 500 ? v : '/dashboard');
 
 const toToken = (r: { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }): ApiToken => ({
   id: r.id,

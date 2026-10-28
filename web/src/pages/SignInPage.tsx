@@ -2,6 +2,7 @@ import { Link, Navigate, useLocation, useSearchParams } from 'react-router';
 import { AsciiOrb } from '@/components/AsciiOrb';
 import { Logo } from '@/components/Logo';
 import { isSignedIn, useMe } from '@/lib/queries';
+import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { INVITE_ONLY_NOTICE, OPERATOR_EMAIL } from '@/pages/public/PublicLayout';
 
@@ -32,9 +33,10 @@ export function SignInPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
-  if (me.data && isSignedIn(me.data)) return <Navigate to={from && from !== '/signin' ? from : '/'} replace />;
+  // Signing in lands on the board, or back on the page that sent the person here.
+  if (me.data && isSignedIn(me.data)) return <Navigate to={from && from !== '/signin' ? from : DASHBOARD} replace />;
   const error = params.get('error');
-  const next = from && from.startsWith('/') ? from : '/';
+  const next = from && from.startsWith('/') ? from : DASHBOARD;
   const google = me.data?.signIn.google ?? true;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">

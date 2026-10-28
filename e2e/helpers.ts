@@ -64,7 +64,7 @@ export async function apiSend<T>(request: APIRequestContext, method: 'post' | 'p
 
 /** The dashboard, with the grid rendered (the five core widgets are present on a fresh database). */
 export async function openDashboard(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
   await expect(widget(page, 'Classes overview')).toBeVisible();
 }

@@ -4,6 +4,8 @@ import { ArrowDown, ArrowRight, Bot, Briefcase, CalendarDays, ClipboardCheck, Da
 import { AsciiOrb } from '@/components/AsciiOrb';
 import { Button } from '@/components/ui/button';
 import { DemoBoard } from '@/demo/DemoBoard';
+import { isSignedIn, useMe } from '@/lib/queries';
+import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { Bento } from './landing/Bento';
 import { DotField } from './landing/DotField';
@@ -243,6 +245,7 @@ function SelfHost() {
 }
 
 function Closing() {
+  const signedIn = isSignedIn(useMe().data);
   return (
     <section className="px-5 pb-24 pt-4">
       <Reveal className="surface mx-auto grid max-w-6xl items-center gap-10 overflow-hidden rounded-[32px] p-8 sm:p-12 lg:grid-cols-[1.2fr_1fr]">
@@ -254,7 +257,7 @@ function Closing() {
           </h2>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="h-12 px-6 text-[15px]">
-              <Link to="/signin">Sign in</Link>
+              <Link to={signedIn ? DASHBOARD : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="h-12 px-6 text-[15px]">
               <a href={GITHUB_URL} target="_blank" rel="noreferrer">

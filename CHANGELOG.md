@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- The board moves to `/dashboard`; `/` is always the home page, with Open dashboard when you are signed in. Signing in and newly installed apps land on the board. A bookmark of the root, or an app installed before this, opens the home page; re-bookmark `/dashboard` or reinstall to go straight to the board. Signing out now goes straight to the home page.
 - Assignments can be pushed into Google Tasks as well as Todoist: Settings → To-do apps → Google Tasks picks a list (created if missing) and whether the course code prefixes the title; the due day is the assignment's day in your timezone and the time is in the notes. Same rules as the Todoist push: never reopens, never writes back to Canvas or Gradescope, deletes are fused. `GET /api/todo/status` reports both apps for the settings page.
 - CLI: `collected task add` goes to the default to-do app (or `--to todoist|gtasks`, with `--due` for Google Tasks); `task done` closes tasks in either app; `cli demo gtasks` loads Google Tasks fixtures.
 

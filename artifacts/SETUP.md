@@ -7,7 +7,7 @@ Nothing external is required before coding starts. Everything below is needed th
 ```sh
 npm i -g pnpm && pnpm install
 cp .env.example .env    # then set AUTH_DISABLED=true and LOCAL_HELPER_KEY=$(openssl rand -hex 16); leave SECRET_KEY empty
-pnpm dev                # http://localhost:5173
+pnpm dev                # http://localhost:5173/dashboard (the board; / is the public home page)
 ```
 
 `.env.example` ships with `AUTH_DISABLED=false` on purpose: copying it verbatim onto the VPS must never disable the login check. Only the local `.env` sets it to `true`. If the server prints `Invalid environment`, that line tells you exactly which variable to fix.

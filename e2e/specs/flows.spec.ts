@@ -6,8 +6,8 @@ import { apiGet, apiSend, openDashboard, pane, widget } from '../helpers.js';
  * The e2e server runs with auth off, which has no sign-out. These answer /api/auth/me as a signed-in person until
  * /api/auth/logout is called, then as a visitor; every other request still reaches the real server.
  */
-async function fakeSession(page: Page) {
-  let signedIn = true;
+async function fakeSession(page: Page, start: { signedIn: boolean } = { signedIn: true }) {
+  let signedIn = start.signedIn;
   await page.route('**/api/auth/me', (r) =>
     r.fulfill({
       json: signedIn
@@ -65,10 +65,29 @@ test.describe('flows', () => {
     await expect(pane(page)).toBeHidden();
   });
 
-  test('an unknown address goes home instead of a blank page', async ({ page }) => {
+  test('an unknown address goes to the home page instead of a blank one', async ({ page }) => {
     await page.goto('/no/such/page');
     await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: /Everything you juggle/ })).toBeVisible();
+  });
+
+  test('"/" is the home page even when signed in, and Open dashboard leads to the board', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: /Everything you juggle/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0);
+    await page.getByRole('link', { name: 'Open dashboard' }).first().click();
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
+  });
+
+  test('a visitor opening the board is sent to sign in, which then returns to the board', async ({ page }) => {
+    await fakeSession(page, { signedIn: false });
+    await page.goto('/dashboard');
+    await expect(page).toHaveURL(/\/signin$/);
+    await expect(page.getByRole('link', { name: /Google/ })).toHaveAttribute('href', `/api/auth/google/start?next=${encodeURIComponent('/dashboard')}`);
+    // Straight to sign-in, with no page to come back to, still lands on the board.
+    await page.goto('/signin');
+    await expect(page.getByRole('link', { name: /Google/ })).toHaveAttribute('href', `/api/auth/google/start?next=${encodeURIComponent('/dashboard')}`);
   });
 
   test('the profile menu theme and accent are reachable by keyboard and keep the menu open', async ({ page }) => {
@@ -182,7 +201,7 @@ test.describe('flows', () => {
 
     await page.getByRole('heading', { name: 'Jobs' }).click(); // focus off the field
     await page.keyboard.press('Escape');
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
   });
 

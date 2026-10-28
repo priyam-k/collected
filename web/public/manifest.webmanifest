@@ -2,7 +2,7 @@
   "name": "collected",
   "short_name": "collected",
   "description": "Everything a student juggles, in one grid.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#1b1c1f",

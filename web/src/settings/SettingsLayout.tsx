@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, Navigate, Link, useNavigate } from 'react-route
 import { ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useLiquid } from '@/lib/liquid';
+import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { SourcesPage } from './SourcesPage';
 import { CoursesPage } from './CoursesPage';
@@ -39,7 +40,7 @@ export function SettingsLayout() {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       if (document.querySelector('[role=dialog], [role=alertdialog], [role=menu], [role=listbox], [data-radix-popper-content-wrapper]')) return;
-      navigate('/');
+      navigate(DASHBOARD);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -47,7 +48,7 @@ export function SettingsLayout() {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
       <header className="mb-8">
-        <Link to="/" title="Back to the dashboard (Esc)" aria-keyshortcuts="Escape" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
+        <Link to={DASHBOARD} title="Back to the dashboard (Esc)" aria-keyshortcuts="Escape" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-sub shadow-[var(--shadow-card),inset_0_0_0_1px_var(--line)] transition-colors hover:bg-surface-hover hover:text-ink">
           <ArrowLeft className="size-4" strokeWidth={1.7} /> Dashboard
         </Link>
         {/* Logo is inline-flex; a block of its own keeps it off the back link's line. */}

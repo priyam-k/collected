@@ -57,7 +57,7 @@ pnpm cli demo canvas            # fixture data so the widgets are not empty (als
 pnpm dev                        # server on :3000, web on :5173
 ```
 
-Open http://localhost:5173. Useful afterwards:
+Open http://localhost:5173/dashboard for the board (`/` is the public home page). Useful afterwards:
 
 ```sh
 pnpm sync canvas               # run one ingester now (also: gradescope, gcal, todoist, jobs, all)

@@ -5,6 +5,7 @@ import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useGlass, useLiquid } from '@/lib/liquid';
 import { isSignedIn, useMe } from '@/lib/queries';
+import { DASHBOARD } from '@/lib/routes';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -98,7 +99,7 @@ export function PublicLayout({ children, wide, nav = 'pages' }: { children: Reac
             <ThemeButton />
             <Button asChild>
               {/* Someone already signed in, reading the demo or the legal pages, gets their board instead. */}
-              <Link to={signedIn ? '/' : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
+              <Link to={signedIn ? DASHBOARD : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
             </Button>
           </nav>
         </div>

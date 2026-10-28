@@ -117,7 +117,7 @@ test.describe.serial('file sync', () => {
   });
 
   test('the course drawer shows the sync panel with the decisions', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.locator('.react-grid-item').filter({ hasText: 'Classes overview' }).getByRole('button', { name: /CMSC422/ }).click();
     const drawer = page.getByRole('dialog');
     await drawer.getByRole('button', { name: /^Files/ }).click();

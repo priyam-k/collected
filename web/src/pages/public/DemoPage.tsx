@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router';
 import { isSignedIn, useMe } from '@/lib/queries';
+import { DASHBOARD } from '@/lib/routes';
 import { DemoBoard } from '@/demo/DemoBoard';
 import { PublicLayout } from './PublicLayout';
 
@@ -24,7 +25,7 @@ export function DemoPage() {
           <span>
             <span className="font-semibold">Live demo.</span> A made-up semester on the real dashboard. Press Edit to rearrange; nothing is saved.
           </span>
-          <Link to={signedIn ? '/' : '/signin'} className="font-semibold underline underline-offset-[3px]">
+          <Link to={signedIn ? DASHBOARD : '/signin'} className="font-semibold underline underline-offset-[3px]">
             {signedIn ? 'Back to your board' : 'Sign in to use your own'}
           </Link>
         </div>
