@@ -115,7 +115,7 @@ export function Dashboard() {
   const eyebrow = [format(new Date(), 'EEEE'), summary.term].filter(Boolean).join(' · ');
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 px-4 pb-28 pt-4 sm:px-6 sm:pb-10">
+    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 px-3 pb-28 pt-4 sm:px-4 sm:pb-10">
       {/* One row as tall as the toolbar pill beside it: the date, then the eyebrow over the summary. */}
       <header className="flex h-11 items-center gap-3.5 px-1 sm:pr-[300px]">
         <h1 className="shrink-0 text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
@@ -131,7 +131,7 @@ export function Dashboard() {
           fixed, so swapping its contents for edit mode never moves the board. */}
       <div
         ref={glass}
-        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1.5rem,calc((100vw-1600px)/2+1.5rem))] sm:top-4"
+        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1rem,calc((100vw-1600px)/2+1rem))] sm:top-4"
       >
         {editMode ? (
           <>
