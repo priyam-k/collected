@@ -277,11 +277,11 @@ export function Landing() {
       <div className="landing">
         <Hero />
         <DemoShowcase />
-        <section className="px-5 pt-28 sm:pt-36">
-          <SectionHead id="how" eyebrow="How it works" title="Six sources in. One board out." sub="collected pulls from every account on a timer into one local copy, layers your own decisions on top, and hands it back as a board, a to-do list, folders on your laptop and a command line." />
-          <div className="mx-auto mt-14 max-w-6xl">
+        <section className="px-5 pt-24 sm:pt-28">
+          <SectionHead id="how" eyebrow="How it works" title="Six sources in. One board out." sub="Everything you already use, gathered into one copy that is yours, and handed back wherever you want it." />
+          <Reveal className="mx-auto mt-10 max-w-6xl">
             <Hub />
-          </div>
+          </Reveal>
         </section>
         <Agents />
         <section className="px-5 pb-8">
