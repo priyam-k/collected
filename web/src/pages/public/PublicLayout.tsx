@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 import { Moon, Sun, SunMoon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGlass, useLiquid } from '@/lib/liquid';
@@ -61,11 +61,19 @@ const SECTIONS: [string, string][] = [
 export function PublicLayout({ children, wide, nav = 'pages' }: { children: ReactNode; wide?: boolean; nav?: 'sections' | 'pages' }) {
   const glass = useGlass<HTMLDivElement>();
   const liquid = useLiquid<HTMLElement>();
+  const { pathname } = useLocation();
+  // On the home page the logo is "back to the top": the route is already '/', so scroll there and drop any #section.
+  const toTop = (e: React.MouseEvent) => {
+    if (pathname !== '/') return;
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    history.replaceState(history.state, '', '/');
+  };
   return (
     <div className="flex min-h-full flex-col text-foreground">
       <header className="pointer-events-none sticky top-0 z-30 px-3 pt-3 sm:px-6 sm:pt-4">
         <div ref={glass} className="glass pointer-events-auto mx-auto flex h-[52px] w-full max-w-6xl items-center gap-2 p-1.5 pl-4">
-          <Link to="/" className="rounded-full" aria-label="collected home">
+          <Link to="/" className="rounded-full" aria-label="collected home" onClick={toTop}>
             <Brand />
           </Link>
           {nav === 'sections' ? (

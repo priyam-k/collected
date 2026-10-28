@@ -24,13 +24,19 @@ const WORKS_WITH: [string, typeof GraduationCap][] = [
   ['Job feeds', Briefcase],
 ];
 
-function SectionHead({ eyebrow, title, sub, className }: { eyebrow: string; title: ReactNode; sub?: string; className?: string }) {
+/**
+ * A section's heading. `id` is the nav anchor: it sits on a plain wrapper (the heading itself starts its reveal
+ * offset) so a jump lands the heading just under the floating nav, not the section's top padding.
+ */
+function SectionHead({ id, eyebrow, title, sub, className }: { id?: string; eyebrow: string; title: ReactNode; sub?: string; className?: string }) {
   return (
+    <div id={id} className="scroll-mt-24">
     <Reveal className={cn('mx-auto max-w-3xl text-center', className)}>
       <p className="label">{eyebrow}</p>
       <h2 className="mt-3 text-[clamp(32px,4.6vw,56px)] font-[640] leading-[1.02] tracking-[-0.035em]">{title}</h2>
       {sub && <p className="mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-sub sm:text-[18px]">{sub}</p>}
     </Reveal>
+    </div>
   );
 }
 
@@ -104,8 +110,8 @@ function DemoShowcase() {
   const flat = p >= 0.999 || editing;
   const tilt = 1 - p;
   return (
-    <section id="demo" className="scroll-mt-24 px-3 pt-16 sm:px-6 sm:pt-20">
-      <div ref={ref} className="mx-auto max-w-[1240px] [perspective:1800px]">
+    <section className="px-3 pt-16 sm:px-6 sm:pt-20">
+      <div id="demo" ref={ref} className="mx-auto max-w-[1240px] scroll-mt-24 [perspective:1800px]">
         <div
           className="demo-frame rounded-[30px] p-2 sm:p-2.5"
           style={flat ? undefined : { transform: `rotateX(${tilt * 18}deg) scale(${0.9 + 0.1 * p}) translateY(${tilt * -24}px)`, transformOrigin: '50% 0%' }}
@@ -140,8 +146,8 @@ function DemoShowcase() {
 function Agents() {
   const harnesses = ['Claude Code', 'Codex', 'Gemini CLI', 'Cursor', 'a cron job'];
   return (
-    <section id="agents" className="scroll-mt-24 px-5 py-24 sm:py-32">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1fr_1.15fr]">
+    <section className="px-5 py-24 sm:py-32">
+      <div id="agents" className="mx-auto grid max-w-6xl scroll-mt-28 items-center gap-12 lg:grid-cols-[1fr_1.15fr]">
         <Reveal>
           <p className="label">Built for agents</p>
           <h2 className="mt-3 text-[clamp(32px,4.4vw,52px)] font-[640] leading-[1.03] tracking-[-0.035em]">Your agents can read the board too.</h2>
@@ -180,8 +186,8 @@ function Agents() {
 
 function SelfHost() {
   return (
-    <section id="self-host" className="scroll-mt-24 px-5 py-24 sm:py-28">
-      <SectionHead eyebrow="Yours to run" title="One container. One SQLite file. Your domain." sub="Run it on a small server you control, or ask for an invite to the hosted instance." />
+    <section className="px-5 py-24 sm:py-28">
+      <SectionHead id="self-host" eyebrow="Yours to run" title="One container. One SQLite file. Your domain." sub="Run it on a small server you control, or ask for an invite to the hosted instance." />
       <div className="mx-auto mt-14 grid max-w-6xl gap-4 lg:grid-cols-3">
         <Reveal className="surface flex flex-col rounded-[26px] p-7 lg:col-span-2">
           <div className="flex items-center gap-2.5">
@@ -271,15 +277,15 @@ export function Landing() {
       <div className="landing">
         <Hero />
         <DemoShowcase />
-        <section id="how" className="scroll-mt-24 px-5 pt-28 sm:pt-36">
-          <SectionHead eyebrow="How it works" title="Six sources in. One board out." sub="collected pulls from every account on a timer into one local copy, layers your own decisions on top, and hands it back as a board, a to-do list, folders on your laptop and a command line." />
+        <section className="px-5 pt-28 sm:pt-36">
+          <SectionHead id="how" eyebrow="How it works" title="Six sources in. One board out." sub="collected pulls from every account on a timer into one local copy, layers your own decisions on top, and hands it back as a board, a to-do list, folders on your laptop and a command line." />
           <div className="mx-auto mt-14 max-w-6xl">
             <Hub />
           </div>
         </section>
         <Agents />
-        <section id="features" className="scroll-mt-24 px-5 pb-8">
-          <SectionHead eyebrow="On the board" title="Everything a semester throws at you." />
+        <section className="px-5 pb-8">
+          <SectionHead id="features" eyebrow="On the board" title="Everything a semester throws at you." />
           <div className="mx-auto mt-14 max-w-6xl">
             <Bento />
           </div>
