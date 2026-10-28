@@ -30,6 +30,26 @@ function termLabel(term: string | undefined): string | null {
   return m ? `${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} ${m[1]}` : term;
 }
 
+/**
+ * Publishes the page scrollbar's width as --sbw on <html> (0 with overlay scrollbars). A classic scrollbar takes room
+ * on the right only, so the board subtracts it from its right padding to keep the visible margins even.
+ */
+function useScrollbarWidth() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => root.style.setProperty('--sbw', `${Math.max(0, window.innerWidth - root.clientWidth)}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+      root.style.removeProperty('--sbw');
+    };
+  }, []);
+}
+
 /** "2 classes today · 10 overdue · synced 5 min ago" under the date. */
 function useSummary() {
   // Relative times are computed at render, and polling returns identical data, so nothing re-renders on its own.
@@ -76,6 +96,7 @@ export function Dashboard() {
   const [trayOpen, setTrayOpen] = useState(false);
   const summary = useSummary();
   const glass = useGlass<HTMLDivElement>();
+  useScrollbarWidth();
 
   const hide = (id: string) => {
     upsert.mutate({ id, hidden: true });
@@ -115,7 +136,7 @@ export function Dashboard() {
   const eyebrow = [format(new Date(), 'EEEE'), summary.term].filter(Boolean).join(' · ');
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 px-3 pb-28 pt-4 sm:px-4 sm:pb-10">
+    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 pb-28 pl-3 pr-[max(0px,calc(0.75rem-var(--sbw,0px)))] pt-4 sm:pb-10 sm:pl-4 sm:pr-[max(0px,calc(1rem-var(--sbw,0px)))]">
       {/* One row as tall as the toolbar pill beside it: the date, then the eyebrow over the summary. */}
       <header className="flex h-11 items-center gap-3.5 px-1 sm:pr-[300px]">
         <h1 className="shrink-0 text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
@@ -131,7 +152,7 @@ export function Dashboard() {
           fixed, so swapping its contents for edit mode never moves the board. */}
       <div
         ref={glass}
-        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1rem,calc((100vw-1600px)/2+1rem))] sm:top-4"
+        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(calc(1rem-var(--sbw,0px)),calc((100vw-var(--sbw,0px)-1600px)/2+1rem-var(--sbw,0px)))] sm:top-4"
       >
         {editMode ? (
           <>
