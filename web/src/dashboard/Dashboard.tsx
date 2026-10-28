@@ -115,12 +115,13 @@ export function Dashboard() {
   const eyebrow = [format(new Date(), 'EEEE'), summary.term].filter(Boolean).join(' · ');
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-5 px-4 pb-28 pt-7 sm:px-6 sm:pb-10">
-      <header className="flex items-end gap-3 px-0.5 sm:pr-[300px]">
-        <div className="flex min-w-0 flex-col">
-          <p className="label">{eyebrow}</p>
-          <h1 className="mt-1.5 text-[38px] font-[620] leading-[1.04] tracking-[-0.032em] sm:text-[44px]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
-          <p className="mt-2 truncate text-[15px] text-sub">
+    <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 px-4 pb-28 pt-4 sm:px-6 sm:pb-10">
+      {/* One row as tall as the toolbar pill beside it: the date, then the eyebrow over the summary. */}
+      <header className="flex h-11 items-center gap-3.5 px-1 sm:pr-[300px]">
+        <h1 className="shrink-0 text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
+        <div className="flex min-w-0 flex-col justify-center gap-0.5">
+          <p className="label !text-[10.5px] !leading-[13px]">{eyebrow}</p>
+          <p className="truncate text-[13px] leading-[17px] text-sub">
             {parts.length ? parts.map((p, i) => <span key={i}>{i > 0 && <span className="text-ter"> · </span>}{p}</span>) : ' '}
           </p>
         </div>
@@ -130,7 +131,7 @@ export function Dashboard() {
           fixed, so swapping its contents for edit mode never moves the board. */}
       <div
         ref={glass}
-        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1.5rem,calc((100vw-1600px)/2+1.5rem))] sm:top-6"
+        className="glass fixed z-40 flex items-center gap-0.5 p-1 max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:left-1/2 max-sm:-translate-x-1/2 sm:right-[max(1.5rem,calc((100vw-1600px)/2+1.5rem))] sm:top-4"
       >
         {editMode ? (
           <>
@@ -138,7 +139,7 @@ export function Dashboard() {
             <button className="glass-btn px-3.5 text-[14px] font-[560]" onClick={() => setTrayOpen(true)}>
               <Plus className="size-4" /> Add widget
             </button>
-            <button className="h-10 rounded-full bg-brand px-5 text-[14px] font-[560] text-on-brand transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--brand)_88%,var(--ink))] active:scale-[.98]" onClick={leaveEdit}>
+            <button className="h-9 rounded-full bg-brand px-4 text-[14px] font-[560] text-on-brand transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--brand)_88%,var(--ink))] active:scale-[.98]" onClick={leaveEdit}>
               Done
             </button>
           </>
@@ -272,7 +273,7 @@ function ProfileMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button aria-label="Profile and settings" className="ml-0.5 grid size-10 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-semibold tracking-[0.01em] text-on-brand transition-transform active:scale-95">
+        <button aria-label="Profile and settings" className="ml-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-semibold tracking-[0.01em] text-on-brand transition-transform active:scale-95">
           {initials || <UserRound className="size-[18px]" strokeWidth={1.7} />}
         </button>
       </DropdownMenuTrigger>
