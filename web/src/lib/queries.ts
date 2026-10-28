@@ -355,6 +355,15 @@ export function useClearSourceConfig() {
   });
 }
 
+/** Clears the Todoist token and, for an OAuth connection, revokes it at Todoist. */
+export function useDisconnectTodoist() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: () => api<{ ok: true; revoked: boolean }>('/todoist/disconnect', { method: 'POST' }),
+    onSettled: () => inv(qk.sources),
+  });
+}
+
 export function useSetSourceEnabled() {
   const inv = useInvalidate();
   return useMutation({

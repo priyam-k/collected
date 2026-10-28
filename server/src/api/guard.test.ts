@@ -38,6 +38,8 @@ describe('identityAllows', () => {
       ['PUT', '/api/settings/jobs.filter'],
       ['PUT', '/api/layout'],
       ['GET', '/api/google/start'],
+      ['GET', '/api/todoist/connect'],
+      ['POST', '/api/todoist/disconnect'],
       ['POST', '/api/sources/canvas/cookie'],
     ] as const)
       expect(identityAllows(svc, m, p), `${m} ${p}`).toBe(false);

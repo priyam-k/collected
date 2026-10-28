@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { INGESTED_SOURCE_IDS, outboundUrlSchema, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
+import { todoistOAuthConfigured } from '../auth/todoist.js';
+import type { Env } from '../env.js';
 import type { AppContext } from '../context.js';
 import { sources } from '../db/schema.js';
 import { ingesters as registryIngesters } from '../ingest/registry.js';
@@ -18,7 +20,7 @@ function stripPrivateMeta(meta: unknown): Record<string, unknown> {
   return rest;
 }
 
-function toPublic(row: typeof sources.$inferSelect): Source {
+export function toPublic(row: typeof sources.$inferSelect, env: Env): Source {
   return {
     id: row.id as IngestedSourceId,
     enabled: row.enabled,
@@ -30,6 +32,7 @@ function toPublic(row: typeof sources.$inferSelect): Source {
     running: isRunning(row.id as IngestedSourceId),
     meta: stripPrivateMeta(row.meta),
     updatedAt: row.updatedAt,
+    ...(row.id === 'todoist' ? { oauthAvailable: todoistOAuthConfigured(env) } : {}),
   };
 }
 
@@ -77,13 +80,13 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const rows = await ctx.db.select().from(sources);
     const order = new Map(INGESTED_SOURCE_IDS.map((id, i) => [id, i]));
     rows.sort((a, b) => (order.get(a.id as IngestedSourceId) ?? 99) - (order.get(b.id as IngestedSourceId) ?? 99));
-    return c.json(rows.map(toPublic));
+    return c.json(rows.map((row) => toPublic(row, ctx.env)));
   });
 
   r.get('/:id', async (c) => {
     const id = sourceIdSchema.safeParse(c.req.param('id'));
     if (!id.success) bad('unknown source', 404);
-    return c.json(toPublic(await getSourceRow(ctx, id.data)));
+    return c.json(toPublic(await getSourceRow(ctx, id.data), ctx.env));
   });
 
   /** Replace the secret config for a source. Body is validated per source. */
@@ -95,8 +98,9 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     await setSourceConfig(ctx, id.data, body);
     await setSourceStatus(ctx, id.data, 'disconnected', { lastError: null });
     await ctx.db.update(sources).set({ enabled: true }).where(eq(sources.id, id.data));
+    if (id.data === 'todoist') await mergeSourceMeta(ctx, 'todoist', { connectedVia: 'token' });
     ctx.log.info({ source: id.data }, 'source config updated');
-    return c.json(toPublic(await getSourceRow(ctx, id.data)));
+    return c.json(toPublic(await getSourceRow(ctx, id.data), ctx.env));
   });
 
   r.delete('/:id/config', async (c) => {
@@ -104,7 +108,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     if (!id.success) bad('unknown source', 404);
     await setSourceConfig(ctx, id.data, null);
     await setSourceStatus(ctx, id.data, 'disconnected', { lastError: null });
-    return c.json(toPublic(await getSourceRow(ctx, id.data)));
+    return c.json(toPublic(await getSourceRow(ctx, id.data), ctx.env));
   });
 
   r.put('/:id/enabled', async (c) => {
@@ -112,7 +116,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     if (!id.success) bad('unknown source', 404);
     const { enabled } = await parseBody(c, z.object({ enabled: z.boolean() }));
     await ctx.db.update(sources).set({ enabled }).where(eq(sources.id, id.data));
-    return c.json(toPublic(await getSourceRow(ctx, id.data)));
+    return c.json(toPublic(await getSourceRow(ctx, id.data), ctx.env));
   });
 
   /** Non-secret per-source options (selected calendars, etc.). Shallow-merged into meta. */
@@ -124,7 +128,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     // The jobs ingester reads its feed list from meta, so feed URLs are validated like any other outbound URL.
     if (id.data === 'jobs' && 'sources' in patch) patch.sources = sourceConfigSchemas.jobs.parse({ sources: patch.sources }).sources;
     await mergeSourceMeta(ctx, id.data, patch);
-    return c.json(toPublic(await getSourceRow(ctx, id.data)));
+    return c.json(toPublic(await getSourceRow(ctx, id.data), ctx.env));
   });
 
   /** What a source has pulled: last run counts, items per course, the most recent rows. Feeds the settings data viewer. */
@@ -172,7 +176,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const ing = getIngester(id.data);
     if (!ing) bad(`no ingester for ${id.data} yet`, 404);
     const outcome = await runIngester(ctx, ing, { force: true });
-    return c.json({ outcome, source: toPublic(await getSourceRow(ctx, id.data)) });
+    return c.json({ outcome, source: toPublic(await getSourceRow(ctx, id.data), ctx.env) });
   });
 
   /**

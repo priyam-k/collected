@@ -27,7 +27,14 @@ pnpm 12 blocks install scripts by default; `pnpm-workspace.yaml` allow-lists `es
 All of these are entered in the app's Settings page (or `.env` for the Google client), locally first.
 
 ### Todoist
-Paste the API token into Settings → Sources → Todoist.
+Two ways. The quick one: paste the API token into Settings → Sources → Todoist.
+
+The one-click one (optional, free, no paid plan or organisation): register a Todoist app once and the card shows **Connect Todoist**.
+1. `https://developer.todoist.com/appconsole.html` → Create a new app. Name it `collected`; the service URL is your `PUBLIC_URL`.
+2. OAuth redirect URL: `<PUBLIC_URL>/api/todoist/callback` (dev: `http://localhost:5173/api/todoist/callback`). One app holds one redirect URL, so prod and dev are two apps or you switch the URL.
+3. Copy Client ID and Client secret into `.env` as `TODOIST_CLIENT_ID` / `TODOIST_CLIENT_SECRET`; restart the server.
+4. Settings → Sources → Todoist → Connect Todoist. The consent asks for `data:read_write,data:delete`: delete is what lets the push sync remove a task it created when the assignment disappears at the source.
+The token lands in the same encrypted slot the pasted token uses; Disconnect clears it and revokes it at Todoist. The paste form stays under "or paste an API token" as the fallback.
 
 ### Canvas
 Build the `collected` CLI once (`pnpm --filter agent build`, then `collected init http://localhost:3000` and `collected auth helper-key <LOCAL_HELPER_KEY>`; see "Laptop agent" below). Then let it read the cookie from your browser and post it to the running app:

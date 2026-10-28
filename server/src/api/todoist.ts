@@ -1,18 +1,99 @@
+import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { todoistPushConfigSchema } from '@collected/shared';
+import type { AuthVariables } from '../auth/cloudflare-access.js';
+import { exchangeTodoistCode, revokeTodoistToken, todoistAuthUrl } from '../auth/todoist.js';
 import type { AppContext } from '../context.js';
-import { items, overrides, todoistMap } from '../db/schema.js';
+import { items, overrides, sources, todoistMap } from '../db/schema.js';
+import { runIngester } from '../ingest/runner.js';
 import type { TodoistApi } from '../ingest/todoist/api.js';
-import { syncTodoist, taskToRow, todoistApiForCtx } from '../ingest/todoist/ingest.js';
+import { syncTodoist, taskToRow, todoistApiForCtx, todoistIngester } from '../ingest/todoist/ingest.js';
+import { NotConfiguredError } from '../ingest/types.js';
 import { getSettingParsed, setSetting } from '../lib/settings.js';
+import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
 import { nowIso } from '../lib/time.js';
 import { executePush, planPush } from '../sync/todoist-push.js';
 import { bad, parseBody, parsePatch } from './util.js';
 
-export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<TodoistApi> = todoistApiForCtx) {
-  const r = new Hono();
+/** OAuth state → who started the flow and when it expires. Bound to the identity like the Google flow (api/google.ts). */
+const pendingStates = new Map<string, { user: string | null; exp: number }>();
+const STATE_TTL_MS = 10 * 60_000;
+
+/** Reason codes the settings page knows; nothing from Todoist or an exception reaches the URL. */
+type Reason = 'denied' | 'expired' | 'exchange' | 'config' | 'unknown';
+
+export interface TodoistRouteDeps {
+  /** Outbound fetch for the token exchange and revoke; tests pass a fake. */
+  fetchImpl?: typeof fetch;
+  /** What runs the first sync after a connect; tests pass a no-op. */
+  run?: typeof runIngester;
+  now?: () => number;
+}
+
+export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<TodoistApi> = todoistApiForCtx, deps: TodoistRouteDeps = {}) {
+  const r = new Hono<{ Variables: AuthVariables }>();
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const run = deps.run ?? runIngester;
+  const now = deps.now ?? Date.now;
+  const settingsUrl = (q: string) => `${ctx.env.PUBLIC_URL.replace(/\/$/, '')}/settings/sources?${q}`;
+  const failed = (reason: Reason) => settingsUrl(`todoist=error&reason=${reason}`);
+
+  /** Starts the OAuth connect. Needs TODOIST_CLIENT_ID / TODOIST_CLIENT_SECRET; without them the card takes a pasted token. */
+  r.get('/connect', (c) => {
+    try {
+      const t = now();
+      for (const [k, v] of pendingStates) if (v.exp < t) pendingStates.delete(k);
+      const state = randomBytes(16).toString('hex');
+      pendingStates.set(state, { user: c.get('user') ?? null, exp: t + STATE_TTL_MS });
+      return c.redirect(todoistAuthUrl(ctx.env, state));
+    } catch (err) {
+      if (err instanceof NotConfiguredError) return c.redirect(failed('config'));
+      throw err;
+    }
+  });
+
+  /**
+   * Todoist sends the browser back here. The token lands in the same encrypted config slot the pasted token uses
+   * (`{ token }`), so the ingester and the push sync do not know which way it arrived; meta.connectedVia does.
+   */
+  r.get('/callback', async (c) => {
+    const { code, state, error } = c.req.query();
+    if (error) return c.redirect(failed(error === 'access_denied' ? 'denied' : 'unknown'));
+    const pending = state ? pendingStates.get(state) : undefined;
+    pendingStates.delete(state ?? '');
+    if (!code || !pending || pending.exp < now() || pending.user !== (c.get('user') ?? null)) return c.redirect(failed('expired'));
+    try {
+      const token = await exchangeTodoistCode(ctx.env, code, fetchImpl);
+      await setSourceConfig(ctx, 'todoist', { token });
+      await mergeSourceMeta(ctx, 'todoist', { connectedVia: 'oauth' });
+      await ctx.db.update(sources).set({ enabled: true }).where(eq(sources.id, 'todoist'));
+      await setSourceStatus(ctx, 'todoist', 'connected', { lastError: null });
+      ctx.log.info('todoist connected via oauth');
+      void run(ctx, todoistIngester, { force: true }).catch((err) => ctx.log.warn({ err }, 'first todoist sync after connect failed'));
+      return c.redirect(settingsUrl('todoist=connected'));
+    } catch (err) {
+      ctx.log.error({ err }, 'todoist oauth callback failed');
+      return c.redirect(failed(err instanceof NotConfiguredError ? 'config' : 'exchange'));
+    }
+  });
+
+  /** Clears the token (pasted or OAuth). An OAuth token is also revoked at Todoist, best effort. */
+  r.post('/disconnect', async (c) => {
+    const row = await getSourceRow(ctx, 'todoist');
+    const via = (row.meta as { connectedVia?: string }).connectedVia;
+    let revoked = false;
+    if (via === 'oauth') {
+      const cfg = await getSourceConfig<{ token?: string }>(ctx, 'todoist').catch(() => null);
+      if (cfg?.token) revoked = await revokeTodoistToken(ctx.env, cfg.token, fetchImpl);
+    }
+    await setSourceConfig(ctx, 'todoist', null);
+    await mergeSourceMeta(ctx, 'todoist', { connectedVia: null });
+    await setSourceStatus(ctx, 'todoist', 'disconnected', { lastError: null });
+    ctx.log.info({ revoked }, 'todoist disconnected');
+    return c.json({ ok: true, revoked });
+  });
 
   /** Preview (dryRun=1) or execute the one-way push. Execution requires the setting to be enabled unless force=1. */
   r.post('/push', async (c) => {

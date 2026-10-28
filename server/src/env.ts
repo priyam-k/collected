@@ -34,6 +34,9 @@ const envSchema = z.object({
     .pipe(z.string().min(32, 'LOCAL_HELPER_KEY must be at least 32 characters (openssl rand -hex 32)').optional()),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Todoist app from developer.todoist.com/appconsole.html. Optional: without it the Todoist card takes a pasted API token. */
+  TODOIST_CLIENT_ID: z.string().optional().transform((v) => v?.trim() || undefined),
+  TODOIST_CLIENT_SECRET: z.string().optional().transform((v) => v?.trim() || undefined),
   PUBLIC_URL: z.string().url().default('http://localhost:5173'),
   SCHEDULER_DISABLED: bool.default(false),
   SEED_CONFIG_PATH: z.string().optional(),
