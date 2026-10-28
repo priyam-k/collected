@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- CLI 1.1.1: the npm package installs again. 1.1.0 declared the workspace-only `@collected/shared` as a dependency even though it is bundled in, so `npm i collected-cli` failed with a 404 for that package.
 ## 1.1.0 — 2026-10-28 · recommended
 
 - New logo and wordmark ("collected."), a landing page built around a live demo of the real dashboard, and a `/demo` page.

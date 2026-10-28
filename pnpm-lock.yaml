@@ -121,11 +121,10 @@ importers:
         version: 5.9.3
 
   agent:
-    dependencies:
+    devDependencies:
       '@collected/shared':
         specifier: workspace:*
         version: link:../shared
-    devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
