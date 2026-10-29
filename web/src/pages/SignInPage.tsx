@@ -11,7 +11,9 @@ const ERRORS: Record<string, string> = {
   expired: 'That sign-in link expired. Try again.',
   exchange: 'Google did not complete the sign-in. Try again.',
   config: 'Google sign-in is not configured on this server. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
-  not_allowed: 'This instance belongs to someone else. Ask them to add your email to ALLOWED_EMAILS.',
+  not_allowed: INVITE_ONLY_NOTICE
+    ? 'Your Google account is not on this instance yet: hosted collected is invite-only for now. Self-host it, or email the address below to join the waitlist.'
+    : 'This instance belongs to someone else. Ask them to add your email to ALLOWED_EMAILS.',
 };
 
 /** Google's four-colour "G", as its sign-in branding guidelines ask for on a Sign in with Google button. */
