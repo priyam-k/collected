@@ -27,6 +27,7 @@ export async function testContext(): Promise<AppContext> {
       UPDATE_CHECK_DISABLED: false,
       SEED_CONFIG_PATH: '/nonexistent/seed.json',
       rootDir: '/nonexistent',
+      packageVersion: 'test',
     } as AppContext['env'],
     db,
     log: pino({ level: 'silent' }),

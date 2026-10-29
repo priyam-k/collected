@@ -1,7 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
+import type { CoreConfig } from '@collected/core';
 
 const bool = z
   .union([z.boolean(), z.string()])
@@ -64,9 +65,17 @@ const envSchema = z.object({
     .transform((v) => v?.trim() || undefined),
 });
 
-export type Env = Omit<z.infer<typeof envSchema>, 'SECRET_KEY'> & { rootDir: string; SECRET_KEY: string; secretKeySource: 'env' | 'file' };
+/**
+ * What the server runs on: the core's config (every path absolute) plus the HTTP-side settings only this package reads.
+ * `rootDir` is the repo checkout (or /app in the image); it anchors relative paths here and never reaches core.
+ */
+export type Env = CoreConfig &
+  Omit<z.infer<typeof envSchema>, keyof CoreConfig> & {
+    rootDir: string;
+    secretKeySource: 'env' | 'file';
+  };
 
-/** Loads ../.env (repo root) when present, then validates process.env. */
+/** Loads ../.env (repo root) when present, then validates process.env and resolves every path core will be handed. */
 export function loadEnv(): Env {
   const rootDir = path.resolve(import.meta.dirname, '..', '..');
   for (const candidate of [path.join(rootDir, '.env'), path.join(process.cwd(), '.env')]) {
@@ -103,9 +112,35 @@ export function loadEnv(): Env {
     rootDir,
     DATA_DIR: dataDir,
     WEB_DIST: env.WEB_DIST ? path.resolve(rootDir, env.WEB_DIST) : undefined,
+    // Relative to the cwd, as `path.resolve` has always read it; the image and the e2e suite pass absolutes.
+    MIGRATIONS_DIR: env.MIGRATIONS_DIR ? path.resolve(env.MIGRATIONS_DIR) : undefined,
+    SEED_CONFIG_PATH: resolveSeedConfig(rootDir, env.SEED_CONFIG_PATH),
     SECRET_KEY: key.value,
     secretKeySource: key.source,
+    packageVersion: readVersion(rootDir),
+    buildInfoFile: path.join(rootDir, 'server', 'build-info.json'),
+    gitDir: rootDir,
   };
+}
+
+/**
+ * The seed file core loads into an empty database. A relative SEED_CONFIG_PATH is read against server/ (where the CLI
+ * used to run), then artifacts/seed-config.json, then the raw value; the first that exists wins. When none does, the
+ * first candidate is still handed over so the "starting empty" warning can name what was tried.
+ */
+function resolveSeedConfig(rootDir: string, configured: string | undefined): string {
+  const primary = configured ? path.resolve(rootDir, 'server', configured) : path.resolve(rootDir, 'artifacts', 'seed-config.json');
+  const candidates = [primary, path.resolve(rootDir, 'artifacts', 'seed-config.json'), configured ?? ''].filter((p) => p && existsSync(p));
+  return candidates[0] ?? primary;
+}
+
+function readVersion(rootDir: string): string {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(rootDir, 'package.json'), 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 /**

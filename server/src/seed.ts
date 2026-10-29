@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
 import { count, eq } from 'drizzle-orm';
 import { INGESTED_SOURCE_IDS, gtasksPushConfigSchema, jobsFilterSchema, seedConfigSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from './context.js';
@@ -27,15 +26,10 @@ export async function seed(ctx: AppContext): Promise<void> {
     return;
   }
 
-  const seedPath = env.SEED_CONFIG_PATH
-    ? path.resolve(env.rootDir, 'server', env.SEED_CONFIG_PATH)
-    : path.resolve(env.rootDir, 'artifacts', 'seed-config.json');
-  const candidates = [seedPath, path.resolve(env.rootDir, 'artifacts', 'seed-config.json'), env.SEED_CONFIG_PATH ?? ''].filter(
-    (p) => p && existsSync(p),
-  );
-  const file = candidates[0];
+  // Absolute, resolved by whoever built the config (the server tries a few places; see server/src/env.ts).
+  const file = env.SEED_CONFIG_PATH && existsSync(env.SEED_CONFIG_PATH) ? env.SEED_CONFIG_PATH : undefined;
   if (!file) {
-    log.warn({ tried: seedPath }, 'no seed-config.json found; starting empty');
+    log.warn({ tried: env.SEED_CONFIG_PATH }, 'no seed-config.json found; starting empty');
     await ensureCoreWidgets(ctx, []);
     return;
   }

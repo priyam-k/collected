@@ -5,11 +5,10 @@ import { migrate } from 'drizzle-orm/libsql/migrator';
 import type { Db } from './client.js';
 
 /**
- * Finds server/drizzle whether we run from src/db (tsx) or dist (tsup bundle):
- * walk up from this file until a `drizzle/meta/_journal.json` appears.
+ * Finds the package's own drizzle/ whether we run from src/db (tsx) or a bundle next to it: walk up from this file
+ * until a `drizzle/meta/_journal.json` appears. The server passes an explicit folder (MIGRATIONS_DIR) when it has one.
  */
 export function defaultMigrationsFolder(): string {
-  if (process.env.MIGRATIONS_DIR) return path.resolve(process.env.MIGRATIONS_DIR);
   let dir = import.meta.dirname;
   for (let i = 0; i < 5; i++) {
     const candidate = path.join(dir, 'drizzle');

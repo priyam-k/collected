@@ -16,7 +16,7 @@
     "e2e": "pnpm --filter e2e test",
     "sync": "pnpm --filter server sync",
     "cli": "pnpm --filter server cli",
-    "db:generate": "pnpm --filter server db:generate",
+    "db:generate": "pnpm --filter @collected/core db:generate",
     "agent": "pnpm --filter collected-cli dev"
   },
   "devDependencies": {

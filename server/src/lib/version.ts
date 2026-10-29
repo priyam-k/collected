@@ -3,16 +3,25 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { BuildInfo } from '../context.js';
 
+export interface BuildInfoSources {
+  /** The COLLECTED_COMMIT env the Dockerfile sets. */
+  fromEnv?: string | undefined;
+  /** The build-info.json the image build writes next to the server. */
+  buildInfoFile?: string | undefined;
+  /** A checkout to ask `git rev-parse` (development). */
+  gitDir?: string | undefined;
+}
+
 /**
  * Which commit is running. In order: the COLLECTED_COMMIT env the Dockerfile sets, the build-info.json the image
  * build writes next to the server, `git rev-parse` when a checkout is present (development), else "dev". The update
  * check compares this against upstream main, so a wrong answer here means a wrong banner, never a wrong write.
  */
-export function resolveBuildInfo(rootDir: string, fromEnv: string | undefined): BuildInfo {
-  const file = readBuildInfoFile(path.join(rootDir, 'server', 'build-info.json'));
+export function resolveBuildInfo({ fromEnv, buildInfoFile, gitDir }: BuildInfoSources): BuildInfo {
+  const file = buildInfoFile ? readBuildInfoFile(buildInfoFile) : null;
   if (fromEnv && fromEnv !== 'dev') return { commit: shortSha(fromEnv), builtAt: file?.builtAt ?? null };
   if (file?.commit && file.commit !== 'dev') return { commit: shortSha(file.commit), builtAt: file.builtAt };
-  const git = gitHead(rootDir);
+  const git = gitDir ? gitHead(gitDir) : null;
   if (git) return { commit: git, builtAt: file?.builtAt ?? null };
   return { commit: 'dev', builtAt: file?.builtAt ?? null };
 }

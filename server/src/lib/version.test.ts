@@ -11,6 +11,8 @@ const scratch = () => {
   mkdirSync(path.join(d, 'server'));
   return d;
 };
+/** The server's layout: build-info.json under server/, git asked at the root. */
+const resolve = (root: string, fromEnv: string | undefined) => resolveBuildInfo({ fromEnv, buildInfoFile: path.join(root, 'server', 'build-info.json'), gitDir: root });
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
@@ -18,18 +20,18 @@ afterEach(() => {
 describe('resolveBuildInfo', () => {
   it('prefers the env, then build-info.json, then dev (no .git here)', () => {
     const root = scratch();
-    expect(resolveBuildInfo(root, undefined)).toEqual({ commit: 'dev', builtAt: null });
+    expect(resolve(root, undefined)).toEqual({ commit: 'dev', builtAt: null });
     writeFileSync(path.join(root, 'server', 'build-info.json'), JSON.stringify({ commit: 'abc1234', builtAt: '2026-10-28T00:00:00Z' }));
-    expect(resolveBuildInfo(root, undefined)).toEqual({ commit: 'abc1234', builtAt: '2026-10-28T00:00:00Z' });
-    expect(resolveBuildInfo(root, 'fedcba9876543210fedcba9876543210fedcba98')).toEqual({ commit: 'fedcba9', builtAt: '2026-10-28T00:00:00Z' });
+    expect(resolve(root, undefined)).toEqual({ commit: 'abc1234', builtAt: '2026-10-28T00:00:00Z' });
+    expect(resolve(root, 'fedcba9876543210fedcba9876543210fedcba98')).toEqual({ commit: 'fedcba9', builtAt: '2026-10-28T00:00:00Z' });
   });
 
   it('treats "dev" and garbage in the file as unknown', () => {
     const root = scratch();
     writeFileSync(path.join(root, 'server', 'build-info.json'), JSON.stringify({ commit: 'dev', builtAt: '' }));
-    expect(resolveBuildInfo(root, 'dev')).toEqual({ commit: 'dev', builtAt: null });
+    expect(resolve(root, 'dev')).toEqual({ commit: 'dev', builtAt: null });
     writeFileSync(path.join(root, 'server', 'build-info.json'), 'not json');
-    expect(resolveBuildInfo(root, undefined)).toEqual({ commit: 'dev', builtAt: null });
+    expect(resolve(root, undefined)).toEqual({ commit: 'dev', builtAt: null });
   });
 
   it('shortens a full sha and leaves a short one alone', () => {

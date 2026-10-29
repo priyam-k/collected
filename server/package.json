@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@collected/core": "workspace:*",
     "@collected/shared": "workspace:*",
     "@googleapis/calendar": "^16.0.0",
     "@hono/node-server": "^2.1.5",

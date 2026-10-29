@@ -1,11 +1,12 @@
+import type { CoreConfig } from '@collected/core';
 import type { Db } from './db/client.js';
 import type { Env } from './env.js';
 import type { Crypto } from './lib/crypto.js';
 import type { Logger } from './lib/log.js';
 
-/** Everything a route or ingester needs. Built once in index.ts / cli.ts. */
-export interface AppContext {
-  env: Env;
+/** Everything a route or ingester needs. Built once by createContext (bootstrap.ts); the server widens `env` to its own Env. */
+export interface AppContext<C extends CoreConfig = Env> {
+  env: C;
   db: Db;
   log: Logger;
   crypto: Crypto;
