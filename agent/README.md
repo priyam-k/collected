@@ -25,7 +25,7 @@ collected auth service-token <client-id>          # prompts for the secret; keep
 collected courses                                 # proves the connection
 ```
 
-`init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas` (reads the Canvas session from your browser and hands it to the server) is being added; until it lands, paste the cookie in Settings → Sources.
+`init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas` reads the Canvas session from your browser and hands it to the server; the fallback is pasting the cookie in Settings → Sources.
 
 No server at all? See [Local mode](#local-mode).
 
@@ -72,7 +72,35 @@ collected daemon uninstall
 
 macOS gets `~/Library/LaunchAgents/com.collected.sync.plist` (loaded with `launchctl bootstrap gui/$UID`); Linux a systemd user service and timer under `~/.config/systemd/user/` (`collected-sync.timer`, enabled with `systemctl --user enable --now`); on Windows the command prints the `schtasks` line to run yourself. The unit calls the exact binary you ran `install` from, so after moving or upgrading the CLI run `install` again. The period is `daemon.intervalMinutes` in `agent.json` (minimum 5). Nothing secret goes into the unit: credentials live in the database, and the unit carries paths only.
 
-Not there yet: the Google and Todoist sign-in buttons, which need your own OAuth client ids (a `~/.collected/.env` for them is coming in a later release). Until then Todoist takes a pasted API token, and Google Calendar works through its iCal address.
+### Google Calendar and Google Tasks: `collected connect google`
+
+```sh
+collected connect google               # Google Calendar: opens the consent screen, waits for Google to come back
+collected connect google tasks         # Google Tasks, its own consent (the tasks scope only)
+collected connect google --no-open     # prints the URL instead of opening a browser
+```
+
+No Google Cloud project is needed: the package carries a Google OAuth client of the "Desktop app" kind, and that kind accepts any `http://127.0.0.1:<port>/...` redirect, so the sign-in finishes on whatever loopback port the command (or `collected ui`) is listening on. The command starts the same app `ui` serves on an ephemeral port without the scheduler, opens Google, waits up to three minutes for the browser to land back on it, prints the result (the calendars or lists it found) and stops the listener. The Connect buttons under Settings → Sources in `collected ui` do the same thing from the page. The flow carries PKCE, and the refresh token lands encrypted in the local database like every other credential. Against a server, the command says to use Settings → Sources there: the sign-in has to end where the server's redirect URI points.
+
+A build can ship without the built-in client (the Sources page says so, and `connect google` says so before it listens); then either add your own client to `~/.collected/.env` (below) or use the Google Calendar (iCal) source, which needs no sign-in.
+
+Todoist in local mode takes a pasted API token (Todoist → Settings → Integrations → Developer). Sign in with Todoist needs a Todoist app of your own, because Todoist registers one exact redirect URL per app and has no loopback exception: register one at `https://developer.todoist.com/appconsole.html` with `http://127.0.0.1:4848/api/todoist/callback` (the `ui` port) and put its id and secret in `~/.collected/.env`.
+
+### `~/.collected/.env`: overrides for local mode
+
+Optional. Same syntax as a server `.env` (`KEY=value`, quotes, `#` comments); make it `chmod 600` (the CLI warns when other users can read it). It is read into the in-process server's config and never into the environment. Only these keys are read; anything else is ignored, and `--verbose` names what was skipped:
+
+```
+GOOGLE_CLIENT_ID=        # your own Google OAuth client, "Desktop app" kind; wins over the built-in one
+GOOGLE_CLIENT_SECRET=    #   (both or neither: an id without a secret switches Google connect off, with a note)
+TODOIST_CLIENT_ID=       # a Todoist app of your own, for Sign in with Todoist (pasted tokens need nothing)
+TODOIST_CLIENT_SECRET=
+TZ=America/New_York      # the zone a fresh database is seeded with; default: this machine's
+LOG_LEVEL=info           # the in-process server's log level on stderr; default warn; --verbose means info
+UPSTREAM_REPO=owner/name # only matters for a fork
+```
+
+The override location lives in `agent.json`'s directory: with `COLLECTED_AGENT_HOME` set, the file is `$COLLECTED_AGENT_HOME/.env`.
 
 ## Commands
 
@@ -111,6 +139,7 @@ Local mode only (`collected init --local`):
 
 ```
 ui [--port 4848] [--no-open]                the dashboard at http://127.0.0.1:<port> until Ctrl-C, syncing in the background
+connect google [calendar|tasks] [--no-open] the Google sign-in in your browser, on a temporary loopback port; no project needed
 daemon install | uninstall | status         a user timer running `sync all` every 15 minutes (daemon.intervalMinutes)
 demo <canvas|gradescope|gcal|todoist|gtasks>   load that source's fixture data into the local database
 demo clear                                  remove everything the demo loaders created
@@ -144,7 +173,7 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## Config file
 
-`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them.
+`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them. Local mode's optional overrides (OAuth clients, `TZ`, `LOG_LEVEL`) go in `~/.collected/.env` next to it, see [above](#collectedenv-overrides-for-local-mode).
 
 `collected auth model` stores a TypeSafe key for the Jev classifier that sorts files the rules cannot place. Skip it to sort by rules only.
 
