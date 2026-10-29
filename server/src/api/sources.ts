@@ -29,7 +29,7 @@ export function toPublic(row: typeof sources.$inferSelect, env: Env): Source {
     lastSuccessAt: row.lastSuccessAt,
     lastError: row.lastError,
     hasConfig: !!row.configEnc,
-    running: isRunning(row.id as IngestedSourceId),
+    running: isRunning(row.id as IngestedSourceId, { dataDir: env.DATA_DIR, timeoutMs: registryIngesters.find((i) => i.id === row.id)?.timeoutMs }),
     meta: stripPrivateMeta(row.meta),
     updatedAt: row.updatedAt,
     ...(row.id === 'todoist' ? { oauthAvailable: todoistOAuthConfigured(env) } : {}),
@@ -60,7 +60,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const result: SyncAllResult = { started: [], skipped: [] };
     for (const ing of deps.ingesters) {
       const id = ing.id as IngestedSourceId;
-      if (isRunning(id)) {
+      if (isRunning(id, { dataDir: ctx.env.DATA_DIR, timeoutMs: ing.timeoutMs })) {
         result.skipped.push({ id, reason: 'running' });
         continue;
       }

@@ -1,14 +1,28 @@
+import path from 'node:path';
 import type { SourceId, SourceStatus } from '@collected/shared';
 import type { AppContext } from '../context.js';
+import { acquireLock, isLocked } from '../lib/sync-lock.js';
 import { nowIso } from '../lib/time.js';
 import { UndecryptableConfigError, getSourceRow, mergeSourceMeta, setSourceStatus } from '../lib/sources.js';
 import { NeedsAuthError, NotConfiguredError, type Ingester, type RunResult } from './types.js';
 
 const running = new Set<SourceId>();
 
-/** Whether a run for this source is in flight right now (in this process). */
-export function isRunning(id: SourceId): boolean {
-  return running.has(id);
+const DEFAULT_TIMEOUT_MS = 120_000;
+/** A lock file older than the run's own cap plus a minute belongs to a process that died without releasing it. */
+export const lockStaleMs = (timeoutMs: number | undefined): number => (timeoutMs ?? DEFAULT_TIMEOUT_MS) + 60_000;
+
+/** The data directory a file lock can live in: the context's, when it is a real directory (tests run on `:memory:`). */
+const lockDir = (dataDir: string): string | null => (path.isAbsolute(dataDir) ? dataDir : null);
+
+/**
+ * Whether a run for this source is in flight right now: in this process (the mutex), or, given a data directory, in
+ * another process on the same database (the lock file `sync.lock/<source>` the runner holds while it works).
+ */
+export function isRunning(id: SourceId, opts: { dataDir?: string; timeoutMs?: number } = {}): boolean {
+  if (running.has(id)) return true;
+  const dir = opts.dataDir ? lockDir(opts.dataDir) : null;
+  return !!dir && isLocked(dir, id, lockStaleMs(opts.timeoutMs));
 }
 
 /** Post-sync work that depends on more than one source (dedup, the Todoist and Google Tasks pushes). Failures are logged, never propagated. */
@@ -69,11 +83,18 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
   }
   const row = await getSourceRow(ctx, ing.id);
   if (!row.enabled && !opts.force) return { ok: false, skipped: 'disabled' };
+  const timeoutMs = ing.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  // The file lock is what two processes on one database (the CLI's `ui`, a read that syncs first, the daemon) see of each other.
+  const dir = lockDir(ctx.env.DATA_DIR);
+  const lock = dir ? acquireLock(dir, ing.id, lockStaleMs(timeoutMs)) : null;
+  if (dir && !lock) {
+    log.debug('skipped: another process is syncing this source');
+    return { ok: false, skipped: 'running' };
+  }
 
   running.add(ing.id);
   const started = Date.now();
   const ac = new AbortController();
-  const timeoutMs = ing.timeoutMs ?? 120_000;
   let timer: NodeJS.Timeout | undefined;
   // The signal only cancels fetches that honour it; the race is what guarantees the run is recorded as an error,
   // the after-hooks (dedup, Todoist push) do not act on partial data, and the mutex is released.
@@ -113,5 +134,6 @@ export async function runIngester(ctx: AppContext, ing: Ingester, opts: { force?
   } finally {
     clearTimeout(timer);
     running.delete(ing.id);
+    lock?.release();
   }
 }

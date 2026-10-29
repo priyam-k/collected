@@ -1,31 +1,18 @@
-import { serve } from '@hono/node-server';
-import { startScheduler } from '@collected/core/scheduler';
-import { createApp } from './app.js';
 import { bootstrap } from './bootstrap.js';
+import { startServer } from './serve.js';
 
 const ctx = await bootstrap();
 const { env, log } = ctx;
 
-const { app, updates, servingSpa } = createApp(ctx, { webDist: env.WEB_DIST });
-
-const scheduler = env.SCHEDULER_DISABLED ? null : startScheduler(ctx);
-// The update check is its own timer, not an ingester: it has no source row and no items, and SCHEDULER_DISABLED (tests, the
-// CLI) should silence it too. UPDATE_CHECK_DISABLED switches off the GitHub request even for an operator who runs the scheduler.
-if (!env.SCHEDULER_DISABLED && !env.UPDATE_CHECK_DISABLED) updates.start();
-
-const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
-  log.info(
-    { port: info.port, version: ctx.version, commit: ctx.build.commit, authDisabled: env.AUTH_DISABLED, spa: servingSpa, dataDir: env.DATA_DIR },
-    `collected listening on http://localhost:${info.port}`,
-  );
-});
+const running = await startServer(ctx, { webDist: env.WEB_DIST, port: env.PORT });
+log.info(
+  { port: running.port, version: ctx.version, commit: ctx.build.commit, authDisabled: env.AUTH_DISABLED, spa: running.servingSpa, dataDir: env.DATA_DIR },
+  `collected listening on http://localhost:${running.port}`,
+);
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     log.info({ sig }, 'shutting down');
-    scheduler?.stop();
-    updates.stop();
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 2000).unref();
+    void running.stop().then(() => process.exit(0));
   });
 }

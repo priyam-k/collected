@@ -7,11 +7,11 @@ import { serveStatic } from '@hono/node-server/serve-static';
 export function mountStatic(app: Hono, dist: string): boolean {
   const indexFile = path.join(dist, 'index.html');
   if (!existsSync(indexFile)) return false;
-  const root = path.relative(process.cwd(), dist) || '.';
+  // Absolute: the CLI's `ui` serves from wherever the shell happens to be.
   app.use(
     '/*',
     serveStatic({
-      root,
+      root: dist,
       onFound: (p, c) => {
         if (/\/assets\//.test(p)) c.header('Cache-Control', 'public, max-age=31536000, immutable');
       },

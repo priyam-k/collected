@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, 
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/libsql/migrator';
+import { acquireLockWaiting } from '../lib/sync-lock.js';
 import type { Db } from './client.js';
 
 /**
@@ -98,18 +99,30 @@ export type AppliedMigrations = string[] & { snapshot: string | null };
  * over collected.db, delete -wal/-shm, start the previous image".
  */
 export async function runMigrations(db: Db, folder = defaultMigrationsFolder()): Promise<AppliedMigrations> {
-  const before = await appliedTimestamps(db);
   const journal = readJournal(folder);
-  const pending = journal.entries.filter((e) => !before.has(e.when));
+  const file = await databaseFile(db);
+  // Two processes opening one file at once (the CLI's `ui` and a read) must not both find the same migration pending:
+  // the second would re-run it after the first's transaction. The check and the apply happen under the data
+  // directory's `migrate` lock; a holder that died is taken over after the cut-off.
+  const lock = file ? await acquireLockWaiting(path.dirname(file), 'migrate', MIGRATE_LOCK_STALE_MS, MIGRATE_LOCK_WAIT_MS) : null;
+  if (file && !lock) throw new Error(`another process has been migrating ${file} for over ${MIGRATE_LOCK_WAIT_MS / 1000} s; retry when it finishes`);
+  try {
+    const before = await appliedTimestamps(db);
+    const pending = journal.entries.filter((e) => !before.has(e.when));
 
-  let snapshot: string | null = null;
-  if (pending.length) {
-    const file = await databaseFile(db);
-    if (file) snapshot = await snapshotBeforeMigration(db, file, pending[0]!.tag);
+    let snapshot: string | null = null;
+    if (pending.length && file) snapshot = await snapshotBeforeMigration(db, file, pending[0]!.tag);
+
+    await migrate(db, { migrationsFolder: folder });
+    const after = await appliedTimestamps(db);
+    const applied = journal.entries.filter((e) => after.has(e.when) && !before.has(e.when)).map((e) => e.tag);
+    return Object.assign(applied, { snapshot });
+  } finally {
+    lock?.release();
   }
-
-  await migrate(db, { migrationsFolder: folder });
-  const after = await appliedTimestamps(db);
-  const applied = journal.entries.filter((e) => after.has(e.when) && !before.has(e.when)).map((e) => e.tag);
-  return Object.assign(applied, { snapshot });
 }
+
+/** A migration run that takes longer than this left a dead process behind; the next opener takes the lock over. */
+const MIGRATE_LOCK_STALE_MS = 10 * 60_000;
+/** How long an opener waits for a live migrator before giving up (a migration is seconds; the snapshot of a big file is the slow part). */
+const MIGRATE_LOCK_WAIT_MS = 30_000;

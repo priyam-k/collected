@@ -46,6 +46,8 @@ export function createApp(ctx: AppContext, opts: AppOptions = {}): { app: Hono; 
   );
   const updates = opts.updates ?? createUpdateChecker(ctx);
   app.route('/api', createApi(ctx, { updates }));
+  // The owner's own machine has no visitor to show a landing page to: `/` is the board (DECISIONS 054).
+  if (ctx.env.LOCAL_OWNER) app.get('/', (c) => c.redirect('/dashboard', 302));
   const servingSpa = opts.webDist ? mountStatic(app, opts.webDist) : false;
   return { app, updates, servingSpa };
 }
