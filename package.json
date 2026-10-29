@@ -10,14 +10,16 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"pnpm --filter @collected/server dev\" \"pnpm --filter web dev\"",
-    "build": "pnpm --filter web build && pnpm --filter @collected/server build",
+    "build": "pnpm --filter web build && pnpm --filter @collected/server build && pnpm --filter collected-cli build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --filter '!e2e' test",
     "e2e": "pnpm --filter e2e test",
     "sync": "pnpm --filter @collected/server sync",
     "cli": "pnpm --filter @collected/server cli",
     "db:generate": "pnpm --filter @collected/core db:generate",
-    "agent": "pnpm --filter collected-cli dev"
+    "agent": "pnpm --filter collected-cli dev",
+    "build:cli": "pnpm --filter web build && pnpm --filter collected-cli build",
+    "smoke:cli": "node scripts/smoke-cli-package.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",

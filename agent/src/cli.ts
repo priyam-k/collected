@@ -49,7 +49,8 @@ function usage(): never {
     install-launchd [--interval 30] | uninstall-launchd
     connect canvas [--browser X] [--domain host] [--dry-run]
                                               read the Canvas session cookie from your browser and send it to the server`);
-  process.exit(cmd ? 1 : 0);
+  // Asked for (`help`, `--help`, no command) is success; reached from an unknown command is not.
+  process.exit(cmd && cmd !== 'help' && cmd !== '--help' ? 1 : 0);
 }
 
 const say = (s: string) => console.log(s);

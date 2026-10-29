@@ -7,7 +7,9 @@ import type { Db } from './client.js';
 
 /**
  * Finds the package's own drizzle/ whether we run from src/db (tsx) or a bundle next to it: walk up from this file
- * until a `drizzle/meta/_journal.json` appears. The server passes an explicit folder (MIGRATIONS_DIR) when it has one.
+ * until a `drizzle/meta/_journal.json` appears. The walk stops at a `node_modules` boundary, so an installed bundle
+ * can only find its own copy, never a checkout that happens to sit above the install. The server and the CLI pass an
+ * explicit folder (MIGRATIONS_DIR); this is the fallback for tests and the dev server.
  */
 export function defaultMigrationsFolder(): string {
   let dir = import.meta.dirname;
@@ -15,7 +17,7 @@ export function defaultMigrationsFolder(): string {
     const candidate = path.join(dir, 'drizzle');
     if (existsSync(path.join(candidate, 'meta', '_journal.json'))) return candidate;
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir || path.basename(parent) === 'node_modules') break;
     dir = parent;
   }
   throw new Error(`Could not locate drizzle migrations folder starting from ${import.meta.dirname}`);

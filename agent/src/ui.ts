@@ -5,6 +5,7 @@ import { createContext, createLogger } from '@collected/core';
 import { startServer, type RunningServer } from '@collected/server/serve';
 import { localDataDir, type AgentConfig } from './config.js';
 import { localEnv } from './local.js';
+import { shippedWebDist } from './paths.js';
 
 /*
  * `collected ui`: the dashboard over the local database, on this machine only. The same app the CLI's other commands
@@ -16,11 +17,11 @@ export const DEFAULT_UI_PORT = 4848;
 export const LOOPBACK = '127.0.0.1';
 
 /**
- * The built web app to serve. For now the repo layout: `web/dist` two levels above agent/src or agent/dist. Packaging
- * (phase 4) replaces this one function with the copy shipped inside the package.
+ * The built web app to serve: the copy the npm package carries next to the bundle (`dist/web`), or in a checkout the
+ * repo's `web/dist`. Only the checkout can lack it; the package build refuses to produce a bundle without it.
  */
 export function resolveWebDist(): string {
-  const dist = path.resolve(import.meta.dirname, '..', '..', 'web', 'dist');
+  const dist = shippedWebDist();
   if (!existsSync(path.join(dist, 'index.html'))) throw new Error(`no web build at ${dist}: run pnpm --filter web build first`);
   return dist;
 }

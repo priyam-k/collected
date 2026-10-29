@@ -10,6 +10,7 @@ import type { Env } from '@collected/server/env';
 import { ApiError, downloadFromCdn, downloadTarget, itemsQuery, readJson, type CollectedApi } from './api.js';
 import { localDataDir, type AgentConfig } from './config.js';
 import type { CourseContentRow } from './facts.js';
+import { shippedMigrations, shippedSeedConfig } from './paths.js';
 
 /*
  * Local mode: the whole backend inside this process. The same Hono app the server listens on is built here over a
@@ -58,8 +59,11 @@ export function localEnv(dataDir: string, opts: LocalEnvOptions = {}): Env {
     UPSTREAM_REPO: 'priyam-k/collected',
     UPDATE_CHECK_DISABLED: true,
     packageVersion: cliVersion(),
-    // MIGRATIONS_DIR and SEED_CONFIG_PATH stay unset: core finds its own drizzle/ (next to the bundle, or in core/),
-    // and the database starts empty; `collected demo canvas` or a real Canvas connection fills it.
+    // Explicit paths, so core never has to look for them: the package's own copies next to the bundle, or the repo's
+    // (paths.ts). The seed has no courses, only the jobs feed and the to-do defaults; `collected demo canvas` or a
+    // real Canvas connection brings the courses.
+    MIGRATIONS_DIR: shippedMigrations(),
+    SEED_CONFIG_PATH: shippedSeedConfig(),
   };
 }
 
