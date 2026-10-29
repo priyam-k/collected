@@ -11,7 +11,7 @@ import { authRoutes } from './auth.js';
 import { calendarRoutes } from './calendar.js';
 import { canvasRoutes } from './canvas.js';
 import { coursesRoutes } from './courses.js';
-import { googleRoutes } from './google.js';
+import { googleRoutes, type GoogleRouteOptions } from './google.js';
 import { exportRoutes } from './export.js';
 import { fileSyncRoutes } from './file-sync.js';
 import { gradesRoutes } from './grades.js';
@@ -72,7 +72,7 @@ export function crossSite(headers: { origin?: string; secFetchSite?: string }, p
   }
 }
 
-export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {}) {
+export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; google?: GoogleRouteOptions } = {}) {
   const updates = deps.updates ?? createUpdateChecker(ctx);
   const api = new Hono<{ Variables: AuthVariables }>();
 
@@ -139,7 +139,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {
   api.route('/layout', layoutRoutes(ctx));
   api.route('/widgets', widgetRoutes(ctx));
   api.route('/settings', settingsRoutes(ctx));
-  api.route('/google', googleRoutes(ctx));
+  api.route('/google', googleRoutes(ctx, deps.google));
   api.route('/calendar', calendarRoutes(ctx));
   api.route('/canvas', canvasRoutes(ctx));
   api.route('/grades', gradesRoutes(ctx));

@@ -41,7 +41,8 @@ export function openBrowser(url: string): void {
 export interface UiOptions {
   port: number;
   open: boolean;
-  logLevel?: string;
+  logLevel?: string | undefined;
+  verbose?: boolean | undefined;
   say?: (s: string) => void;
 }
 
@@ -50,7 +51,7 @@ export async function startUi(cfg: AgentConfig, opts: UiOptions): Promise<Runnin
   const webDist = resolveWebDist();
   const dataDir = localDataDir(cfg);
   // The browser's Origin on a write must match PUBLIC_URL (the same-site check), so the address is fixed to the loopback literal.
-  const env = localEnv(dataDir, { logLevel: opts.logLevel, publicUrl: `http://${LOOPBACK}:${opts.port}`, scheduler: true });
+  const env = localEnv(dataDir, { logLevel: opts.logLevel, verbose: opts.verbose, publicUrl: `http://${LOOPBACK}:${opts.port}`, scheduler: true });
   const log = createLogger(env.LOG_LEVEL, false, { stderr: true });
   const ctx = await createContext(env, { log });
   const running = await startServer(ctx, { webDist, port: opts.port, hostname: LOOPBACK }).catch((err: NodeJS.ErrnoException) => {

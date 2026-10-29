@@ -63,6 +63,50 @@ describe('google connect', () => {
     const cal = await scopes('/google/start');
     expect(cal.scope).toEqual(['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly']);
   });
+
+  it('sends a PKCE S256 challenge with each start, a fresh one per flow, and the redirect URI from PUBLIC_URL', async () => {
+    const ctx = await testContext();
+    ctx.env.GOOGLE_CLIENT_ID = 'client';
+    ctx.env.GOOGLE_CLIENT_SECRET = 'secret';
+    ctx.env.PUBLIC_URL = 'http://127.0.0.1:50123';
+    const app = new Hono().route('/google', googleRoutes(ctx));
+    const start = async (path: string) => new URL((await app.request(path)).headers.get('location')!);
+    const a = await start('/google/start');
+    const b = await start('/google/start?source=gtasks');
+    for (const u of [a, b]) {
+      expect(u.searchParams.get('code_challenge_method')).toBe('S256');
+      expect(u.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(u.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:50123/api/google/callback');
+    }
+    expect(a.searchParams.get('code_challenge')).not.toBe(b.searchParams.get('code_challenge'));
+    expect(a.searchParams.get('state')).not.toBe(b.searchParams.get('state'));
+  });
+
+  it('tells the result hook how a callback ended, and redirects with the same reason', async () => {
+    const ctx = await testContext();
+    ctx.env.GOOGLE_CLIENT_ID = 'client';
+    ctx.env.GOOGLE_CLIENT_SECRET = 'secret';
+    const results: unknown[] = [];
+    const app = new Hono().route('/google', googleRoutes(ctx, { onResult: (r) => results.push(r) }));
+    const state = new URL((await app.request('/google/start?source=gtasks')).headers.get('location')!).searchParams.get('state')!;
+    const denied = await app.request(`/google/callback?state=${state}&error=access_denied`);
+    expect(denied.headers.get('location')).toBe('http://localhost:5173/settings/sources?google=error&reason=denied&source=gtasks');
+    // An unknown or spent state is `expired`; its target is unknown so it reads as Calendar.
+    const stale = await app.request(`/google/callback?state=${state}&code=x`);
+    expect(stale.headers.get('location')).toBe('http://localhost:5173/settings/sources?google=error&reason=expired');
+    expect(results).toEqual([
+      { target: 'gtasks', ok: false, reason: 'denied' },
+      { target: 'gcal', ok: false, reason: 'expired' },
+    ]);
+  });
+
+  it('answers unconfigured when there is no Google client, without touching the hook', async () => {
+    const ctx = await testContext();
+    const results: unknown[] = [];
+    const app = new Hono().route('/google', googleRoutes(ctx, { onResult: (r) => results.push(r) }));
+    expect((await app.request('/google/start')).headers.get('location')).toBe('http://localhost:5173/settings/sources?google=unconfigured');
+    expect(results).toEqual([]);
+  });
 });
 
 describe('google tasks push routes', () => {

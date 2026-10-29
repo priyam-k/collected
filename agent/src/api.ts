@@ -40,7 +40,7 @@ export interface CollectedApi extends SyncApi {
 }
 
 /** The API for this config: in-process when `server` is `local` (that code is loaded only then), else HTTP. */
-export async function openApi(cfg: AgentConfig, opts: { logLevel?: string } = {}): Promise<CollectedApi> {
+export async function openApi(cfg: AgentConfig, opts: { logLevel?: string; verbose?: boolean } = {}): Promise<CollectedApi> {
   if (!isLocal(cfg)) return new Api(cfg);
   const { LocalApi } = await import('./local.js');
   return LocalApi.open(cfg, opts);

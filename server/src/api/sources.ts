@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { INGESTED_SOURCE_IDS, outboundUrlSchema, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import { todoistOAuthConfigured } from '@collected/core/auth/todoist';
+import { googleOAuthConfigured } from '@collected/core/ingest/gcal/api';
 import type { Env } from '../env.js';
 import type { AppContext } from '../context.js';
 import { sources } from '@collected/core/db/schema';
@@ -33,6 +34,8 @@ export function toPublic(row: typeof sources.$inferSelect, env: Env): Source {
     meta: stripPrivateMeta(row.meta),
     updatedAt: row.updatedAt,
     ...(row.id === 'todoist' ? { oauthAvailable: todoistOAuthConfigured(env) } : {}),
+    // Calendar and Tasks share one client; the cards say when a build or an instance has none.
+    ...(row.id === 'gcal' || row.id === 'gtasks' ? { oauthAvailable: googleOAuthConfigured(env) } : {}),
   };
 }
 

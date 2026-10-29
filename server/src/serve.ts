@@ -2,7 +2,7 @@ import { serve, type ServerType } from '@hono/node-server';
 import { startScheduler, type Scheduler } from '@collected/core/scheduler';
 import { closeDb } from '@collected/core/db/client';
 import type { UpdateChecker } from '@collected/core/lib/updates';
-import { createApp } from './app.js';
+import { createApp, type AppOptions } from './app.js';
 import type { AppContext } from './context.js';
 
 export interface ServeOptions {
@@ -11,6 +11,7 @@ export interface ServeOptions {
   port: number;
   /** Interface to bind; unset binds every interface (the image behind its proxy). The CLI's `ui` passes 127.0.0.1. */
   hostname?: string | undefined;
+  onGoogleConnect?: AppOptions['onGoogleConnect'];
 }
 
 export interface RunningServer {
@@ -32,7 +33,7 @@ export interface RunningServer {
  */
 export function startServer(ctx: AppContext, opts: ServeOptions): Promise<RunningServer> {
   const { env } = ctx;
-  const { app, updates, servingSpa } = createApp(ctx, { webDist: opts.webDist });
+  const { app, updates, servingSpa } = createApp(ctx, { webDist: opts.webDist, onGoogleConnect: opts.onGoogleConnect });
   const scheduler = env.SCHEDULER_DISABLED ? null : startScheduler(ctx);
   // The update check is its own timer, not an ingester: it has no source row and no items, and SCHEDULER_DISABLED (tests, the
   // CLI) should silence it too. UPDATE_CHECK_DISABLED switches off the GitHub request even for an operator who runs the scheduler.

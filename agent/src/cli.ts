@@ -8,6 +8,7 @@ import { Api, openApi } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas } from './connect.js';
 import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
+import { localDotenvPath } from './dotenv.js';
 import { daemonStatus, describeStatus, installDaemon, uninstallDaemon } from './daemon.js';
 import { READ_SOURCES, ensureFresh, takeFreshnessFlags } from './freshness.js';
 import { assertSecureUrl } from './guard.js';
@@ -16,13 +17,15 @@ import { pullFile } from './pull.js';
 import { loadState } from './state.js';
 import { runSync } from './sync.js';
 
-// `--verbose` anywhere raises the in-process app's log level in local mode (warnings only otherwise, on stderr).
+// `--verbose` anywhere raises the in-process app's log level in local mode (the dotenv's LOG_LEVEL or warnings otherwise, on stderr).
 // `--fresh` / `--stale-ok` anywhere decide whether a local-mode read syncs first (freshness.ts); a server keeps itself fresh.
 const verbose = process.argv.includes('--verbose');
 const { flags: freshness, rest: argvWords } = takeFreshnessFlags(process.argv.slice(2).filter((a) => a !== '--verbose'));
 const [cmd, ...rest] = argvWords;
 const DEMO_SOURCES = ['canvas', 'gradescope', 'gcal', 'todoist', 'gtasks'] as const;
 const SYNC_SOURCES = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'gtasks', 'jobs', 'all'];
+/** The in-process app's log level: `--verbose` says info; otherwise `~/.collected/.env`'s LOG_LEVEL, then warn (local.ts). */
+const localOpts = { logLevel: verbose ? 'info' : undefined, verbose };
 
 function usage(): never {
   console.log(`${HELP}
@@ -48,7 +51,9 @@ function usage(): never {
     status                                    last file sync and what has been placed
     install-launchd [--interval 30] | uninstall-launchd
     connect canvas [--browser X] [--domain host] [--dry-run]
-                                              read the Canvas session cookie from your browser and send it to the server`);
+                                              read the Canvas session cookie from your browser and send it to the server
+    connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
+                                              (overrides, if you have your own OAuth client: ${localDotenvPath()})`);
   // Asked for (`help`, `--help`, no command) is success; reached from an unknown command is not.
   process.exit(cmd && cmd !== 'help' && cmd !== '--help' ? 1 : 0);
 }
@@ -85,7 +90,7 @@ try {
     argv = rest.slice(1);
   } else if (cmd === 'link' && rest[0] !== 'add' && rest[0] !== 'rm') command = 'files-link';
   const cfgOf = () => loadConfig();
-  const apiFor = (cfg = cfgOf()) => openApi(cfg, { logLevel: verbose ? 'info' : 'warn' });
+  const apiFor = (cfg = cfgOf()) => openApi(cfg, localOpts);
   // Local mode gives `sync` a second meaning: `sync <source|all>` is the source sync (`resync`), not the file sync.
   if (cmd === 'sync' && rest[0] && SYNC_SOURCES.includes(rest[0])) {
     const cfg = cfgOf();
@@ -144,7 +149,7 @@ try {
       }
       const port = values.port === undefined ? (await import('./ui.js')).DEFAULT_UI_PORT : Number(values.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`--port needs a number from 1 to 65535, not "${values.port}"`);
-      await (await import('./ui.js')).runUi(cfg, { port, open, logLevel: verbose ? 'info' : 'warn', say });
+      await (await import('./ui.js')).runUi(cfg, { port, open, ...localOpts, say });
       break;
     }
     case 'daemon': {
@@ -162,7 +167,7 @@ try {
       if (!isLocal(cfg)) throw new Error('`collected demo` loads fixtures into a local database; it needs local mode (collected init --local). A server loads them with `pnpm cli demo <source>`.');
       const what = rest[0];
       const { LocalApi } = await import('./local.js');
-      const api = await LocalApi.open(cfg, { logLevel: verbose ? 'info' : 'warn' });
+      const api = await LocalApi.open(cfg, localOpts);
       if (what === 'clear') {
         const r = await api.demoClear();
         say(`removed ${r.items} item${r.items === 1 ? '' : 's'} and ${r.content} content row${r.content === 1 ? '' : 's'} the demo loaders had created`);
@@ -212,6 +217,16 @@ try {
       break;
     }
     case 'connect': {
+      if (rest[0] === 'google') {
+        const { values, positionals } = parseArgs({ args: rest.slice(1), options: { 'no-open': { type: 'boolean' } }, allowPositionals: true });
+        const target = positionals[0] ?? 'calendar';
+        if (positionals.length > 1 || (target !== 'calendar' && target !== 'tasks')) usage();
+        const { connectGoogle } = await import('./connect-google.js');
+        const r = await connectGoogle(loadConfig(), { target, log: say, noOpen: values['no-open'], ...localOpts });
+        if (!r.ok) throw new Error(r.detail);
+        say(r.detail);
+        break;
+      }
       if (rest[0] !== 'canvas') usage();
       const { values } = parseArgs({ args: rest.slice(1), options: { browser: { type: 'string' }, domain: { type: 'string' }, 'dry-run': { type: 'boolean' } } });
       await connectCanvas(loadConfig(), { browser: values.browser, domain: values.domain, dryRun: values['dry-run'], log: say });

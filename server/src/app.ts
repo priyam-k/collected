@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import { createUpdateChecker, type UpdateChecker } from '@collected/core/lib/updates';
 import { createApi } from './api/index.js';
+import type { GoogleConnectResult } from './api/google.js';
 import type { AppContext } from './context.js';
 import { mountStatic } from './static.js';
 
@@ -10,6 +11,8 @@ export interface AppOptions {
   updates?: UpdateChecker;
   /** Absolute path of a built web app to serve under `/`; nothing is mounted when it is unset or has no index.html. */
   webDist?: string | undefined;
+  /** Told how each Google connect callback ended; the CLI's `connect google` waits on it. */
+  onGoogleConnect?: ((r: GoogleConnectResult) => void) | undefined;
 }
 
 /**
@@ -45,7 +48,7 @@ export function createApp(ctx: AppContext, opts: AppOptions = {}): { app: Hono; 
     }),
   );
   const updates = opts.updates ?? createUpdateChecker(ctx);
-  app.route('/api', createApi(ctx, { updates }));
+  app.route('/api', createApi(ctx, { updates, google: { onResult: opts.onGoogleConnect } }));
   // The owner's own machine has no visitor to show a landing page to: `/` is the board (DECISIONS 054).
   if (ctx.env.LOCAL_OWNER) app.get('/', (c) => c.redirect('/dashboard', 302));
   const servingSpa = opts.webDist ? mountStatic(app, opts.webDist) : false;

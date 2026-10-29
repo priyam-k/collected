@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ApiToken, Me } from '@collected/shared';
 import { exchangeSignIn, googleSignInConfigured, signInUrl } from '@collected/core/auth/google';
+import { createPkce } from '@collected/core/auth/pkce';
 import { SYNTHETIC_PERSONS, createSession, createToken, deleteSession, emailAllowed, isPerson, listTokens, revokeToken, upsertUser, userByEmail } from '@collected/core/auth/session';
 import { type AuthVariables } from '../auth/cloudflare-access.js';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from '../auth/cookies.js';
@@ -10,8 +11,8 @@ import type { AppContext } from '../context.js';
 import { NotConfiguredError } from '@collected/core/ingest/types';
 import { bad, parseBody } from './util.js';
 
-/** OAuth state for sign-in: nobody is signed in yet, so it carries only the return path and an expiry. */
-const pending = new Map<string, { next: string; exp: number }>();
+/** OAuth state for sign-in: nobody is signed in yet, so it carries the return path, an expiry and the PKCE verifier. */
+const pending = new Map<string, { next: string; exp: number; verifier: string }>();
 const STATE_TTL_MS = 10 * 60_000;
 
 /** Only a path on this site may be the post-sign-in destination; without one, the board (web/src/lib/routes.ts). */
@@ -53,8 +54,9 @@ export function authRoutes(ctx: AppContext) {
       const now = Date.now();
       for (const [k, v] of pending) if (v.exp < now) pending.delete(k);
       const state = randomBytes(16).toString('hex');
-      pending.set(state, { next: safeNext(c.req.query('next')), exp: now + STATE_TTL_MS });
-      return c.redirect(signInUrl(ctx.env, state));
+      const pkce = createPkce();
+      pending.set(state, { next: safeNext(c.req.query('next')), exp: now + STATE_TTL_MS, verifier: pkce.verifier });
+      return c.redirect(signInUrl(ctx.env, state, pkce.challenge));
     } catch (err) {
       if (err instanceof NotConfiguredError) return c.redirect(signInPage('error=config'));
       throw err;
@@ -68,7 +70,7 @@ export function authRoutes(ctx: AppContext) {
     pending.delete(state ?? '');
     if (!code || !p || p.exp < Date.now()) return c.redirect(signInPage('error=expired'));
     try {
-      const profile = await exchangeSignIn(ctx.env, code);
+      const profile = await exchangeSignIn(ctx.env, code, p.verifier);
       if (!(await emailAllowed(ctx, profile.email))) {
         ctx.log.warn({ email: profile.email }, 'sign-in refused: not an allowed email');
         return c.redirect(signInPage('error=not_allowed'));

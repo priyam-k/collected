@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { useClearSourceConfig, useDisconnectTodoist, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
+import { isLocalOwner, useClearSourceConfig, useDisconnectTodoist, useMe, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
 import { safeColor } from '@/lib/color';
 import { friendlyDate, relative } from '@/lib/time';
 import { safeHref } from '@/lib/url';
@@ -27,8 +27,26 @@ const STATUS: Record<Source['status'], { tone: StatusTone; word: string }> = {
 /** Code inside running text: a well chip, never literal backticks. */
 const Cmd = ({ children }: { children: React.ReactNode }) => <code className="rounded-md bg-well px-1 py-px font-mono text-[11.5px] text-ink">{children}</code>;
 
+/*
+ * Local mode (`collected ui`, identity `local`) has no operator and no server `.env`: the Google client is the one
+ * built into the CLI unless `~/.collected/.env` names another, and a build can ship without one. The cards say which
+ * case this is; the controls are the same.
+ */
+const LOCAL_DOTENV = '~/.collected/.env';
+const LOCAL_GOOGLE_BUILTIN = `Uses collected's built-in Google client; set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in ${LOCAL_DOTENV} to use your own.`;
+const LOCAL_GOOGLE_MISSING = `This build ships without a Google client. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to ${LOCAL_DOTENV}`;
+const LOCAL_TODOIST_NOTE = `Sign in with Todoist needs your own Todoist app: add TODOIST_CLIENT_ID and TODOIST_CLIENT_SECRET to ${LOCAL_DOTENV}. Pasting a token works without it.`;
+
+/** The Google cards' description: the server's as written, or in local mode which client (if any) the build runs with. */
+function googleDescription(local: boolean, source: Source, server: string, icalFallback: boolean): string {
+  if (!local) return server;
+  if (source.oauthAvailable === false) return `${LOCAL_GOOGLE_MISSING}${icalFallback ? ', or use the iCal source.' : '.'}`;
+  return `${server} ${LOCAL_GOOGLE_BUILTIN}`;
+}
+
 export function SourcesPage() {
   const q = useSources();
+  const local = isLocalOwner(useMe().data);
   if (q.isPending) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (q.isError) return <p className="text-sm text-destructive">{q.error.message}</p>;
   const by = Object.fromEntries(q.data.map((s) => [s.id, s])) as Record<SourceId, Source>;
@@ -41,20 +59,26 @@ export function SourcesPage() {
       <SourceCard source={by.gradescope} description="Your Gradescope email and password. Use a Gradescope password, not the school sign-in button.">
         <GradescopeForm source={by.gradescope} />
       </SourceCard>
-      <SourceCard source={by.gcal} description="Connect your Google account to see your calendars and add events to them.">
-        <GoogleForm source={by.gcal} />
+      <SourceCard source={by.gcal} description={googleDescription(local, by.gcal, 'Connect your Google account to see your calendars and add events to them.', true)}>
+        <GoogleForm source={by.gcal} local={local} />
       </SourceCard>
       <SourceCard source={by.gcal_ical} description="Read-only and no Google sign-in: one calendar's secret iCal address, refreshed every 30 minutes.">
         <GcalIcalForm source={by.gcal_ical} />
       </SourceCard>
       <SourceCard
         source={by.todoist}
-        description={by.todoist.oauthAvailable ? 'Sign in with Todoist, or paste an API token from Todoist → Settings → Integrations → Developer.' : 'Paste an API token from Todoist → Settings → Integrations → Developer. (Sign in with Todoist appears once this server has a Todoist app set up.)'}
+        description={
+          by.todoist.oauthAvailable
+            ? 'Sign in with Todoist, or paste an API token from Todoist → Settings → Integrations → Developer.'
+            : local
+              ? 'Paste an API token from Todoist → Settings → Integrations → Developer.'
+              : 'Paste an API token from Todoist → Settings → Integrations → Developer. (Sign in with Todoist appears once this server has a Todoist app set up.)'
+        }
       >
-        <TodoistForm source={by.todoist} />
+        <TodoistForm source={by.todoist} local={local} />
       </SourceCard>
       {by.gtasks && (
-        <SourceCard source={by.gtasks} description="Connected separately from Calendar, and asks only for your tasks. (The server's Google project needs the Tasks API turned on.)">
+        <SourceCard source={by.gtasks} description={googleDescription(local, by.gtasks, local ? 'Connected separately from Calendar, and asks only for your tasks.' : "Connected separately from Calendar, and asks only for your tasks. (The server's Google project needs the Tasks API turned on.)", false)}>
           <GTasksForm source={by.gtasks} />
         </SourceCard>
       )}
@@ -395,7 +419,7 @@ const TODOIST_ERRORS: Record<string, string> = {
 };
 
 /** OAuth connect when the operator registered a Todoist app, with the pasted token folded away as the fallback; the plain token form otherwise. */
-function TodoistForm({ source }: { source: Source }) {
+function TodoistForm({ source, local }: { source: Source; local: boolean }) {
   const meta = (source.meta ?? {}) as { connectedVia?: 'oauth' | 'token' | null };
   const disconnect = useDisconnectTodoist();
   const [showToken, setShowToken] = useState(false);
@@ -410,7 +434,14 @@ function TodoistForm({ source }: { source: Source }) {
     setParams(params, { replace: true });
   }, [params, setParams]);
 
-  if (!source.oauthAvailable) return <TokenForm source={source} field="token" label="API token" />;
+  if (!source.oauthAvailable) {
+    return (
+      <div className="space-y-2">
+        <TokenForm source={source} field="token" label="API token" />
+        {local && <p className="text-xs text-muted-foreground">{LOCAL_TODOIST_NOTE}</p>}
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -460,7 +491,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
   unknown: 'Google connect failed',
 };
 
-function GoogleForm({ source }: { source: Source }) {
+function GoogleForm({ source, local }: { source: Source; local: boolean }) {
   const meta = (source.meta ?? {}) as GCalMeta;
   const patch = usePatchSourceMeta();
   const clear = useClearSourceConfig();
@@ -469,14 +500,14 @@ function GoogleForm({ source }: { source: Source }) {
     const g = params.get('google');
     if (!g) return;
     if (g === 'connected') toast.success(params.get('source') === 'gtasks' ? 'Google Tasks connected' : 'Google Calendar connected');
-    else if (g === 'unconfigured') toast.error('Google sign-in is not set up on this server yet. The self-host guide covers it.');
+    else if (g === 'unconfigured') toast.error(local ? `${LOCAL_GOOGLE_MISSING}, or use the iCal source.` : 'Google sign-in is not set up on this server yet. The self-host guide covers it.');
     else if (params.get('source') === 'gtasks' && params.get('reason') === 'unknown') toast.error('Google Tasks: the first sync failed, see the Google Tasks card (is the Tasks API enabled?)');
     else toast.error(GOOGLE_ERRORS[params.get('reason') ?? ''] ?? GOOGLE_ERRORS.unknown);
     params.delete('google');
     params.delete('reason');
     params.delete('source');
     setParams(params, { replace: true });
-  }, [params, setParams]);
+  }, [params, setParams, local]);
 
   const selected = new Set(meta.selectedCalendars ?? (meta.calendars ?? []).filter((c) => c.primary).map((c) => c.id));
   const toggle = (id: string, on: boolean) => {
