@@ -54,16 +54,24 @@ Simplify listings.json ───────┘                                 
 ```
 collected/
   artifacts/        docs only: DESIGN, DECISIONS, SETUP, PROGRESS, seed-config
-  server/           Hono API, ingesters, scheduler, CLI      (TypeScript)
+  core/             @collected/core: everything that is not HTTP   (TypeScript)
+    drizzle/        migrations (`pnpm db:generate` writes here)
     src/
-      index.ts      boot: migrate, start scheduler, start http
+      config.ts     CoreConfig: the seam; absolute paths, no process.env, no repo root
+      bootstrap.ts  createContext(config, {log}): open db → migrate → crypto → seed
+      db/           drizzle schema, client, migrate
+      ingest/       canvas/  gradescope/  gcal/  todoist/  gtasks/  jobs/  + registry, runner
+      sync/         push-core.ts  todoist-push.ts  gtasks-push.ts  dedup.ts
+      auth/         session.ts (sessions, tokens, users)  google.ts  todoist.ts
+      lib/          crypto.ts  http.ts  log.ts  settings.ts  sources.ts  updates.ts  …
+      scheduler.ts  seed.ts  test-util.ts
+  server/           Hono API: routes, static SPA, env parsing, CLI entry
+    src/
+      index.ts      boot: createContext, mount api + spa, start scheduler + http
       cli.ts        `pnpm sync <source>`, `pnpm push todoist`, etc.
-      db/           drizzle schema + migrations
-      ingest/       canvas.ts  canvas-ical.ts  gradescope.ts  gcal.ts  todoist.ts  jobs.ts
-      sync/         todoist-push.ts  dedup.ts
+      env.ts        process.env → Env (CoreConfig plus PORT, AUTH_*, CF_ACCESS_*, WEB_DIST …)
       api/          route modules
-      auth/         cloudflare-access.ts
-      lib/          crypto.ts  http.ts  log.ts
+      auth/         cloudflare-access.ts  cookies.ts
   web/              Vite React SPA
     src/
       widgets/      one folder per widget + registry.ts
@@ -78,7 +86,7 @@ collected/
   CLAUDE.md
 ```
 
-pnpm workspaces: `server`, `web`, `shared`, `agent`.
+pnpm workspaces: `shared`, `core`, `server`, `web`, `agent`, `e2e`. `core` is the backend without HTTP (DECISIONS 052); `server` is the Hono layer over it and bundles it into one `dist/index.js`.
 
 Dev: Vite on 5173 proxies `/api` to the server on 3000. Prod: server on 3000 serves both.
 

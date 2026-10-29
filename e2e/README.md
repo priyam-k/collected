@@ -30,7 +30,7 @@ E2E_SERVER_LOG_LEVEL=debug pnpm e2e                  # chattier server.log
 1. Makes a temp directory (`collected-e2e-*` under the OS tmpdir) with a fresh `DATA_DIR`.
 2. Builds `web/dist` if it is missing (`E2E_REBUILD=1` forces it) and always rebuilds `agent/dist` (fast).
 3. Loads the demo data the way `pnpm cli demo <source>` does: `tsx src/cli.ts demo canvas|gradescope|gcal|todoist`,
-   which runs the real ingesters against `server/src/ingest/*/fixture-client.ts` and `mock-api.ts`.
+   which runs the real ingesters against `core/src/ingest/*/fixture-client.ts` and `mock-api.ts`.
 4. Starts `tsx src/index.ts` and waits for `GET /api/health`.
 
 `global-teardown.ts` stops the server and deletes the temp directory.

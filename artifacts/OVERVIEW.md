@@ -20,7 +20,7 @@ One thing runs *off* the box: `collected-agent` (the `agent` workspace) on the l
 
 Why one process (DECISIONS 001, 003): the hard part of this app is scrapers on a timer, which want a boring long-lived runtime you can debug locally with `pnpm sync canvas`. Serverless and edge runtimes fight that. Postgres buys nothing for one user. Hono was picked over Next/SvelteKit because a scheduler wants a plain server process, not request-scoped handlers.
 
-**Boot** (`server/src/bootstrap.ts`, shared by server and CLI): load `.env` → open DB → run pending Drizzle migrations → build the `AppContext` `{env, db, log, crypto, version}` → seed. Seed inserts the six `sources` rows every boot and, only if `courses` is empty, loads `artifacts/seed-config.json`. Every route and ingester receives that one `ctx` object; there is no DI framework, just a struct passed down.
+**Boot** (`server/src/bootstrap.ts` → `createContext` in `core/src/bootstrap.ts`, shared by server and CLI): load `.env` and resolve every path to an absolute `CoreConfig` (`server/src/env.ts`) → open DB → run pending Drizzle migrations → build the `AppContext` `{env, db, log, crypto, version, build}` → seed. Seed inserts the six `sources` rows every boot and, only if `courses` is empty, loads `artifacts/seed-config.json`. Every route and ingester receives that one `ctx` object; there is no DI framework, just a struct passed down.
 
 ## The data model, by purpose
 
@@ -51,7 +51,7 @@ Time is always ISO UTC text; day-only values (applied date, exam date) are `YYYY
 
 ## Ingesters: the write path
 
-Every source has a folder under `server/src/ingest/<source>/` with roughly the same three files: a **client** (HTTP + auth + pagination for that source), a **map** (source JSON/HTML → `items` rows, pure functions, fixture-tested), and an **ingest** (orchestrates the calls, calls the two shared writers). Each exports an `Ingester` object: `{ id, intervalMinutes, timeoutMs, run(ctx, signal) }`. `ingest/registry.ts` lists them; the scheduler and CLI both iterate that list.
+Every source has a folder under `core/src/ingest/<source>/` with roughly the same three files: a **client** (HTTP + auth + pagination for that source), a **map** (source JSON/HTML → `items` rows, pure functions, fixture-tested), and an **ingest** (orchestrates the calls, calls the two shared writers). Each exports an `Ingester` object: `{ id, intervalMinutes, timeoutMs, run(ctx, signal) }`. `ingest/registry.ts` lists them; the scheduler and CLI both iterate that list.
 
 The **runner** (`ingest/runner.ts`) is what makes them uniform. It wraps every run with: a per-source mutex (skip if already running), the `enabled` check, a timeout that aborts the fetches, and status writing. It classifies failures by error type: `NotConfiguredError` → `disconnected`, quietly; `NeedsAuthError` or an undecryptable config → `needs_auth` with a message; anything else → `error`. The runner never throws. That's why the Sources widget can always show something true, and a dead scraper degrades one panel, never the app.
 

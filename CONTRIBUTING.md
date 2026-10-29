@@ -31,18 +31,18 @@ The ones that trip people up:
 
 - **Ingesters** upsert by `(source, external_id)`, soft-delete what they no longer see, and always write their status to `sources`. An empty or failed upstream answer is never a deletion. Every ingester is also a CLI command (`pnpm sync <source>`); build and debug it that way first.
 - **Todoist push is one-way.** It creates, updates, closes and deletes tasks for assignments; it never reopens a task and never touches Canvas or Gradescope from a Todoist event.
-- **Every outbound fetch** goes through `server/src/lib/http.ts` (a deadline and a byte budget), and every user-settable URL is validated with `outboundUrlSchema` (https to a public host). Redirects and pagination links stay on the configured origin.
+- **Every outbound fetch** goes through `core/src/lib/http.ts` (a deadline and a byte budget), and every user-settable URL is validated with `outboundUrlSchema` (https to a public host). Redirects and pagination links stay on the configured origin.
 - **Mutating routes** parse bodies with `parseBody` / `parsePatch`; never read `c.req.json()` directly, never write `schema.partial()` back. Bound free-text fields in `shared/src/schemas.ts` with `.max()`.
 - **Credentials have scope** (`identityAllows` in `server/src/api/index.ts`). New routes that touch credentials, settings, layout or import/export stay on the deny list for non-person identities.
 - **The agent trusts nothing from the server about paths.** Targets are checked against `allowedTargets`, every vault write goes through `assertInside`, downloads follow only https redirects to public hosts.
-- **Secrets** go through `server/src/lib/crypto.ts`, never on a command line in docs or help text, never logged or committed.
+- **Secrets** go through `core/src/lib/crypto.ts`, never on a command line in docs or help text, never logged or committed.
 - **Widgets**: one folder under `web/src/widgets/<type>/`, one entry in `registry.ts`, every size tier from `useWidgetSize()`, and empty, loading and error states.
 - **Docs**: `artifacts/DECISIONS.md` is append-only (new numbered entry when a decision changes); `artifacts/SETUP.md` and `docs/self-host.md` must stay accurate when env vars or flows change.
 - **Dependencies**: none added casually. Open an issue first if a change needs one.
 
 ## Changelog
 
-Every user-visible change adds a bullet to `CHANGELOG.md` under the `## Unreleased` heading, in the same pull request. The file is machine-read by the update check that self-hosters see, so the format is strict: a release heading is `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>` and each change is one `-` bullet under it. Cutting a release means renaming `## Unreleased` to that heading, bumping `version` in the root `package.json`, and adding a fresh `## Unreleased` above it. `server/src/lib/changelog.test.ts` parses the real file, so a malformed heading fails CI.
+Every user-visible change adds a bullet to `CHANGELOG.md` under the `## Unreleased` heading, in the same pull request. The file is machine-read by the update check that self-hosters see, so the format is strict: a release heading is `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>` and each change is one `-` bullet under it. Cutting a release means renaming `## Unreleased` to that heading, bumping `version` in the root `package.json`, and adding a fresh `## Unreleased` above it. `core/src/lib/changelog.test.ts` parses the real file, so a malformed heading fails CI.
 
 ## Commits and pull requests
 

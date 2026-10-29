@@ -1,6 +1,6 @@
 # Changelog
 
-Every user-visible change gets a bullet. The format is read by the app's update check (`server/src/lib/changelog.ts`),
+Every user-visible change gets a bullet. The format is read by the app's update check (`core/src/lib/changelog.ts`),
 so keep it exact: a heading `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>`, then one `-` bullet per
 change. Unshipped work goes under `## Unreleased`, which the parser skips; the release that ships it renames the
 heading. `recommended` means a self-hoster should pull it (a fix, a security change, a source that would otherwise
@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- The backend is split into `@collected/core` (database, ingesters, syncs, sessions, scheduler) and the `server` HTTP layer over it. Nothing changes for a running instance: the image runs the same bundle, and the migrations now ship from `core/drizzle` (`MIGRATIONS_DIR` in the image).
 - CLI 1.1.1: the npm package installs again. 1.1.0 declared the workspace-only `@collected/shared` as a dependency even though it is bundled in, so `npm i collected-cli` failed with a 404 for that package.
 ## 1.1.0 — 2026-10-28 · recommended
 
