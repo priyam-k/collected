@@ -1,12 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import type { Context } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from '../context.js';
-import type { Env } from '../env.js';
-import { apiTokens, sessions, users, type ApiTokenRow, type UserRow } from '@collected/core/db/schema';
-import { getSetting, setSetting } from '@collected/core/lib/settings';
-import { nowIso } from '@collected/core/lib/time';
+import { apiTokens, sessions, users, type ApiTokenRow, type UserRow } from '../db/schema.js';
+import { getSetting, setSetting } from '../lib/settings.js';
+import { nowIso } from '../lib/time.js';
 
 export const SESSION_COOKIE = 'collected_session';
 export const SESSION_DAYS = 30;
@@ -70,24 +67,6 @@ export async function sessionUser(ctx: AppContext, id: string): Promise<UserRow 
 
 export async function deleteSession(ctx: AppContext, id: string): Promise<void> {
   await ctx.db.delete(sessions).where(eq(sessions.id, id));
-}
-
-export function readSessionCookie(c: Context): string | undefined {
-  return getCookie(c, SESSION_COOKIE);
-}
-
-export function setSessionCookie(c: Context, env: Env, id: string, expiresAt: string): void {
-  setCookie(c, SESSION_COOKIE, id, {
-    httpOnly: true,
-    sameSite: 'Lax',
-    secure: env.PUBLIC_URL.startsWith('https://'),
-    path: '/',
-    expires: new Date(expiresAt),
-  });
-}
-
-export function clearSessionCookie(c: Context, env: Env): void {
-  deleteCookie(c, SESSION_COOKIE, { path: '/', secure: env.PUBLIC_URL.startsWith('https://') });
 }
 
 // --- API tokens (the CLI) --------------------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { AppContext } from '../context.js';
-import { createSession, createToken, emailAllowed, upsertUser } from '../auth/session.js';
+import { createSession, createToken, emailAllowed, upsertUser } from '@collected/core/auth/session';
 import { testContext } from '../test-util.js';
 import { createApi } from './index.js';
 

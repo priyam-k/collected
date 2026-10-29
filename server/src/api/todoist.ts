@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { todoistPushConfigSchema } from '@collected/shared';
 import type { AuthVariables } from '../auth/cloudflare-access.js';
-import { exchangeTodoistCode, revokeTodoistToken, todoistAuthUrl } from '../auth/todoist.js';
+import { exchangeTodoistCode, revokeTodoistToken, todoistAuthUrl } from '@collected/core/auth/todoist';
 import type { AppContext } from '../context.js';
 import { items, overrides, sources, todoistMap } from '@collected/core/db/schema';
 import { runIngester } from '@collected/core/ingest/runner';

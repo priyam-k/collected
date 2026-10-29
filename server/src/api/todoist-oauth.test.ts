@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { AuthVariables } from '../auth/cloudflare-access.js';
-import { TODOIST_REVOKE_URL, TODOIST_TOKEN_URL } from '../auth/todoist.js';
+import { TODOIST_REVOKE_URL, TODOIST_TOKEN_URL } from '@collected/core/auth/todoist';
 import { getSourceConfig, getSourceRow } from '@collected/core/lib/sources';
 import { testContext } from '../test-util.js';
 import { toPublic } from './sources.js';

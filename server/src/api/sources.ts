@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { INGESTED_SOURCE_IDS, outboundUrlSchema, sourceConfigSchemas, sourceIdSchema, type IngestedSourceId, type Source } from '@collected/shared';
 import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
-import { todoistOAuthConfigured } from '../auth/todoist.js';
+import { todoistOAuthConfigured } from '@collected/core/auth/todoist';
 import type { Env } from '../env.js';
 import type { AppContext } from '../context.js';
 import { sources } from '@collected/core/db/schema';

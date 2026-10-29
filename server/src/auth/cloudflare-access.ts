@@ -4,7 +4,8 @@ import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { AppContext } from '../context.js';
 import type { Env } from '../env.js';
-import { readSessionCookie, sessionUser, tokenUser } from './session.js';
+import { sessionUser, tokenUser } from '@collected/core/auth/session';
+import { readSessionCookie } from './cookies.js';
 
 export type AuthVariables = { user: string | null };
 

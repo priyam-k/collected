@@ -1,6 +1,6 @@
-import type { Env } from '../env.js';
-import { NotConfiguredError } from '@collected/core/ingest/types';
-import { readText, withTimeout } from '@collected/core/lib/http';
+import type { CoreConfig } from '../config.js';
+import { NotConfiguredError } from '../ingest/types.js';
+import { readText, withTimeout } from '../lib/http.js';
 
 /**
  * Todoist OAuth 2.0 over plain fetch. The app is registered once by the operator at
@@ -15,16 +15,16 @@ export const TODOIST_SCOPE = 'data:read_write,data:delete';
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
-export const todoistOAuthConfigured = (env: Env): boolean => !!(env.TODOIST_CLIENT_ID && env.TODOIST_CLIENT_SECRET);
+export const todoistOAuthConfigured = (env: CoreConfig): boolean => !!(env.TODOIST_CLIENT_ID && env.TODOIST_CLIENT_SECRET);
 
-export const todoistRedirectUri = (env: Env): string => `${env.PUBLIC_URL.replace(/\/$/, '')}/api/todoist/callback`;
+export const todoistRedirectUri = (env: CoreConfig): string => `${env.PUBLIC_URL.replace(/\/$/, '')}/api/todoist/callback`;
 
-function credentials(env: Env): { id: string; secret: string } {
+function credentials(env: CoreConfig): { id: string; secret: string } {
   if (!env.TODOIST_CLIENT_ID || !env.TODOIST_CLIENT_SECRET) throw new NotConfiguredError('TODOIST_CLIENT_ID / TODOIST_CLIENT_SECRET are not set (see docs/self-host.md)');
   return { id: env.TODOIST_CLIENT_ID, secret: env.TODOIST_CLIENT_SECRET };
 }
 
-export function todoistAuthUrl(env: Env, state: string): string {
+export function todoistAuthUrl(env: CoreConfig, state: string): string {
   const { id } = credentials(env);
   const u = new URL(TODOIST_AUTHORIZE_URL);
   u.searchParams.set('client_id', id);
@@ -38,7 +38,7 @@ export function todoistAuthUrl(env: Env, state: string): string {
 const FORM = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' };
 
 /** Swaps the authorization code for a token. Todoist tokens do not expire; there is no refresh token. */
-export async function exchangeTodoistCode(env: Env, code: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+export async function exchangeTodoistCode(env: CoreConfig, code: string, fetchImpl: typeof fetch = fetch): Promise<string> {
   const { id, secret } = credentials(env);
   const res = await fetchImpl(TODOIST_TOKEN_URL, {
     method: 'POST',
@@ -62,7 +62,7 @@ export async function exchangeTodoistCode(env: Env, code: string, fetchImpl: typ
 }
 
 /** Best effort. A failed revoke still disconnects locally; the token is then an orphan the user can revoke from Todoist. */
-export async function revokeTodoistToken(env: Env, token: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+export async function revokeTodoistToken(env: CoreConfig, token: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   if (!todoistOAuthConfigured(env)) return false;
   const { id, secret } = credentials(env);
   try {
