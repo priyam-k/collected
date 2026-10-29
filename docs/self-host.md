@@ -185,7 +185,9 @@ collected help                       # every command
 
 `collected connect canvas` posts your Canvas session cookie to the server (step 7). `collected files link <course-id> ~/school/<course>` and `collected sync` set up the file sync; `collected install-launchd --interval 30` keeps it running on a Mac. The config file holds the server URL and the token; the server never learns a filesystem path, and the agent never overwrites or removes a file whose bytes changed since it placed it.
 
-If you are deploying from a checkout rather than npm, `pnpm --filter agent build` produces `agent/dist/cli.js`; alias `collected` to `node <checkout>/agent/dist/cli.js`.
+If you are deploying from a checkout rather than npm, `pnpm --filter collected-cli build` produces `agent/dist/cli.js`; alias `collected` to `node <checkout>/agent/dist/cli.js`.
+
+The CLI can also run without any server: `collected init --local` keeps the whole backend inside the command, over a SQLite database in `~/.collected/data`. It is the quickest way to try collected, or to use it from a terminal only; the web dashboard over that database is a later release. See the CLI's [README](../agent/README.md#local-mode).
 
 ## Troubleshooting
 

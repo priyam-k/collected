@@ -25,6 +25,23 @@ collected courses                                 # proves the connection
 
 `init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas` (reads the Canvas session from your browser and hands it to the server) is being added; until it lands, paste the cookie in Settings → Sources.
 
+No server at all? See [Local mode](#local-mode).
+
+## Local mode
+
+Local mode runs collected inside the command itself: the same backend the server runs, over a SQLite database on this machine. No server, no Docker, no `.env`. Every command works the same way; the difference is where the data lives.
+
+```sh
+collected init --local                 # or --data-dir <path>; default ~/.collected/data
+collected demo canvas                  # fixture courses and assignments, to look around (demo clear removes them)
+collected courses
+collected status                       # "local · <data dir>"
+```
+
+The data directory (created `0700`) holds `collected.db`, the encryption key (`.secret_key`, created on first use) and the pre-migration snapshots under `backups/`. It is yours to back up or delete. `collected sync <source|all>` runs a source's sync right there and waits for it; `collected connect canvas` stores the Canvas session in the local database and syncs it. `login` and `auth service-token` have nothing to do in local mode and say so.
+
+What is not there yet: the web dashboard over the local database (`collected ui`), a background refresh, and the Google and Todoist sign-in buttons, which need your own OAuth client ids (a `~/.collected/.env` for them is coming in a later release). Until then Todoist takes a pasted API token, and Google Calendar works through its iCal address.
+
 ## Commands
 
 Add `--json` to any read for machine-readable output; everything is written so another program (or an agent) can call it.
@@ -58,6 +75,14 @@ jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
 resync [canvas|gradescope|gcal|todoist|jobs|all]
 ```
 
+Local mode only (`collected init --local`):
+
+```
+demo <canvas|gradescope|gcal|todoist|gtasks>   load that source's fixture data into the local database
+demo clear                                  remove everything the demo loaders created
+sync <source|all>                           run a source sync in-process and wait for it (same as resync)
+```
+
 Canvas, read-only (one GET through the server with its stored session; nothing is ever written to Canvas):
 
 ```
@@ -84,7 +109,7 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## Config file
 
-`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL, the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them.
+`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them.
 
 `collected auth model` stores a TypeSafe key for the Jev classifier that sorts files the rules cannot place. Skip it to sort by rules only.
 

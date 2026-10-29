@@ -29,7 +29,9 @@ export async function seed(ctx: AppContext): Promise<void> {
   // Absolute, resolved by whoever built the config (the server tries a few places; see server/src/env.ts).
   const file = env.SEED_CONFIG_PATH && existsSync(env.SEED_CONFIG_PATH) ? env.SEED_CONFIG_PATH : undefined;
   if (!file) {
-    log.warn({ tried: env.SEED_CONFIG_PATH }, 'no seed-config.json found; starting empty');
+    // A configured path that is not there is worth a warning; no path at all (the CLI's local mode) is the normal empty start.
+    if (env.SEED_CONFIG_PATH) log.warn({ tried: env.SEED_CONFIG_PATH }, 'no seed-config.json found; starting empty');
+    else log.info('no seed file configured; starting empty');
     await ensureCoreWidgets(ctx, []);
     return;
   }

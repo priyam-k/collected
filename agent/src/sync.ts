@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { FILE_SYNC_SKIP, allowedTargets, decideFile, type FileSyncDecision, type FileSyncFileView, type FileSyncManifestCourse, type FileSyncReport } from '@collected/shared';
-import { Api, type SyncApi } from './api.js';
+import { openApi, type SyncApi } from './api.js';
 import { classify, modelUnavailable } from './classify.js';
 import { courseFactsDir, courseIndexPath, courseRoot, knownTargets, targetDir, type AgentConfig } from './config.js';
 import { writeFacts } from './facts.js';
@@ -74,7 +74,7 @@ const metaOf = (f: FileSyncFileView): NonNullable<Placement['meta']> => ({ title
  */
 export async function runSync(cfg: AgentConfig, opts: SyncOptions = {}): Promise<SyncSummary> {
   const log = opts.log ?? (() => {});
-  const api: SyncApi = opts.api ?? new Api(cfg);
+  const api: SyncApi = opts.api ?? (await openApi(cfg));
   const state = loadState();
   const manifest = await api.getManifest();
   const report: FileSyncReport = { device: cfg.device, model: false, targets: {}, decisions: [], placed: [], removed: [], errors: [] };

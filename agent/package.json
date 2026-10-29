@@ -3,7 +3,7 @@
   "version": "1.1.1",
   "private": false,
   "type": "module",
-  "description": "Command-line client for collected, the self-hosted student dashboard: read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders.",
+  "description": "Command-line client for collected, the self-hosted student dashboard: read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders. Runs against your server, or on its own against a database on this machine (local mode).",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
@@ -42,7 +42,25 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@googleapis/calendar": "^16.0.0",
+    "@hono/node-server": "^2.1.5",
+    "@libsql/client": "^0.18.0",
+    "cheerio": "^1.2.0",
+    "croner": "^10.0.1",
+    "drizzle-orm": "^0.45.4",
+    "fetch-cookie": "^3.2.0",
+    "google-auth-library": "^11.3.1",
+    "hono": "^4.13.14",
+    "jose": "^6.2.13",
+    "node-ical": "^0.27.3",
+    "pino": "^10.4.0",
+    "tough-cookie": "^6.0.2",
+    "zod": "^4.6.7"
+  },
   "devDependencies": {
+    "@collected/core": "workspace:*",
+    "@collected/server": "workspace:*",
     "@collected/shared": "workspace:*",
     "@types/node": "^24.13.3",
     "tsup": "^8.5.1",

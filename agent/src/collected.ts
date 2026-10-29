@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import type { Course, CourseGrades, EffectiveItem, Job, Meeting, Source } from '@collected/shared';
-import type { Api } from './api.js';
+import type { CollectedApi as Api } from './api.js';
 import { dayOf, describeSchedule, htmlToText, linkedFiles, localDate, parseMeetings, table, when } from './format.js';
 
 /*

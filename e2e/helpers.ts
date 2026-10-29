@@ -20,19 +20,22 @@ export interface CliResult {
   stderr: string;
 }
 
-/** Runs the built `collected` CLI (agent/dist/cli.js) against the e2e server. `input` is piped to stdin. */
-export function cli(args: string[], opts: { input?: string } = {}): CliResult {
+/**
+ * Runs the built `collected` CLI (agent/dist/cli.js) against the e2e server. `input` is piped to stdin; `home` is
+ * another COLLECTED_AGENT_HOME (the local-mode spec keeps its own, with its own database).
+ */
+export function cli(args: string[], opts: { input?: string; home?: string } = {}): CliResult {
   const r = spawnSync(process.execPath, [AGENT_CLI, ...args], {
     encoding: 'utf8',
     input: opts.input,
-    env: { ...process.env, COLLECTED_AGENT_HOME: agentHome(), TZ: 'America/New_York' },
+    env: { ...process.env, COLLECTED_AGENT_HOME: opts.home ?? agentHome(), TZ: 'America/New_York' },
     timeout: 60_000,
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
 /** `cli` that must succeed; returns stdout. */
-export function cliOk(args: string[], opts: { input?: string } = {}): string {
+export function cliOk(args: string[], opts: { input?: string; home?: string } = {}): string {
   const r = cli(args, opts);
   expect(r.status, `collected ${args.join(' ')}\n${r.stdout}\n${r.stderr}`).toBe(0);
   return r.stdout;

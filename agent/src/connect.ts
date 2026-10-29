@@ -1,4 +1,4 @@
-import { Api } from './api.js';
+import { openApi } from './api.js';
 import type { AgentConfig } from './config.js';
 import { BROWSER_ORDER, isBrowserId, scanBrowser, type BrowserId, type FoundCookie, type KeychainReader } from './browser-cookies.js';
 
@@ -87,7 +87,7 @@ export async function connectCanvas(cfg: AgentConfig, opts: ConnectOptions): Pro
     return { browser: hit.browser, profile: hit.profile, names, posted: false };
   }
 
-  const api = opts.api ?? new Api(cfg);
+  const api = opts.api ?? (await openApi(cfg));
   const res = await api.postCanvasCookie({ cookieHeader: cookieHeader(hit.cookies), baseUrl: `https://${host}` });
   const outcome = (res.outcome ?? {}) as { ok?: boolean; result?: { counts?: unknown } };
   if (outcome.ok) log(`cookie accepted; Canvas synced: ${JSON.stringify(outcome.result?.counts ?? {})}`);

@@ -8,8 +8,10 @@ import { isInside } from './place.js';
  * target names; this file says where each one is on this machine.
  */
 export interface AgentConfig {
-  /** Where collected runs, e.g. https://collected.example.com or http://localhost:3000 */
+  /** Where collected runs, e.g. https://collected.example.com or http://localhost:3000; or `local` for a database on this machine. */
   server: string;
+  /** Local mode (`collected init --local`): the app runs inside the CLI against a SQLite file in `dataDir`. */
+  local?: { dataDir: string };
   auth: {
     /** Cloudflare Access service token (prod). */
     cfAccessClientId?: string;
@@ -59,6 +61,14 @@ export interface ModelConfig {
 export const agentHome = (): string => process.env.COLLECTED_AGENT_HOME || path.join(homedir(), '.collected');
 export const configPath = (): string => path.join(agentHome(), 'agent.json');
 
+/** The `server` value that means "no server: run the app in this process" (agent/src/local.ts). */
+export const LOCAL = 'local';
+export const isLocal = (cfg: Pick<AgentConfig, 'server'>): boolean => cfg.server === LOCAL;
+/** Where local mode keeps its database, key file and snapshots unless `init --local --data-dir` said otherwise. */
+export const defaultLocalDataDir = (): string => path.join(agentHome(), 'data');
+/** The data directory of a local-mode config, absolute; `~` expanded. */
+export const localDataDir = (cfg: AgentConfig): string => path.resolve(expandHome(cfg.local?.dataDir ?? defaultLocalDataDir()));
+
 export function defaultConfig(server = 'http://localhost:3000'): AgentConfig {
   return { server, auth: {}, device: hostname().replace(/\.local$/, ''), cacheDir: path.join(agentHome(), 'cache'), courses: {}, model: { enabled: true, baseUrl: 'https://api.typesafe.ai', model: 'jev-latest' } };
 }
@@ -68,7 +78,9 @@ export function loadConfig(): AgentConfig {
   if (!existsSync(file)) throw new Error(`No agent config at ${file}. Run: collected-agent init <server-url>`);
   const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<AgentConfig>;
   const base = defaultConfig(raw.server);
-  return { ...base, ...raw, auth: raw.auth ?? {}, courses: raw.courses ?? {}, model: { ...base.model, ...(raw.model ?? {}) } };
+  const cfg: AgentConfig = { ...base, ...raw, auth: raw.auth ?? {}, courses: raw.courses ?? {}, model: { ...base.model, ...(raw.model ?? {}) } };
+  if (isLocal(cfg)) cfg.local = { dataDir: raw.local?.dataDir ?? defaultLocalDataDir() };
+  return cfg;
 }
 
 /** Owner-only, written to a temp name and renamed in, so a crash never leaves a truncated or readable copy. */

@@ -1,18 +1,24 @@
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { Api } from './api.js';
+import { Api, openApi } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas } from './connect.js';
-import { configPath, defaultConfig, loadConfig, saveConfig, targetDir } from './config.js';
+import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, saveConfig, targetDir } from './config.js';
 import { assertSecureUrl } from './guard.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
 import { pullFile } from './pull.js';
 import { loadState } from './state.js';
 import { runSync } from './sync.js';
 
-const [cmd, ...rest] = process.argv.slice(2);
+// `--verbose` anywhere raises the in-process app's log level in local mode (warnings only otherwise, on stderr).
+const verbose = process.argv.includes('--verbose');
+const [cmd, ...rest] = process.argv.slice(2).filter((a) => a !== '--verbose');
+const DEMO_SOURCES = ['canvas', 'gradescope', 'gcal', 'todoist', 'gtasks'] as const;
+const SYNC_SOURCES = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'gtasks', 'jobs', 'all'];
 
 function usage(): never {
   console.log(`${HELP}
@@ -20,6 +26,10 @@ function usage(): never {
   File sync (course files → folders on this machine)
 
     init <server-url>                         write ${configPath()} (device name, cache dir, model on); https, or http://localhost
+    init --local [--data-dir <path>]          no server: run collected inside this command against a database on this machine
+                                              (default ${defaultLocalDataDir()}); then: collected demo canvas, collected courses
+    demo <canvas|gradescope|gcal|todoist|gtasks> | demo clear    local mode: load the fixture data into the local database, or remove it
+    sync <source|all>                         local mode: run that source's sync now and wait (same as resync)
     auth service-token <id> [secret] | auth helper-key [key] | auth token [token] | auth model [typesafe-api-key]
                                               leave the secret off to be prompted for it (or pipe it in): it then stays out of shell history
     login                                     sign in: opens Settings → Account on the server, then paste the token here
@@ -64,8 +74,17 @@ try {
     command = rest[0] === 'courses' ? 'files-courses' : rest[0] === 'link' ? 'files-link' : rest[0] === 'unlink' ? 'unlink' : rest[0];
     argv = rest.slice(1);
   } else if (cmd === 'link' && rest[0] !== 'add' && rest[0] !== 'rm') command = 'files-link';
+  const cfgOf = () => loadConfig();
+  const apiFor = (cfg = cfgOf()) => openApi(cfg, { logLevel: verbose ? 'info' : 'warn' });
+  // Local mode gives `sync` a second meaning: `sync <source|all>` is the source sync (`resync`), not the file sync.
+  if (cmd === 'sync' && rest[0] && SYNC_SOURCES.includes(rest[0])) {
+    const cfg = cfgOf();
+    if (!isLocal(cfg)) throw new Error(`\`collected sync ${rest[0]}\` runs a source sync in local mode only; against a server use \`collected resync ${rest[0]}\` (the file sync is \`collected sync\` with no source)`);
+    say(await runCollected(await apiFor(cfg), 'resync', rest));
+    process.exit(0);
+  }
   if (command === cmd && isCollectedCommand(cmd)) {
-    say(await runCollected(new Api(loadConfig()), cmd, rest));
+    say(await runCollected(await apiFor(), cmd, rest));
     process.exit(0);
   }
   switch (command) {
@@ -75,10 +94,11 @@ try {
       usage();
     // eslint-disable-next-line no-fallthrough
     case 'init': {
-      const server = rest[0];
-      if (!server) usage();
+      const { values, positionals } = parseArgs({ args: rest, options: { force: { type: 'boolean' }, device: { type: 'string' }, local: { type: 'boolean' }, 'data-dir': { type: 'string' } }, allowPositionals: true });
+      const server = values.local ? LOCAL : positionals[0];
+      if (!server || (values.local && positionals[0])) usage();
+      if (values['data-dir'] && !values.local) throw new Error('--data-dir goes with --local');
       assertSecureUrl(server, 'the server URL');
-      const { values } = parseArgs({ args: rest.slice(1), options: { force: { type: 'boolean' }, device: { type: 'string' } } });
       let existing: ReturnType<typeof loadConfig> | null = null;
       try {
         existing = loadConfig();
@@ -91,13 +111,36 @@ try {
       }
       const cfg = defaultConfig(server);
       if (values.device) cfg.device = values.device;
+      if (values.local) {
+        cfg.local = { dataDir: values['data-dir'] ? path.resolve(values['data-dir']) : defaultLocalDataDir() };
+        mkdirSync(cfg.local.dataDir, { recursive: true, mode: 0o700 });
+      }
       saveConfig(cfg);
-      say(`wrote ${configPath()}\nnext: collected auth service-token <id>   (prompts for the secret; or auth helper-key for a local server)\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)\n      collected courses`);
+      if (values.local) say(`wrote ${configPath()}\nlocal mode: data in ${cfg.local!.dataDir} (created on first command)\nnext: collected demo canvas              (fixture courses and assignments, to look around)\n      collected courses\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)`);
+      else say(`wrote ${configPath()}\nnext: collected auth service-token <id>   (prompts for the secret; or auth helper-key for a local server)\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)\n      collected courses`);
+      break;
+    }
+    case 'demo': {
+      const cfg = cfgOf();
+      if (!isLocal(cfg)) throw new Error('`collected demo` loads fixtures into a local database; it needs local mode (collected init --local). A server loads them with `pnpm cli demo <source>`.');
+      const what = rest[0];
+      const { LocalApi } = await import('./local.js');
+      const api = await LocalApi.open(cfg, { logLevel: verbose ? 'info' : 'warn' });
+      if (what === 'clear') {
+        const r = await api.demoClear();
+        say(`removed ${r.items} item${r.items === 1 ? '' : 's'} and ${r.content} content row${r.content === 1 ? '' : 's'} the demo loaders had created`);
+        break;
+      }
+      if (!what || !(DEMO_SOURCES as readonly string[]).includes(what)) usage();
+      const r = await api.demo(what as (typeof DEMO_SOURCES)[number]);
+      const counts = Object.entries(r.counts).map(([k, v]) => `${k} ${v}`).join(', ');
+      say(`${r.source}: ${counts || 'loaded'}${r.coursesCreated.length ? `\ncourses created from the fixture: ${r.coursesCreated.join(', ')}` : ''}\nremove with: collected demo clear`);
       break;
     }
     case 'auth': {
       const cfg = loadConfig();
       const [what, a, b] = rest;
+      if (isLocal(cfg) && what !== 'model') throw new Error('local mode has no server credential: the database is on this machine. `collected auth model` still sets the classifier key.');
       if (what === 'service-token' && a) cfg.auth = { cfAccessClientId: a, cfAccessClientSecret: b ?? (await readSecret('service token secret: ')) };
       else if (what === 'helper-key') cfg.auth = { helperKey: a ?? (await readSecret('helper key: ')) };
       else if (what === 'token') cfg.auth = { ...cfg.auth, token: a ?? (await readSecret('token: ')) }; // keeps the edge credentials
@@ -110,6 +153,7 @@ try {
     }
     case 'login': {
       const cfg = loadConfig();
+      if (isLocal(cfg)) throw new Error('local mode needs no sign-in: this command already owns the database.');
       const url = `${cfg.server.replace(/\/$/, '')}/settings/account?cli=1&device=${encodeURIComponent(cfg.device)}`;
       say(`Sign in and create a token for this machine:\n  ${url}`);
       if (process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
@@ -138,7 +182,7 @@ try {
     }
     case 'files-courses': {
       const cfg = loadConfig();
-      const m = await new Api(cfg).getManifest();
+      const m = await (await apiFor(cfg)).getManifest();
       if (!m.courses.length) say('no course has file sync enabled yet (turn it on in the course drawer → Files → Sync to laptop)');
       for (const c of m.courses) {
         const local = cfg.courses[c.course.id];
@@ -200,7 +244,7 @@ try {
       const cfg = loadConfig();
       const st = loadState();
       const n = Object.keys(st.placements).length;
-      say(`server ${cfg.server} · device ${cfg.device} · model ${cfg.model.enabled ? 'on' : 'off'}\nlast run ${st.lastRunAt ?? 'never'} · ${n} file${n === 1 ? '' : 's'} placed`);
+      say(`${isLocal(cfg) ? `local · ${localDataDir(cfg)}` : `server ${cfg.server}`} · device ${cfg.device} · model ${cfg.model.enabled ? 'on' : 'off'}\nlast run ${st.lastRunAt ?? 'never'} · ${n} file${n === 1 ? '' : 's'} placed`);
       const byCourse = new Map<string, number>();
       for (const p of Object.values(st.placements)) byCourse.set(p.courseId, (byCourse.get(p.courseId) ?? 0) + 1);
       for (const [c, k] of byCourse) say(`  ${c}: ${k}`);

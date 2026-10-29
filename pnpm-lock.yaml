@@ -121,7 +121,56 @@ importers:
         version: 5.9.3
 
   agent:
+    dependencies:
+      '@googleapis/calendar':
+        specifier: ^16.0.0
+        version: 16.0.0(supports-color@10.2.2)
+      '@hono/node-server':
+        specifier: ^2.1.5
+        version: 2.1.5(hono@4.13.14)
+      '@libsql/client':
+        specifier: ^0.18.0
+        version: 0.18.0
+      cheerio:
+        specifier: ^1.2.0
+        version: 1.2.0
+      croner:
+        specifier: ^10.0.1
+        version: 10.0.1
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@libsql/client@0.18.0)
+      fetch-cookie:
+        specifier: ^3.2.0
+        version: 3.2.0
+      google-auth-library:
+        specifier: ^11.3.1
+        version: 11.3.1(supports-color@10.2.2)
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      jose:
+        specifier: ^6.2.13
+        version: 6.2.13
+      node-ical:
+        specifier: ^0.27.3
+        version: 0.27.3
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
+      tough-cookie:
+        specifier: ^6.0.2
+        version: 6.0.2
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
+      '@collected/core':
+        specifier: workspace:*
+        version: link:../core
+      '@collected/server':
+        specifier: workspace:*
+        version: link:../server
       '@collected/shared':
         specifier: workspace:*
         version: link:../shared

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { Api, type SyncApi } from './api.js';
+import { openApi, type SyncApi } from './api.js';
 import { courseRoot, expandHome, type AgentConfig } from './config.js';
 import { assertInside, cachePathFor, findIdentical, handoutFor, isMarkdown, placeFile, resolveName, safeName, sha256File, sha256Text, writeTextAtomic } from './place.js';
 import { loadState, saveState, stateKey } from './state.js';
@@ -21,7 +21,7 @@ export interface PullResult {
  * lists it in the course index.
  */
 export async function pullFile(cfg: AgentConfig, fileId: string, toDir: string, opts: { api?: SyncApi; course?: string } = {}): Promise<PullResult> {
-  const api = opts.api ?? new Api(cfg);
+  const api = opts.api ?? (await openApi(cfg));
   const manifest = await api.getManifest();
   const hit = manifest.courses
     .filter((c) => !opts.course || c.course.id === opts.course || c.course.code.toLowerCase() === opts.course.toLowerCase())

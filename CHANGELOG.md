@@ -9,6 +9,7 @@ break); `optional` means it is nice to have.
 ## Unreleased
 
 - The backend is split into `@collected/core` (database, ingesters, syncs, sessions, scheduler) and the `server` HTTP layer over it. Nothing changes for a running instance: the image runs the same bundle, and the migrations now ship from `core/drizzle` (`MIGRATIONS_DIR` in the image).
+- CLI local mode: `collected init --local` runs the whole backend inside the command over a SQLite database on this machine (`~/.collected/data` by default), with no server, Docker or `.env`. Every command works unchanged; `collected demo <source>` loads fixture data to look around and `collected sync <source|all>` runs a source's sync in-process. The Canvas demo loader now creates courses from the fixture's enrollments when the database has none.
 - CLI 1.1.1: the npm package installs again. 1.1.0 declared the workspace-only `@collected/shared` as a dependency even though it is bundled in, so `npm i collected-cli` failed with a 404 for that package.
 ## 1.1.0 — 2026-10-28 · recommended
 

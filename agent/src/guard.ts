@@ -18,8 +18,12 @@ export function badTarget(name: string, allowed: string[]): string | null {
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
-/** Throws unless `url` is https, or http to this machine. Credentials go to whatever this passes. */
-export function assertSecureUrl(url: string, what: string): URL {
+/**
+ * Throws unless `url` is https, or http to this machine. Credentials go to whatever this passes. The literal `local`
+ * (agent.json's `server` in local mode) is not a URL and passes as null: nothing is sent anywhere.
+ */
+export function assertSecureUrl(url: string, what: string): URL | null {
+  if (url === 'local') return null;
   let u: URL;
   try {
     u = new URL(url);

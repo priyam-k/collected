@@ -14,10 +14,11 @@ describe('guard', () => {
   });
 
   it('allows https anywhere and http only to this machine', () => {
-    expect(assertSecureUrl('https://collected.example.com', 'server').hostname).toBe('collected.example.com');
-    expect(assertSecureUrl('http://localhost:3000', 'server').port).toBe('3000');
-    expect(assertSecureUrl('http://127.0.0.1:3000/', 'server').hostname).toBe('127.0.0.1');
-    expect(assertSecureUrl('http://[::1]:3000', 'server').hostname).toBe('[::1]');
+    expect(assertSecureUrl('https://collected.example.com', 'server')!.hostname).toBe('collected.example.com');
+    expect(assertSecureUrl('http://localhost:3000', 'server')!.port).toBe('3000');
+    expect(assertSecureUrl('http://127.0.0.1:3000/', 'server')!.hostname).toBe('127.0.0.1');
+    expect(assertSecureUrl('http://[::1]:3000', 'server')!.hostname).toBe('[::1]');
+    expect(assertSecureUrl('local', 'server')).toBeNull(); // local mode: not a URL, nothing is sent
     expect(() => assertSecureUrl('http://collected.example.com', 'server')).toThrow(/must be https/);
     expect(() => assertSecureUrl('http://192.168.1.5:3000', 'the server URL')).toThrow(/the server URL must be https/);
     expect(() => assertSecureUrl('ftp://x', 'server')).toThrow(/must be https/);
