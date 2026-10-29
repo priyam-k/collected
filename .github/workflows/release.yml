@@ -44,7 +44,15 @@ jobs:
           want="cli-v$(node -p "require('./agent/package.json').version")"
           [ "$GITHUB_REF_NAME" = "$want" ] || { echo "tag $GITHUB_REF_NAME does not match $want"; exit 1; }
 
+      # The package carries the dashboard (agent/dist/web), so the web build comes first; the CLI build refuses to run without it.
+      - run: pnpm --filter web build
       - run: pnpm --filter collected-cli build
+
+      # The guard against an uninstallable package (1.1.0 shipped one): pack, install the tarball into an empty project
+      # outside the repo with real dependency resolution, and run local mode end to end, the dashboard included.
+      - name: Pack, install and smoke-test the package
+        run: node scripts/smoke-cli-package.mjs
+
       - run: pnpm --filter collected-cli publish --no-git-checks --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
