@@ -6,14 +6,16 @@ The dashboard reads are the same data the web app shows (assignments, agenda, gr
 
 ## Install
 
-Needs Node 22 or newer.
+Needs Node 22.12 or newer and nothing else: the package carries the whole app for local mode (the backend, the database migrations, the demo fixtures and the built dashboard), so a machine with Node is a machine that can run collected.
 
 ```sh
 npm i -g collected-cli
-collected help
+collected init --local                 # no server: a SQLite database in ~/.collected/data
+collected demo canvas                  # something to look at
+collected ui                           # the dashboard at http://127.0.0.1:4848
 ```
 
-Two binaries are installed, `collected` and `collected-agent`; they are the same program.
+Or, against your own server, `collected init https://collected.example.com` (see [Set up](#set-up)). Two binaries are installed, `collected` and `collected-agent`; they are the same program. `npx -p collected-cli collected help` runs it without installing. The install is about 60 MB on disk, most of it the SQLite driver (`@libsql/client`, which brings a prebuilt binary for macOS, Linux x64 and arm64, and Windows x64).
 
 ## Set up
 
@@ -47,7 +49,7 @@ collected ui                           # http://127.0.0.1:4848, opened in your b
 collected ui --port 5000 --no-open
 ```
 
-The same web dashboard a server shows, over the local database. It listens on the loopback address only and asks for no sign-in: anyone who can open the page is already on this machine with access to the data folder, so Settings → Account says so and has nothing to sign out of. While it runs, the scheduler keeps every connected source fresh on its usual cadence (Canvas every 15 minutes, Gradescope every 30, calendars and to-do apps every 5), and `/` goes straight to the board. Against a server, `collected ui` just prints the server's address and opens it. The web build comes from the repository checkout for now (`pnpm --filter web build`); the npm package will carry its own copy.
+The same web dashboard a server shows, over the local database. It listens on the loopback address only and asks for no sign-in: anyone who can open the page is already on this machine with access to the data folder, so Settings → Account says so and has nothing to sign out of. While it runs, the scheduler keeps every connected source fresh on its usual cadence (Canvas every 15 minutes, Gradescope every 30, calendars and to-do apps every 5), and `/` goes straight to the board. Against a server, `collected ui` just prints the server's address and opens it. The dashboard ships inside the package (`dist/web`); from a repository checkout it is the repo's own `web/dist` (`pnpm --filter web build`).
 
 ### Fresh answers without the dashboard open
 
