@@ -187,7 +187,7 @@ collected help                       # every command
 
 If you are deploying from a checkout rather than npm, `pnpm --filter collected-cli build` produces `agent/dist/cli.js`; alias `collected` to `node <checkout>/agent/dist/cli.js`.
 
-The CLI can also run without any server: `collected init --local` keeps the whole backend inside the command, over a SQLite database in `~/.collected/data`. It is the quickest way to try collected, or to use it from a terminal only; the web dashboard over that database is a later release. See the CLI's [README](../agent/README.md#local-mode).
+**Or run it on your laptop.** None of the above is required to use collected: `collected init --local` keeps the whole backend inside the CLI, over a SQLite database in `~/.collected/data`, with no server, Docker, domain or OAuth client. `collected ui` serves the same dashboard at `http://127.0.0.1:4848` for this machine only, with no sign-in, and keeps the sources syncing while it is open; `collected daemon install` adds a user-level timer (LaunchAgent on macOS, systemd user timer on Linux) that syncs every 15 minutes whether or not the dashboard is open, and a plain `collected agenda` syncs a stale source before it answers. What you give up next to a server: access from another device, and Google sign-in (Google Calendar works through its iCal address, Todoist through a pasted token). See the CLI's [README](../agent/README.md#local-mode).
 
 ## Troubleshooting
 

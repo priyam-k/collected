@@ -560,6 +560,9 @@ export function useMe() {
 /** A person is signed in (or auth is off for local development). Machine identities do not count. */
 export const isSignedIn = (me: Me | undefined): boolean => !!me && (me.authDisabled || !!me.user);
 
+/** The app runs inside the CLI on this machine (`collected ui`): the owner, with nothing to sign in to or out of. */
+export const isLocalOwner = (me: Me | undefined): boolean => me?.identity === 'local';
+
 export function useTokens() {
   return useQuery({ queryKey: qk.tokens, queryFn: () => api<ApiToken[]>('/auth/tokens'), retry: false });
 }

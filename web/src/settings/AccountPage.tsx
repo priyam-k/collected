@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCreateToken, useMe, useRevokeToken, useTokens } from '@/lib/queries';
+import { isLocalOwner, useCreateToken, useMe, useRevokeToken, useTokens } from '@/lib/queries';
 import { useSignOut } from '@/lib/useSignOut';
 import { Field, PageTitle } from './ui';
 
@@ -31,6 +31,7 @@ export function AccountPage() {
 
   const user = me.data?.user;
   const person = !!user;
+  const local = isLocalOwner(me.data);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +57,19 @@ export function AccountPage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle sub={me.data?.authDisabled ? 'Authentication is off (AUTH_DISABLED); this is local development.' : me.data?.signIn.access && !me.data.user?.picture ? 'Signed in through Cloudflare Access.' : 'Signed in with Google.'}>Account</PageTitle>
+      <PageTitle
+        sub={
+          local
+            ? 'Running on this machine (collected ui). There is no sign-in: the dashboard answers only on this computer, to whoever can already open its data folder.'
+            : me.data?.authDisabled
+              ? 'Authentication is off (AUTH_DISABLED); this is local development.'
+              : me.data?.signIn.access && !me.data.user?.picture
+                ? 'Signed in through Cloudflare Access.'
+                : 'Signed in with Google.'
+        }
+      >
+        Account
+      </PageTitle>
 
       {user && (
         <div className="flex items-center gap-3 rounded-2xl bg-well/60 p-3.5">
@@ -70,7 +83,7 @@ export function AccountPage() {
               </a>
             )}
           </div>
-          {!me.data?.authDisabled && (
+          {!me.data?.authDisabled && !local && (
             <Button variant="outline" className="ml-auto" disabled={signingOut} onClick={signOut}>
               {signingOut ? 'Signing out…' : 'Sign out'}
             </Button>
@@ -81,8 +94,10 @@ export function AccountPage() {
       <section className="space-y-3">
         <h2 className="text-base font-semibold">CLI tokens</h2>
         <p className="text-[13px] text-sub">
-          The <code className="rounded bg-well px-1">collected</code> command on your laptop signs in with a token. Create one per machine; revoke it here if the machine is lost.
-          {cli && ' Paste the new token back into the terminal that sent you here.'}
+          {local
+            ? 'The collected command on this machine already owns this database and needs no token. Tokens are for a CLI on another machine pointed at a server; here they are unused.'
+            : 'The collected command on your laptop signs in with a token. Create one per machine; revoke it here if the machine is lost.'}
+          {cli && !local && ' Paste the new token back into the terminal that sent you here.'}
         </p>
         {person && (
           <form onSubmit={submit} className="flex max-w-md items-end gap-2">

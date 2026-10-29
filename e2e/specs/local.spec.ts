@@ -1,7 +1,21 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createServer } from 'node:net';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { AGENT_CLI } from '../env.js';
 import { cli, cliOk, tmpDir } from '../helpers.js';
+
+/** A port nothing listens on right now. */
+const freePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.once('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address() as { port: number };
+      srv.close(() => resolve(port));
+    });
+  });
 
 /*
  * The built CLI in local mode: no server, no .env. `init --local` points it at a database under its own
@@ -47,6 +61,78 @@ test.describe.serial('collected CLI, local mode', () => {
     const r = cli(['sources', '--json'], { home });
     expect(r.status).toBe(0);
     expect(() => JSON.parse(r.stdout)).not.toThrow();
+  });
+
+  test('a read syncs a stale connected source first and still answers when that fails; --stale-ok never syncs', () => {
+    // demo todoist left the source `connected` a moment ago: not stale, so a plain read does not touch it.
+    const quiet = cli(['agenda'], { home });
+    expect(quiet.status).toBe(0);
+    expect(quiet.stderr).toBe('');
+    // --fresh syncs it regardless; the real ingester finds no token, which is reported on stderr, and the answer is what is there.
+    const fresh = cli(['agenda', '--fresh'], { home });
+    expect(fresh.status).toBe(0);
+    expect(fresh.stderr).toContain('sync before answering failed for todoist');
+    expect(fresh.stdout).toContain('[task] Buy oat milk');
+    const sources = JSON.parse(cliOk(['sources', '--json'], { home })) as { id: string; status: string }[];
+    expect(sources.find((s) => s.id === 'todoist')?.status).toBe('disconnected');
+    // Now stale-or-not does not matter: nothing is connected, so nothing is synced, and --stale-ok is silent by construction.
+    const stale = cli(['agenda', '--stale-ok', '--json'], { home });
+    expect(stale.status).toBe(0);
+    expect(stale.stderr).toBe('');
+    expect(() => JSON.parse(stale.stdout)).not.toThrow();
+  });
+
+  test('ui serves the dashboard on the loopback, as the local person, and stops on SIGINT', async ({ page }) => {
+    const port = await freePort();
+    const base = `http://127.0.0.1:${port}`;
+    let out = '';
+    let child: ChildProcess | null = spawn(process.execPath, [AGENT_CLI, 'ui', '--no-open', '--port', String(port)], {
+      env: { ...process.env, COLLECTED_AGENT_HOME: home, TZ: 'America/New_York' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    child.stdout!.on('data', (d: Buffer) => (out += d.toString()));
+    child.stderr!.on('data', (d: Buffer) => (out += d.toString()));
+    const exited = new Promise<number | null>((resolve) => child!.once('exit', (code) => resolve(code)));
+    try {
+      const deadline = Date.now() + 20_000;
+      let up = false;
+      while (!up && Date.now() < deadline) {
+        if (child.exitCode != null) throw new Error(`ui exited early: ${out}`);
+        up = await fetch(`${base}/api/health`).then((r) => r.ok, () => false);
+        if (!up) await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(up, out).toBe(true);
+      expect(out).toContain(`collected is at ${base}`);
+
+      const root = await fetch(`${base}/`, { redirect: 'manual' });
+      expect(root.status).toBe(302);
+      expect(root.headers.get('location')).toBe('/dashboard');
+      const followed = await fetch(`${base}/`);
+      expect(followed.status).toBe(200);
+      expect(followed.url).toBe(`${base}/dashboard`);
+      expect(await followed.text()).toContain('id="root"');
+
+      const me = (await (await fetch(`${base}/api/auth/me`)).json()) as { identity: string; user: { email: string; name: string } | null };
+      expect(me.identity).toBe('local');
+      expect(me.user).toEqual(expect.objectContaining({ email: 'local@this-machine', name: 'This machine' }));
+
+      // In the browser: no sign-in gate, the board renders, and the Account page reads as this machine's.
+      await page.goto(`${base}/`);
+      await expect(page).toHaveURL(`${base}/dashboard`);
+      await expect(page.getByRole('heading', { name: /^Today,/ })).toBeVisible();
+      await page.goto(`${base}/settings/account`);
+      await expect(page.getByText('Running on this machine (collected ui)')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+    } finally {
+      const t0 = Date.now();
+      child.kill('SIGINT');
+      const code = await Promise.race([exited, new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 5_000))]);
+      if (code === 'timeout') child.kill('SIGKILL');
+      expect(code, `ui did not exit within 5 s after SIGINT: ${out}`).not.toBe('timeout');
+      expect(code).toBe(0);
+      expect(Date.now() - t0).toBeLessThan(5_000);
+      child = null;
+    }
   });
 
   test('sync <source> runs a source in-process; login and demo say what they need', () => {

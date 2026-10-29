@@ -28,8 +28,19 @@ function cliVersion(): string {
   }
 }
 
-/** The server config for a data directory: core's paths absolute, no sign-in, no scheduler, the owner flag on. */
-export function localEnv(dataDir: string, opts: { logLevel?: string } = {}): Env {
+export interface LocalEnvOptions {
+  logLevel?: string | undefined;
+  /** The address the browser uses for `collected ui`; the same-site check compares a write's Origin against it. */
+  publicUrl?: string | undefined;
+  /** `collected ui` runs the scheduler; a one-shot command does not. */
+  scheduler?: boolean | undefined;
+}
+
+/**
+ * The server config for a data directory: core's paths absolute, no sign-in, the owner flag on. The update check stays
+ * off: the CLI has no commit to compare and is updated through npm, not `docker compose pull`.
+ */
+export function localEnv(dataDir: string, opts: LocalEnvOptions = {}): Env {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   return {
     NODE_ENV: 'production',
@@ -40,8 +51,8 @@ export function localEnv(dataDir: string, opts: { logLevel?: string } = {}): Env
     AUTH_DISABLED: false,
     AUTH_DISABLED_ACKNOWLEDGED: false,
     LOCAL_OWNER: true,
-    PUBLIC_URL: 'http://localhost',
-    SCHEDULER_DISABLED: true,
+    PUBLIC_URL: opts.publicUrl ?? 'http://localhost',
+    SCHEDULER_DISABLED: !opts.scheduler,
     TZ: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
     LOG_LEVEL: opts.logLevel ?? 'warn',
     UPSTREAM_REPO: 'priyam-k/collected',

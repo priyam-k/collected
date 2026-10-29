@@ -38,9 +38,39 @@ collected courses
 collected status                       # "local · <data dir>"
 ```
 
-The data directory (created `0700`) holds `collected.db`, the encryption key (`.secret_key`, created on first use) and the pre-migration snapshots under `backups/`. It is yours to back up or delete. `collected sync <source|all>` runs a source's sync right there and waits for it; `collected connect canvas` stores the Canvas session in the local database and syncs it. `login` and `auth service-token` have nothing to do in local mode and say so.
+The data directory (created `0700`) holds `collected.db`, the encryption key (`.secret_key`, created on first use), the pre-migration snapshots under `backups/`, the daemon's log and the per-source lock files (`sync.lock/`). It is yours to back up or delete. `collected sync <source|all>` runs a source's sync right there and waits for it; `collected connect canvas` stores the Canvas session in the local database and syncs it. `login` and `auth service-token` have nothing to do in local mode and say so.
 
-What is not there yet: the web dashboard over the local database (`collected ui`), a background refresh, and the Google and Todoist sign-in buttons, which need your own OAuth client ids (a `~/.collected/.env` for them is coming in a later release). Until then Todoist takes a pasted API token, and Google Calendar works through its iCal address.
+### The dashboard: `collected ui`
+
+```sh
+collected ui                           # http://127.0.0.1:4848, opened in your browser; Ctrl-C stops it
+collected ui --port 5000 --no-open
+```
+
+The same web dashboard a server shows, over the local database. It listens on the loopback address only and asks for no sign-in: anyone who can open the page is already on this machine with access to the data folder, so Settings → Account says so and has nothing to sign out of. While it runs, the scheduler keeps every connected source fresh on its usual cadence (Canvas every 15 minutes, Gradescope every 30, calendars and to-do apps every 5), and `/` goes straight to the board. Against a server, `collected ui` just prints the server's address and opens it. The web build comes from the repository checkout for now (`pnpm --filter web build`); the npm package will carry its own copy.
+
+### Fresh answers without the dashboard open
+
+A read (`agenda`, `todo`, `assignments`, `dates`, `grades`, `announcements`, `course`, `jobs`) looks at when each source it depends on last succeeded, and when a connected one is older than `freshness.maxAgeMinutes` (30 by default, in `agent.json`) it syncs that source first, then answers. The check is one database read, so an agent calling the CLI in a loop pays nothing when the data is recent. `courses`, `sources`, `links` and the Canvas commands never sync. Two flags on any read:
+
+```
+--fresh       sync every connected source the command depends on, whatever its age
+--stale-ok    never sync; answer from what is there
+```
+
+A sync that fails never blocks the answer: one line on stderr, and the command prints what the database has. A source that needs a credential or failed last time is not retried from a read. A source already being synced by another process (`collected ui`, the daemon, another terminal) is left alone: every run holds a lock file under `sync.lock/`, so two processes never sync the same source at once.
+
+### Keeping it fresh in the background: `collected daemon`
+
+```sh
+collected daemon install               # a user-level timer running `collected sync all` every 15 minutes
+collected daemon status                # installed or not, and the last run from <data dir>/daemon.log
+collected daemon uninstall
+```
+
+macOS gets `~/Library/LaunchAgents/com.collected.sync.plist` (loaded with `launchctl bootstrap gui/$UID`); Linux a systemd user service and timer under `~/.config/systemd/user/` (`collected-sync.timer`, enabled with `systemctl --user enable --now`); on Windows the command prints the `schtasks` line to run yourself. The unit calls the exact binary you ran `install` from, so after moving or upgrading the CLI run `install` again. The period is `daemon.intervalMinutes` in `agent.json` (minimum 5). Nothing secret goes into the unit: credentials live in the database, and the unit carries paths only.
+
+Not there yet: the Google and Todoist sign-in buttons, which need your own OAuth client ids (a `~/.collected/.env` for them is coming in a later release). Until then Todoist takes a pasted API token, and Google Calendar works through its iCal address.
 
 ## Commands
 
@@ -78,9 +108,12 @@ resync [canvas|gradescope|gcal|todoist|jobs|all]
 Local mode only (`collected init --local`):
 
 ```
+ui [--port 4848] [--no-open]                the dashboard at http://127.0.0.1:<port> until Ctrl-C, syncing in the background
+daemon install | uninstall | status         a user timer running `sync all` every 15 minutes (daemon.intervalMinutes)
 demo <canvas|gradescope|gcal|todoist|gtasks>   load that source's fixture data into the local database
 demo clear                                  remove everything the demo loaders created
 sync <source|all>                           run a source sync in-process and wait for it (same as resync)
+--fresh | --stale-ok                        on any read: sync first regardless of age, or never (default: older than freshness.maxAgeMinutes)
 ```
 
 Canvas, read-only (one GET through the server with its stored session; nothing is ever written to Canvas):
@@ -109,7 +142,7 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## Config file
 
-`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them.
+`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them.
 
 `collected auth model` stores a TypeSafe key for the Jev classifier that sorts files the rules cannot place. Skip it to sort by rules only.
 
@@ -122,7 +155,7 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## launchd
 
-`collected install-launchd --interval 30` writes `~/Library/LaunchAgents/com.collected.agent.plist` and loads it, so the sync runs every 30 minutes while you are logged in; the log is `~/.collected/agent.log`. `collected uninstall-launchd` removes it. On Linux use a user cron entry or a systemd timer that runs `collected sync`.
+`collected install-launchd --interval 30` writes `~/Library/LaunchAgents/com.collected.agent.plist` and loads it, so the file sync runs every 30 minutes while you are logged in; the log is `~/.collected/agent.log`. `collected uninstall-launchd` removes it. On Linux use a user cron entry or a systemd timer that runs `collected sync`. (The source sync in local mode has its own timer: `collected daemon install`, above.)
 
 ## License
 

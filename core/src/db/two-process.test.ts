@@ -53,8 +53,8 @@ describe('two processes on one database', () => {
   });
 
   it('both contexts see one migrated, seeded schema', async () => {
-    const [{ n }] = await a.db.all<{ n: number }>(sql`select count(*) as n from __drizzle_migrations`);
-    expect(n).toBeGreaterThan(0);
+    const [applied] = await a.db.all<{ n: number }>(sql`select count(*) as n from __drizzle_migrations`);
+    expect(applied!.n).toBeGreaterThan(0);
     expect((await b.db.select().from(sources)).map((s) => s.id)).toContain('canvas');
   });
 

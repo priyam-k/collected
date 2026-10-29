@@ -48,6 +48,7 @@ These change the dashboard, Todoist or Google Tasks. Say what you are about to d
 - `collected date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N]` and `collected date rm <id>`
 - `collected jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]`
 - `collected resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]`: runs a sync now and waits. Cheap; use it when data looks stale.
+- In local mode (`collected status` says `local · <data dir>`, no server) a read syncs a source on its own when its last success is older than 30 minutes, which can take a few seconds; add `--stale-ok` to a read when speed matters more than freshness, `--fresh` when it must be current. A failed sync is one line on stderr and the read still answers.
 
 The CLI's token cannot export the database, change credentials, settings or layout, or delete courses; those live in the web app. If you need one of them, tell the user where to click.
 

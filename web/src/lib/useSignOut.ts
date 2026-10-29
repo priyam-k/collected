@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { useLogout, useMe } from '@/lib/queries';
+import { isLocalOwner, useLogout, useMe } from '@/lib/queries';
 
 const FLAG = 'collected.signedOut';
 
@@ -18,7 +18,7 @@ export function useSignOut(): { signOut(): void; pending: boolean; available: bo
   const logout = useLogout();
   const access = !!me.data?.signIn.access;
   return {
-    available: !!me.data && !me.data.authDisabled && !!me.data.user,
+    available: !!me.data && !me.data.authDisabled && !isLocalOwner(me.data) && !!me.data.user,
     pending: logout.isPending,
     signOut: () =>
       void logout.mutateAsync().then(

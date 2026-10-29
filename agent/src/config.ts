@@ -12,6 +12,10 @@ export interface AgentConfig {
   server: string;
   /** Local mode (`collected init --local`): the app runs inside the CLI against a SQLite file in `dataDir`. */
   local?: { dataDir: string };
+  /** Local mode: a read syncs a source first when its last success is older than this (default 30; agent/src/freshness.ts). */
+  freshness?: { maxAgeMinutes?: number };
+  /** Local mode: how often the installed timer runs `collected sync all` (default 15; agent/src/daemon.ts). */
+  daemon?: { intervalMinutes?: number };
   auth: {
     /** Cloudflare Access service token (prod). */
     cfAccessClientId?: string;
@@ -68,6 +72,12 @@ export const isLocal = (cfg: Pick<AgentConfig, 'server'>): boolean => cfg.server
 export const defaultLocalDataDir = (): string => path.join(agentHome(), 'data');
 /** The data directory of a local-mode config, absolute; `~` expanded. */
 export const localDataDir = (cfg: AgentConfig): string => path.resolve(expandHome(cfg.local?.dataDir ?? defaultLocalDataDir()));
+export const DEFAULT_MAX_AGE_MINUTES = 30;
+export const DEFAULT_DAEMON_INTERVAL_MINUTES = 15;
+/** How old a source's last success may be before a local-mode read syncs it first. */
+export const maxAgeMinutes = (cfg: Pick<AgentConfig, 'freshness'>): number => Math.max(1, cfg.freshness?.maxAgeMinutes ?? DEFAULT_MAX_AGE_MINUTES);
+/** The installed timer's period. */
+export const daemonIntervalMinutes = (cfg: Pick<AgentConfig, 'daemon'>): number => Math.max(5, cfg.daemon?.intervalMinutes ?? DEFAULT_DAEMON_INTERVAL_MINUTES);
 
 export function defaultConfig(server = 'http://localhost:3000'): AgentConfig {
   return { server, auth: {}, device: hostname().replace(/\.local$/, ''), cacheDir: path.join(agentHome(), 'cache'), courses: {}, model: { enabled: true, baseUrl: 'https://api.typesafe.ai', model: 'jev-latest' } };
