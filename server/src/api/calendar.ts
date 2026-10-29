@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from '../context.js';
-import { gcalApiForCtx, type GcalMeta } from '../ingest/gcal/ingest.js';
-import { eventToRow } from '../ingest/gcal/map.js';
-import type { CalendarApi } from '../ingest/gcal/api.js';
-import { upsertItems } from '../lib/items.js';
-import { getSourceRow } from '../lib/sources.js';
+import { gcalApiForCtx, type GcalMeta } from '@collected/core/ingest/gcal/ingest';
+import { eventToRow } from '@collected/core/ingest/gcal/map';
+import type { CalendarApi } from '@collected/core/ingest/gcal/api';
+import { upsertItems } from '@collected/core/lib/items';
+import { getSourceRow } from '@collected/core/lib/sources';
 import { bad, parseBody } from './util.js';
 
 export const newEventSchema = z

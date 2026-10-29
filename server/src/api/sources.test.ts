@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { sources } from '../db/schema.js';
-import type { Ingester } from '../ingest/types.js';
+import { sources } from '@collected/core/db/schema';
+import type { Ingester } from '@collected/core/ingest/types';
 import { testContext } from '../test-util.js';
 import { sourcesRoutes } from './sources.js';
 import { eq } from 'drizzle-orm';

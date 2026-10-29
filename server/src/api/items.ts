@@ -4,8 +4,8 @@ import { and, eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { ITEM_KINDS, SOURCE_IDS, manualEventInputSchema, overrideInputSchema, type ItemKind, type ManualEventInput, type ManualEventRaw, type SourceId } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { itemLinks, items, overrides, type NewItemRow } from '../db/schema.js';
-import { queryEffectiveItems } from '../lib/effective.js';
+import { itemLinks, items, overrides, type NewItemRow } from '@collected/core/db/schema';
+import { queryEffectiveItems } from '@collected/core/lib/effective';
 import { bad, csv, intParam, parseBody } from './util.js';
 
 /** A local wall-clock date/time (server TZ) as ISO. Dates in the tracker and course events are days, not instants. */

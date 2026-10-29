@@ -18,7 +18,7 @@ const FETCH_BUDGET = 2 * MB;
  * Paths whose change means the running app would differ after an update. Docs, workflows, the design notes under
  * artifacts/ and the e2e suite do not count: a self-hoster is not asked to pull for a README fix.
  */
-const ALLOW_DIRS = ['server/', 'web/', 'shared/', 'agent/'];
+const ALLOW_DIRS = ['core/', 'server/', 'web/', 'shared/', 'agent/'];
 const ALLOW_FILES = new Set(['Dockerfile', 'docker-compose.yml', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'CHANGELOG.md']);
 
 export function matchesUpdateAllowList(filename: string): boolean {

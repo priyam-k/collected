@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { asc, eq } from 'drizzle-orm';
 import type { CourseGrades } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courses } from '../db/schema.js';
-import { computeGrades, loadGradeInputs } from '../lib/grades.js';
+import { courses } from '@collected/core/db/schema';
+import { computeGrades, loadGradeInputs } from '@collected/core/lib/grades';
 import { bad } from './util.js';
 
 export function gradesRoutes(ctx: AppContext) {

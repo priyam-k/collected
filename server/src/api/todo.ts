@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { gtasksPushConfigSchema, resolveTodoApp, todoistPushConfigSchema, type TodoAppStatus, type TodoStatus } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { getSetting, getSettingParsed } from '../lib/settings.js';
-import { getSourceRow } from '../lib/sources.js';
+import { getSetting, getSettingParsed } from '@collected/core/lib/settings';
+import { getSourceRow } from '@collected/core/lib/sources';
 
 /** `GET /api/todo/status`: the two to-do apps side by side for the settings page (DECISIONS 050). */
 export function todoRoutes(ctx: AppContext) {

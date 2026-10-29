@@ -1,4 +1,4 @@
-import type { Env } from '../../env.js';
+import type { CoreConfig } from '../../config.js';
 import { MB, readText, safeUrlForLog, withTimeout } from '../../lib/http.js';
 import { oauthClient } from '../gcal/api.js';
 import { NeedsAuthError } from '../types.js';
@@ -8,7 +8,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const PAGE_SIZE = 100;
 
 /** Mints an access token from the stored refresh token (google-auth-library caches and refreshes it). */
-export function accessTokenFromRefreshToken(env: Env, refreshToken: string): () => Promise<string> {
+export function accessTokenFromRefreshToken(env: CoreConfig, refreshToken: string): () => Promise<string> {
   const client = oauthClient(env);
   client.setCredentials({ refresh_token: refreshToken });
   return async () => {

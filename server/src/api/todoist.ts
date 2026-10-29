@@ -6,15 +6,15 @@ import { todoistPushConfigSchema } from '@collected/shared';
 import type { AuthVariables } from '../auth/cloudflare-access.js';
 import { exchangeTodoistCode, revokeTodoistToken, todoistAuthUrl } from '../auth/todoist.js';
 import type { AppContext } from '../context.js';
-import { items, overrides, sources, todoistMap } from '../db/schema.js';
-import { runIngester } from '../ingest/runner.js';
-import type { TodoistApi } from '../ingest/todoist/api.js';
-import { syncTodoist, taskToRow, todoistApiForCtx, todoistIngester } from '../ingest/todoist/ingest.js';
-import { NotConfiguredError } from '../ingest/types.js';
-import { getSettingParsed, setSetting } from '../lib/settings.js';
-import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
-import { nowIso } from '../lib/time.js';
-import { executePush, planPush } from '../sync/todoist-push.js';
+import { items, overrides, sources, todoistMap } from '@collected/core/db/schema';
+import { runIngester } from '@collected/core/ingest/runner';
+import type { TodoistApi } from '@collected/core/ingest/todoist/api';
+import { syncTodoist, taskToRow, todoistApiForCtx, todoistIngester } from '@collected/core/ingest/todoist/ingest';
+import { NotConfiguredError } from '@collected/core/ingest/types';
+import { getSettingParsed, setSetting } from '@collected/core/lib/settings';
+import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
+import { nowIso } from '@collected/core/lib/time';
+import { executePush, planPush } from '@collected/core/sync/todoist-push';
 import { bad, parseBody, parsePatch } from './util.js';
 
 /** OAuth state → who started the flow and when it expires. Bound to the identity like the Google flow (api/google.ts). */

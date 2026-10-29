@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { courses, gtasksMap, items, overrides } from '../db/schema.js';
-import fixture from '../ingest/gtasks/fixtures/tasks.json' with { type: 'json' };
-import { syncGtasks } from '../ingest/gtasks/ingest.js';
-import { MockGTasksApi } from '../ingest/gtasks/mock-api.js';
-import { mergeSourceMeta } from '../lib/sources.js';
+import { courses, gtasksMap, items, overrides } from '@collected/core/db/schema';
+import fixture from '@collected/core/ingest/gtasks/fixtures/tasks.json' with { type: 'json' };
+import { syncGtasks } from '@collected/core/ingest/gtasks/ingest';
+import { MockGTasksApi } from '@collected/core/ingest/gtasks/mock-api';
+import { mergeSourceMeta } from '@collected/core/lib/sources';
 import { testContext } from '../test-util.js';
 import { googleRoutes } from './google.js';
 import { gtasksRoutes } from './gtasks.js';

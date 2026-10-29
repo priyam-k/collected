@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { EffectiveItem } from '@collected/shared';
-import { courses } from '../db/schema.js';
+import { courses } from '@collected/core/db/schema';
 import { testContext } from '../test-util.js';
 import { itemsRoutes } from './items.js';
 

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { AuthVariables } from '../auth/cloudflare-access.js';
 import { TODOIST_REVOKE_URL, TODOIST_TOKEN_URL } from '../auth/todoist.js';
-import { getSourceConfig, getSourceRow } from '../lib/sources.js';
+import { getSourceConfig, getSourceRow } from '@collected/core/lib/sources';
 import { testContext } from '../test-util.js';
 import { toPublic } from './sources.js';
 import { todoistRoutes, type TodoistRouteDeps } from './todoist.js';
@@ -140,7 +140,7 @@ describe('Todoist OAuth connect', () => {
     expect((row.meta as { connectedVia?: unknown }).connectedVia).toBeNull();
 
     // Pasted token: nothing to revoke through our app, so no outbound call.
-    const { setSourceConfig, mergeSourceMeta } = await import('../lib/sources.js');
+    const { setSourceConfig, mergeSourceMeta } = await import('@collected/core/lib/sources');
     await setSourceConfig(ctx, 'todoist', { token: 'pasted' });
     await mergeSourceMeta(ctx, 'todoist', { connectedVia: 'token' });
     const res2 = await app.request('/api/todoist/disconnect', { method: 'POST' });

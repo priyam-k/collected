@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { courseInputSchema, type Course } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courseContent, courses, itemLinks, items, widgetInstances } from '../db/schema.js';
-import { courseSlug } from '../seed.js';
+import { courseContent, courses, itemLinks, items, widgetInstances } from '@collected/core/db/schema';
+import { courseSlug } from '@collected/core/seed';
 import { bad, parseBody, parsePatch } from './util.js';
 
 const toPublic = (r: typeof courses.$inferSelect): Course => ({

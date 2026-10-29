@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { sourceConfigSchemas } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { CanvasClient, type CanvasConfig } from '../ingest/canvas/client.js';
-import { NeedsAuthError } from '../ingest/types.js';
-import { getSourceConfig, setSourceStatus } from '../lib/sources.js';
+import { CanvasClient, type CanvasConfig } from '@collected/core/ingest/canvas/client';
+import { NeedsAuthError } from '@collected/core/ingest/types';
+import { getSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
 
 /**
  * The proxied path after URL normalisation: percent-encoded dot segments collapse in `new URL`, so the check has to

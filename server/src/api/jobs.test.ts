@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { jobsFilterSchema, type Job } from '@collected/shared';
-import { upsertListings, type SimplifyListing } from '../ingest/jobs/ingest.js';
-import { setSetting } from '../lib/settings.js';
+import { upsertListings, type SimplifyListing } from '@collected/core/ingest/jobs/ingest';
+import { setSetting } from '@collected/core/lib/settings';
 import { testContext } from '../test-util.js';
 import { jobsRoutes, today } from './jobs.js';
-import sample from '../ingest/jobs/fixtures/listings.sample.json' with { type: 'json' };
+import sample from '@collected/core/ingest/jobs/fixtures/listings.sample.json' with { type: 'json' };
 import seed from '../../../artifacts/seed-config.json' with { type: 'json' };
 
 const json = (body: unknown, method = 'POST') => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

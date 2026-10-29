@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { courseInputSchema, layoutsSchema, widgetInstanceInputSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courses, layouts, settings, widgetInstances } from '../db/schema.js';
-import { courseSlug } from '../seed.js';
+import { courses, layouts, settings, widgetInstances } from '@collected/core/db/schema';
+import { courseSlug } from '@collected/core/seed';
 import { parseBody } from './util.js';
 
 const exportSchema = z.object({
@@ -76,7 +76,7 @@ export function exportRoutes(ctx: AppContext) {
   const r = new Hono();
   r.get('/export', async (c) => c.json(await buildExport(ctx)));
   r.delete('/demo', async (c) => {
-    const { clearDemoData } = await import('../lib/demo.js');
+    const { clearDemoData } = await import('@collected/core/lib/demo');
     return c.json(await clearDemoData(ctx));
   });
   r.post('/import', async (c) => {

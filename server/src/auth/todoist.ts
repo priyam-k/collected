@@ -1,6 +1,6 @@
 import type { Env } from '../env.js';
-import { NotConfiguredError } from '../ingest/types.js';
-import { readText, withTimeout } from '../lib/http.js';
+import { NotConfiguredError } from '@collected/core/ingest/types';
+import { readText, withTimeout } from '@collected/core/lib/http';
 
 /**
  * Todoist OAuth 2.0 over plain fetch. The app is registered once by the operator at

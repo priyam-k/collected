@@ -1,6 +1,6 @@
 import { auth as googleAuth } from '@googleapis/calendar';
 import type { Env } from '../env.js';
-import { NotConfiguredError } from '../ingest/types.js';
+import { NotConfiguredError } from '@collected/core/ingest/types';
 
 /** Identity only. Calendar access is a separate consent with its own callback (`/api/google/callback`). */
 export const SIGN_IN_SCOPES = ['openid', 'email', 'profile'];

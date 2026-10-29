@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { courses, widgetInstances } from '../db/schema.js';
-import { setSetting } from '../lib/settings.js';
+import { courses, widgetInstances } from '@collected/core/db/schema';
+import { setSetting } from '@collected/core/lib/settings';
 import { testContext } from '../test-util.js';
 import { coursesRoutes } from './courses.js';
 import { widgetRoutes } from './layout.js';

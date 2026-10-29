@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { allowedTargets, fileSyncOverrideSchema, fileSyncReportSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { courses } from '../db/schema.js';
-import { applyReport, buildManifest, configOf, courseView, listDevices, listSyncFiles, setManualTarget } from '../lib/file-sync.js';
+import { courses } from '@collected/core/db/schema';
+import { applyReport, buildManifest, configOf, courseView, listDevices, listSyncFiles, setManualTarget } from '@collected/core/lib/file-sync';
 import { bad, parseBody } from './util.js';
 
 /**

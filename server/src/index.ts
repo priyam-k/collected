@@ -3,8 +3,8 @@ import { secureHeaders } from 'hono/secure-headers';
 import { serve } from '@hono/node-server';
 import { createApi } from './api/index.js';
 import { bootstrap } from './bootstrap.js';
-import { createUpdateChecker } from './lib/updates.js';
-import { startScheduler } from './scheduler.js';
+import { createUpdateChecker } from '@collected/core/lib/updates';
+import { startScheduler } from '@collected/core/scheduler';
 import { mountStatic } from './static.js';
 
 const ctx = await bootstrap();

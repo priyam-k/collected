@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canvasApiPath } from './canvas.js';
 import { crossSite, identityAllows } from './index.js';
-import { isAllowedOutboundUrl, isPrivateHost } from '../lib/http.js';
+import { isAllowedOutboundUrl, isPrivateHost } from '@collected/core/lib/http';
 
 describe('identityAllows', () => {
   it('lets a person do anything and the helper key do one thing', () => {

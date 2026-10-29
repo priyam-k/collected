@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { applyImport, buildExport, importSchema } from './api/export.js';
 import { bootstrap } from './bootstrap.js';
-import { getIngester, ingesters } from './ingest/registry.js';
-import { runIngester } from './ingest/runner.js';
+import { getIngester, ingesters } from '@collected/core/ingest/registry';
+import { runIngester } from '@collected/core/ingest/runner';
 
 const [cmd, ...rest] = process.argv.slice(2);
 
@@ -47,23 +47,23 @@ switch (cmd) {
     break;
   case 'demo': {
     const demoStartedAt = new Date().toISOString();
-    const { clearDemoData, tagDemoRows } = await import('./lib/demo.js');
+    const { clearDemoData, tagDemoRows } = await import('@collected/core/lib/demo');
     if (rest[0] === 'clear') {
       console.log(JSON.stringify(await clearDemoData(ctx)));
       break;
     }
     if (rest[0] === 'canvas') {
-      const { fixtureCanvasClient } = await import('./ingest/canvas/fixture-client.js');
-      const { syncCanvas } = await import('./ingest/canvas/ingest.js');
+      const { fixtureCanvasClient } = await import('@collected/core/ingest/canvas/fixture-client');
+      const { syncCanvas } = await import('@collected/core/ingest/canvas/ingest');
       console.log(JSON.stringify(await syncCanvas(ctx, fixtureCanvasClient())));
     } else if (rest[0] === 'gradescope') {
-      const { fixtureGradescopeClient } = await import('./ingest/gradescope/fixture-client.js');
-      const { syncGradescope } = await import('./ingest/gradescope/ingest.js');
+      const { fixtureGradescopeClient } = await import('@collected/core/ingest/gradescope/fixture-client');
+      const { syncGradescope } = await import('@collected/core/ingest/gradescope/ingest');
       console.log(JSON.stringify(await syncGradescope(ctx, fixtureGradescopeClient())));
     } else if (rest[0] === 'gcal') {
-      const { MockCalendarApi, demoCalendars, demoScript } = await import('./ingest/gcal/mock-api.js');
-      const { syncGcal } = await import('./ingest/gcal/ingest.js');
-      const { mergeSourceMeta, setSourceStatus, getSourceRow } = await import('./lib/sources.js');
+      const { MockCalendarApi, demoCalendars, demoScript } = await import('@collected/core/ingest/gcal/mock-api');
+      const { syncGcal } = await import('@collected/core/ingest/gcal/ingest');
+      const { mergeSourceMeta, setSourceStatus, getSourceRow } = await import('@collected/core/lib/sources');
       const api = new MockCalendarApi(demoCalendars, demoScript());
       const row = await getSourceRow(ctx, 'gcal');
       const { counts, meta } = await syncGcal(ctx, api, { ...(row.meta as object), selectedCalendars: demoCalendars.map((c) => c.id), syncTokens: {} });
@@ -71,9 +71,9 @@ switch (cmd) {
       await setSourceStatus(ctx, 'gcal', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
       console.log(JSON.stringify(counts));
     } else if (rest[0] === 'todoist') {
-      const { MockTodoistApi } = await import('./ingest/todoist/mock-api.js');
-      const { syncTodoist } = await import('./ingest/todoist/ingest.js');
-      const { setSourceStatus, mergeSourceMeta } = await import('./lib/sources.js');
+      const { MockTodoistApi } = await import('@collected/core/ingest/todoist/mock-api');
+      const { syncTodoist } = await import('@collected/core/ingest/todoist/ingest');
+      const { setSourceStatus, mergeSourceMeta } = await import('@collected/core/lib/sources');
       const day = (d: number, h = 18) => {
         const x = new Date();
         x.setDate(x.getDate() + d);
@@ -100,15 +100,15 @@ switch (cmd) {
       await setSourceStatus(ctx, 'todoist', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
       console.log(JSON.stringify(counts));
     } else if (rest[0] === 'gtasks') {
-      const { MockGTasksApi } = await import('./ingest/gtasks/mock-api.js');
-      const { syncGtasks } = await import('./ingest/gtasks/ingest.js');
-      const { setSourceStatus, mergeSourceMeta } = await import('./lib/sources.js');
+      const { MockGTasksApi } = await import('@collected/core/ingest/gtasks/mock-api');
+      const { syncGtasks } = await import('@collected/core/ingest/gtasks/ingest');
+      const { setSourceStatus, mergeSourceMeta } = await import('@collected/core/lib/sources');
       const day = (d: number) => {
         const x = new Date();
         x.setDate(x.getDate() + d);
         return `${x.toISOString().slice(0, 10)}T00:00:00.000Z`;
       };
-      const t = (id: string, title: string, due: string | null, extra: Partial<import('./ingest/gtasks/api.js').GTask> = {}) => ({ id, title, notes: null, due, status: 'needsAction', selfLink: `https://www.googleapis.com/tasks/v1/lists/x/tasks/${id}`, ...extra });
+      const t = (id: string, title: string, due: string | null, extra: Partial<import('@collected/core/ingest/gtasks/api').GTask> = {}) => ({ id, title, notes: null, due, status: 'needsAction', selfLink: `https://www.googleapis.com/tasks/v1/lists/x/tasks/${id}`, ...extra });
       const api = new MockGTasksApi({
         lists: [{ id: 'g-school', title: 'School' }, { id: 'g-life', title: 'Life' }],
         tasks: {
@@ -123,20 +123,20 @@ switch (cmd) {
     } else usage();
     const sourceOf: Record<string, string> = { canvas: 'canvas', gradescope: 'gradescope', gcal: 'gcal', todoist: 'todoist', gtasks: 'gtasks' };
     const tagged = await tagDemoRows(ctx, sourceOf[rest[0]!]!, demoStartedAt);
-    const { runDedup } = await import('./sync/dedup.js');
+    const { runDedup } = await import('@collected/core/sync/dedup');
     console.log(JSON.stringify({ tagged, dedup: await runDedup(ctx), hint: 'remove with: cli demo clear (or Settings → Export / import → Remove demo data)' }));
     break;
   }
   case 'push': {
     const app = rest.find((a) => !a.startsWith('--')) ?? 'todoist';
     const dryRun = rest.includes('--dry-run');
-    const { getSettingParsed } = await import('./lib/settings.js');
+    const { getSettingParsed } = await import('@collected/core/lib/settings');
     const summary = (plan: { targetName: string; ops: { op: string; title: string; reason: string }[]; skipped: unknown[]; rebuilt: number }) =>
       JSON.stringify({ target: plan.targetName, ops: plan.ops.map((o) => `${o.op}: ${o.title}${o.reason ? ` (${o.reason})` : ''}`), skipped: plan.skipped.length, rebuilt: plan.rebuilt }, null, 2);
     if (app === 'todoist') {
       const { todoistPushConfigSchema } = await import('@collected/shared');
-      const { todoistApiForCtx } = await import('./ingest/todoist/ingest.js');
-      const { executePush, planPush } = await import('./sync/todoist-push.js');
+      const { todoistApiForCtx } = await import('@collected/core/ingest/todoist/ingest');
+      const { executePush, planPush } = await import('@collected/core/sync/todoist-push');
       const cfg = await getSettingParsed(ctx, 'todoist.push', todoistPushConfigSchema);
       const api = await todoistApiForCtx(ctx);
       const plan = await planPush(ctx, api, cfg);
@@ -147,8 +147,8 @@ switch (cmd) {
       }
     } else if (app === 'gtasks') {
       const { gtasksPushConfigSchema } = await import('@collected/shared');
-      const { gtasksApiForCtx } = await import('./ingest/gtasks/ingest.js');
-      const { executeGtasksPush, planGtasksPush } = await import('./sync/gtasks-push.js');
+      const { gtasksApiForCtx } = await import('@collected/core/ingest/gtasks/ingest');
+      const { executeGtasksPush, planGtasksPush } = await import('@collected/core/sync/gtasks-push');
       const cfg = await getSettingParsed(ctx, 'gtasks.push', gtasksPushConfigSchema);
       const api = await gtasksApiForCtx(ctx);
       const plan = await planGtasksPush(ctx, api, cfg);
@@ -161,7 +161,7 @@ switch (cmd) {
     break;
   }
   case 'dedup': {
-    const { runDedup } = await import('./sync/dedup.js');
+    const { runDedup } = await import('@collected/core/sync/dedup');
     console.log(JSON.stringify(await runDedup(ctx)));
     break;
   }

@@ -1,5 +1,5 @@
 import { auth as googleAuth, calendar, type calendar_v3 } from '@googleapis/calendar';
-import type { Env } from '../../env.js';
+import type { CoreConfig } from '../../config.js';
 import { NeedsAuthError, NotConfiguredError } from '../types.js';
 
 export interface GCalendar {
@@ -61,20 +61,20 @@ export interface CalendarApi {
 
 export const SCOPES = ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'];
 
-export function redirectUri(env: Env): string {
+export function redirectUri(env: CoreConfig): string {
   return `${env.PUBLIC_URL.replace(/\/$/, '')}/api/google/callback`;
 }
 
 export type OAuth2Client = InstanceType<typeof googleAuth.OAuth2>;
 
-export function oauthClient(env: Env): OAuth2Client {
+export function oauthClient(env: CoreConfig): OAuth2Client {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
     throw new NotConfiguredError('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set (see artifacts/SETUP.md, Phase 1)');
   }
   return new googleAuth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, redirectUri(env));
 }
 
-export function authUrl(env: Env, state: string): string {
+export function authUrl(env: CoreConfig, state: string): string {
   return oauthClient(env).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: SCOPES, state, include_granted_scopes: true });
 }
 
@@ -82,11 +82,11 @@ export function authUrl(env: Env, state: string): string {
  * Consent for one more scope on the same client (incremental authorization). Used by Google Tasks, so connecting
  * Tasks never changes what the Calendar connect asks for and the Calendar consent never asks for Tasks.
  */
-export function incrementalAuthUrl(env: Env, state: string, scopes: string[]): string {
+export function incrementalAuthUrl(env: CoreConfig, state: string, scopes: string[]): string {
   return oauthClient(env).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, state, include_granted_scopes: true });
 }
 
-export async function exchangeCode(env: Env, code: string): Promise<{ refreshToken: string | null; scopes: string[] }> {
+export async function exchangeCode(env: CoreConfig, code: string): Promise<{ refreshToken: string | null; scopes: string[] }> {
   const client = oauthClient(env);
   const { tokens } = await client.getToken(code);
   return { refreshToken: tokens.refresh_token ?? null, scopes: (tokens.scope ?? '').split(/\s+/).filter(Boolean) };
@@ -111,7 +111,7 @@ export class GoogleCalendarApi implements CalendarApi {
     this.cal = calendar({ version: 'v3', auth, timeout: 30_000 });
   }
 
-  static fromRefreshToken(env: Env, refreshToken: string): GoogleCalendarApi {
+  static fromRefreshToken(env: CoreConfig, refreshToken: string): GoogleCalendarApi {
     const client = oauthClient(env);
     client.setCredentials({ refresh_token: refreshToken });
     return new GoogleCalendarApi(client);

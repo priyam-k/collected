@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { gtasksPushConfigSchema, jobsFilterSchema, todoDefaultAppSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { allSettings, getSetting, setSetting } from '../lib/settings.js';
+import { allSettings, getSetting, setSetting } from '@collected/core/lib/settings';
 import { bad, parseBody } from './util.js';
 
 /** Keys with a schema are validated on write; anything else is stored as given. */

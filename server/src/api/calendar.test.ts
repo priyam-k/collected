@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { items } from '../db/schema.js';
-import { MockCalendarApi, demoCalendars } from '../ingest/gcal/mock-api.js';
-import { mergeSourceMeta } from '../lib/sources.js';
+import { items } from '@collected/core/db/schema';
+import { MockCalendarApi, demoCalendars } from '@collected/core/ingest/gcal/mock-api';
+import { mergeSourceMeta } from '@collected/core/lib/sources';
 import { testContext } from '../test-util.js';
 import { calendarRoutes } from './calendar.js';
 

@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { courses } from '../db/schema.js';
-import { fixtureCanvasClient } from '../ingest/canvas/fixture-client.js';
-import { setSourceConfig } from '../lib/sources.js';
+import { courses } from '@collected/core/db/schema';
+import { fixtureCanvasClient } from '@collected/core/ingest/canvas/fixture-client';
+import { setSourceConfig } from '@collected/core/lib/sources';
 import { testContext } from '../test-util.js';
 import { onboardingRoutes, splitCourseCode, termSlug } from './onboarding.js';
 

@@ -5,11 +5,11 @@ import { helperKeyMatches, verifyAccess } from '../auth/cloudflare-access.js';
 import { todoistOAuthConfigured } from '../auth/todoist.js';
 import type { Env } from '../env.js';
 import type { AppContext } from '../context.js';
-import { sources } from '../db/schema.js';
-import { ingesters as registryIngesters } from '../ingest/registry.js';
-import { isRunning, runIngester as runReal, type RunOutcome } from '../ingest/runner.js';
-import type { Ingester } from '../ingest/types.js';
-import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
+import { sources } from '@collected/core/db/schema';
+import { ingesters as registryIngesters } from '@collected/core/ingest/registry';
+import { isRunning, runIngester as runReal, type RunOutcome } from '@collected/core/ingest/runner';
+import type { Ingester } from '@collected/core/ingest/types';
+import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
 import { bad, parseBody } from './util.js';
 import { eq } from 'drizzle-orm';
 
@@ -136,7 +136,7 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const id = sourceIdSchema.safeParse(c.req.param('id'));
     if (!id.success) bad('unknown source', 404);
     const row = await getSourceRow(ctx, id.data);
-    const { items, courses, courseContent, jobs } = await import('../db/schema.js');
+    const { items, courses, courseContent, jobs } = await import('@collected/core/db/schema');
     const { and, desc, eq, isNull, sql } = await import('drizzle-orm');
     const perCourse = await ctx.db
       .select({ courseId: items.courseId, kind: items.kind, n: sql<number>`count(*)` })

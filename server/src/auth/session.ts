@@ -4,9 +4,9 @@ import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from '../context.js';
 import type { Env } from '../env.js';
-import { apiTokens, sessions, users, type ApiTokenRow, type UserRow } from '../db/schema.js';
-import { getSetting, setSetting } from '../lib/settings.js';
-import { nowIso } from '../lib/time.js';
+import { apiTokens, sessions, users, type ApiTokenRow, type UserRow } from '@collected/core/db/schema';
+import { getSetting, setSetting } from '@collected/core/lib/settings';
+import { nowIso } from '@collected/core/lib/time';
 
 export const SESSION_COOKIE = 'collected_session';
 export const SESSION_DAYS = 30;

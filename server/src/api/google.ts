@@ -1,15 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import type { AuthVariables } from '../auth/cloudflare-access.js';
-import { authUrl, exchangeCode, GoogleCalendarApi, incrementalAuthUrl } from '../ingest/gcal/api.js';
-import { TASKS_SCOPE } from '../ingest/gtasks/api.js';
-import { gtasksIngester } from '../ingest/gtasks/ingest.js';
-import { gcalIngester } from '../ingest/gcal/ingest.js';
-import { runIngester } from '../ingest/runner.js';
-import { NotConfiguredError } from '../ingest/types.js';
+import { authUrl, exchangeCode, GoogleCalendarApi, incrementalAuthUrl } from '@collected/core/ingest/gcal/api';
+import { TASKS_SCOPE } from '@collected/core/ingest/gtasks/api';
+import { gtasksIngester } from '@collected/core/ingest/gtasks/ingest';
+import { gcalIngester } from '@collected/core/ingest/gcal/ingest';
+import { runIngester } from '@collected/core/ingest/runner';
+import { NotConfiguredError } from '@collected/core/ingest/types';
 import type { AppContext } from '../context.js';
-import { getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '../lib/sources.js';
-import { sources } from '../db/schema.js';
+import { getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
+import { sources } from '@collected/core/db/schema';
 import { eq } from 'drizzle-orm';
 
 /** Which source a connect flow is for. Calendar and Tasks share the client and the callback, not the consent. */

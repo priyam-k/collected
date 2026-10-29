@@ -1,21 +1,6 @@
-import type { CoreConfig } from '@collected/core';
-import type { Db } from './db/client.js';
+import type { AppContext as CoreContext, BuildInfo } from '@collected/core';
 import type { Env } from './env.js';
-import type { Crypto } from './lib/crypto.js';
-import type { Logger } from './lib/log.js';
 
-/** Everything a route or ingester needs. Built once by createContext (bootstrap.ts); the server widens `env` to its own Env. */
-export interface AppContext<C extends CoreConfig = Env> {
-  env: C;
-  db: Db;
-  log: Logger;
-  crypto: Crypto;
-  version: string;
-  /** Git short sha and build time of the running code (lib/version.ts); commit is "dev" when neither is known. */
-  build: BuildInfo;
-}
-
-export interface BuildInfo {
-  commit: string;
-  builtAt: string | null;
-}
+/** Core's context with the server's own Env in `env`: routes read AUTH_DISABLED, PORT and the rest from the same object. */
+export type AppContext = CoreContext<Env>;
+export type { BuildInfo };

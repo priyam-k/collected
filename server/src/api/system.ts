@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../context.js';
-import { systemVersion, type UpdateChecker } from '../lib/updates.js';
+import { systemVersion, type UpdateChecker } from '@collected/core/lib/updates';
 import { bad } from './util.js';
 
 /**

@@ -2,13 +2,13 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { gtasksPushConfigSchema, gtasksQuickAddSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { gtasksMap, items, overrides } from '../db/schema.js';
-import { splitExternalId, type GTasksApi } from '../ingest/gtasks/api.js';
-import { gtaskToRow, gtasksApiForCtx, syncGtasks } from '../ingest/gtasks/ingest.js';
-import { getSettingParsed, setSetting } from '../lib/settings.js';
-import { getSourceRow } from '../lib/sources.js';
-import { nowIso } from '../lib/time.js';
-import { executeGtasksPush, planGtasksPush } from '../sync/gtasks-push.js';
+import { gtasksMap, items, overrides } from '@collected/core/db/schema';
+import { splitExternalId, type GTasksApi } from '@collected/core/ingest/gtasks/api';
+import { gtaskToRow, gtasksApiForCtx, syncGtasks } from '@collected/core/ingest/gtasks/ingest';
+import { getSettingParsed, setSetting } from '@collected/core/lib/settings';
+import { getSourceRow } from '@collected/core/lib/sources';
+import { nowIso } from '@collected/core/lib/time';
+import { executeGtasksPush, planGtasksPush } from '@collected/core/sync/gtasks-push';
 import { bad, parseBody, parsePatch } from './util.js';
 
 interface GtasksMeta {

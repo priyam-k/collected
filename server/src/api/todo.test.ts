@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { TodoStatus } from '@collected/shared';
-import { mergeSourceMeta, setSourceStatus } from '../lib/sources.js';
-import { setSetting } from '../lib/settings.js';
+import { mergeSourceMeta, setSourceStatus } from '@collected/core/lib/sources';
+import { setSetting } from '@collected/core/lib/settings';
 import { testContext } from '../test-util.js';
 import { todoRoutes } from './todo.js';
 

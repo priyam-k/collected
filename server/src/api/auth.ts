@@ -19,7 +19,7 @@ import {
   userByEmail,
 } from '../auth/session.js';
 import type { AppContext } from '../context.js';
-import { NotConfiguredError } from '../ingest/types.js';
+import { NotConfiguredError } from '@collected/core/ingest/types';
 import { bad, parseBody } from './util.js';
 
 /** OAuth state for sign-in: nobody is signed in yet, so it carries only the return path and an expiry. */
@@ -132,7 +132,7 @@ export function authRoutes(ctx: AppContext) {
   /** Every session but the current one, for "sign out everywhere". */
   r.post('/logout-all', async (c) => {
     const user = await personRow(c);
-    const { sessions } = await import('../db/schema.js');
+    const { sessions } = await import('@collected/core/db/schema');
     const { eq } = await import('drizzle-orm');
     await ctx.db.delete(sessions).where(eq(sessions.userId, user.id));
     clearSessionCookie(c, ctx.env);

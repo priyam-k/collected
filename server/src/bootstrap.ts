@@ -1,11 +1,11 @@
 import type { AppContext } from './context.js';
-import { openDb } from './db/client.js';
-import { defaultMigrationsFolder, runMigrations } from './db/migrate.js';
+import { openDb } from '@collected/core/db/client';
+import { defaultMigrationsFolder, runMigrations } from '@collected/core/db/migrate';
 import { loadEnv } from './env.js';
-import { createCrypto } from './lib/crypto.js';
-import { createLogger } from './lib/log.js';
-import { resolveBuildInfo } from './lib/version.js';
-import { seed } from './seed.js';
+import { createCrypto } from '@collected/core/lib/crypto';
+import { createLogger } from '@collected/core/lib/log';
+import { resolveBuildInfo } from '@collected/core/lib/version';
+import { seed } from '@collected/core/seed';
 
 /** Shared startup for the server and the CLI: env → logger → db → migrate → seed. */
 export async function bootstrap(opts: { quiet?: boolean } = {}): Promise<AppContext> {

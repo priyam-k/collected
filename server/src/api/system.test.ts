@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { testContext } from '../test-util.js';
-import { createUpdateChecker } from '../lib/updates.js';
+import { createUpdateChecker } from '@collected/core/lib/updates';
 import { identityAllows } from './index.js';
 import { systemRoutes } from './system.js';
 

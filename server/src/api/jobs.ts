@@ -4,8 +4,8 @@ import { and, desc, eq, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { APPLIED_STAGES, JOB_STATES, TRACKED_STATES, jobStatePatchSchema, manualJobInputSchema, type Job } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { jobState, jobs, type JobRow, type JobStateRow } from '../db/schema.js';
-import { recomputeMatches } from '../ingest/jobs/ingest.js';
+import { jobState, jobs, type JobRow, type JobStateRow } from '@collected/core/db/schema';
+import { recomputeMatches } from '@collected/core/ingest/jobs/ingest';
 import { bad, csv, intParam, parseBody } from './util.js';
 
 export const MANUAL_SOURCE = 'manual';

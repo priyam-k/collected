@@ -3,7 +3,7 @@ import { layoutsSchema, widgetInstanceInputSchema, type Breakpoint, type Layouts
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppContext } from '../context.js';
-import { layouts, widgetInstances } from '../db/schema.js';
+import { layouts, widgetInstances } from '@collected/core/db/schema';
 import { bad, parseBody, parsePatch } from './util.js';
 
 export function layoutRoutes(ctx: AppContext) {
