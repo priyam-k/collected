@@ -13,6 +13,8 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 /**
  * Resolves the identity behind a request, or null. In order:
+ *  - "local" when LOCAL_OWNER: the app runs inside the CLI on the owner's machine and there is no request from anyone
+ *    else to tell apart (env.ts: nothing in the environment can set it);
  *  - "dev" when AUTH_DISABLED (local development);
  *  - "helper" for the shared LOCAL_HELPER_KEY (one script, one route; see identityAllows);
  *  - "token:<name>" for a bearer API token the CLI got from `collected login`;
@@ -22,6 +24,7 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
  */
 export async function verifyAccess(ctx: AppContext, c: Context): Promise<string | null> {
   const env = ctx.env;
+  if (env.LOCAL_OWNER) return 'local';
   if (env.AUTH_DISABLED) return 'dev';
   if (helperKeyMatches(env, c.req.header('x-collected-key'))) return 'helper';
   const authz = c.req.header('authorization');

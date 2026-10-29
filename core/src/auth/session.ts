@@ -104,5 +104,11 @@ export async function revokeToken(ctx: AppContext, userId: string, id: string): 
   return r.length > 0;
 }
 
-/** A person (email or the dev identity), as opposed to a token, service token or helper key. */
-export const isPerson = (identity: string | null | undefined): boolean => identity === 'dev' || (!!identity && identity.includes('@'));
+/** Synthetic identities that stand in for the owner: `dev` under AUTH_DISABLED, `local` for the CLI's in-process app (LOCAL_OWNER). */
+export const SYNTHETIC_PERSONS: Record<string, { email: string; name: string }> = {
+  dev: { email: 'dev@localhost', name: 'Local development' },
+  local: { email: 'local@this-machine', name: 'This machine' },
+};
+
+/** A person (an email or a synthetic owner), as opposed to a token, service token or helper key. */
+export const isPerson = (identity: string | null | undefined): boolean => !!identity && (identity in SYNTHETIC_PERSONS || identity.includes('@'));

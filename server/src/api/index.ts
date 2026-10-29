@@ -37,7 +37,8 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  */
 export function identityAllows(user: string, method: string, pathWithQuery: string): boolean {
   const machine = user.startsWith('service:') || user.startsWith('token:');
-  if (user === 'dev' || (!machine && user !== 'helper')) return true;
+  // `dev` (AUTH_DISABLED) and `local` (the CLI's in-process app) stand in for the owner.
+  if (user === 'dev' || user === 'local' || (!machine && user !== 'helper')) return true;
   const q = pathWithQuery.indexOf('?');
   const path = q === -1 ? pathWithQuery : pathWithQuery.slice(0, q);
   const query = new URLSearchParams(q === -1 ? '' : pathWithQuery.slice(q + 1));
@@ -105,7 +106,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker } = {
       return c.json({ error: 'cross-site request refused' }, 403);
     }
     await next();
-    if (MUTATING.has(c.req.method) && user && user !== 'dev') ctx.log.info({ user, method: c.req.method, path: c.req.path, status: c.res.status }, 'write');
+    if (MUTATING.has(c.req.method) && user && user !== 'dev' && user !== 'local') ctx.log.info({ user, method: c.req.method, path: c.req.path, status: c.res.status }, 'write');
   });
 
   // Bodies are small JSON; an import or a file-sync report is the only thing that legitimately runs to megabytes.

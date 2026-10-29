@@ -504,7 +504,7 @@ export interface TodoStatus {
 
 /** `GET /api/auth/me`: who the request is, and which sign-in methods this server offers. */
 export interface Me {
-  /** The resolved identity string (email, "dev", "token:<name>", "service:<name>", "helper") or null when signed out. */
+  /** The resolved identity string (email, "dev", "local", "token:<name>", "service:<name>", "helper") or null when signed out. */
   identity: string | null;
   user: { email: string; name: string | null; picture: string | null } | null;
   authDisabled: boolean;

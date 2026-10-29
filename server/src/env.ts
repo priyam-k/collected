@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import type { CoreConfig } from '@collected/core';
+import { loadOrCreateKeyFile } from '@collected/core/lib/key-file';
 
 const bool = z
   .union([z.boolean(), z.string()])
@@ -67,12 +67,17 @@ const envSchema = z.object({
 
 /**
  * What the server runs on: the core's config (every path absolute) plus the HTTP-side settings only this package reads.
- * `rootDir` is the repo checkout (or /app in the image); it anchors relative paths here and never reaches core.
+ * Relative paths are anchored at the repo checkout (or /app in the image) here, in `loadEnv`, and arrive absolute.
  */
 export type Env = CoreConfig &
   Omit<z.infer<typeof envSchema>, keyof CoreConfig> & {
-    rootDir: string;
     secretKeySource: 'env' | 'file';
+    /**
+     * The app runs in-process for the CLI's local mode and every request is the machine's owner: the auth middleware
+     * answers `local` (a person) without a credential. Deliberately not in `envSchema`: no environment variable sets it,
+     * only the CLI's own config object (agent/src/local.ts), so a reachable server can never be put in this state.
+     */
+    LOCAL_OWNER?: boolean;
   };
 
 /** Loads ../.env (repo root) when present, then validates process.env and resolves every path core will be handed. */
@@ -109,9 +114,8 @@ export function loadEnv(): Env {
   const key = fromEnv ? { value: fromEnv, source: 'env' as const } : { value: loadOrCreateKeyFile(dataDir), source: 'file' as const };
   return {
     ...rest,
-    rootDir,
     DATA_DIR: dataDir,
-    WEB_DIST: env.WEB_DIST ? path.resolve(rootDir, env.WEB_DIST) : undefined,
+    WEB_DIST: path.resolve(rootDir, env.WEB_DIST ?? path.join('web', 'dist')),
     // Relative to the cwd, as `path.resolve` has always read it; the image and the e2e suite pass absolutes.
     MIGRATIONS_DIR: env.MIGRATIONS_DIR ? path.resolve(env.MIGRATIONS_DIR) : undefined,
     SEED_CONFIG_PATH: resolveSeedConfig(rootDir, env.SEED_CONFIG_PATH),
@@ -141,22 +145,4 @@ function readVersion(rootDir: string): string {
   } catch {
     return '0.0.0';
   }
-}
-
-/**
- * Keeps the encryption key in DATA_DIR/.secret_key when SECRET_KEY isn't set. Losing the key means every
- * stored credential must be re-entered, so it lives beside the database (and inside the Docker volume).
- */
-function loadOrCreateKeyFile(dataDir: string): string {
-  const file = path.join(dataDir, '.secret_key');
-  try {
-    const existing = readFileSync(file, 'utf8').trim();
-    if (/^[0-9a-fA-F]{64}$/.test(existing)) return existing;
-  } catch {
-    // create below
-  }
-  mkdirSync(dataDir, { recursive: true });
-  const key = randomBytes(32).toString('hex');
-  writeFileSync(file, `${key}\n`, { mode: 0o600 });
-  return key;
 }

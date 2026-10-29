@@ -1,44 +1,12 @@
-import { Hono } from 'hono';
-import { secureHeaders } from 'hono/secure-headers';
 import { serve } from '@hono/node-server';
-import { createApi } from './api/index.js';
-import { bootstrap } from './bootstrap.js';
-import { createUpdateChecker } from '@collected/core/lib/updates';
 import { startScheduler } from '@collected/core/scheduler';
-import { mountStatic } from './static.js';
+import { createApp } from './app.js';
+import { bootstrap } from './bootstrap.js';
 
 const ctx = await bootstrap();
 const { env, log } = ctx;
 
-const app = new Hono();
-// Everything is same-origin except Canvas file previews, which `/api/canvas/files/:id/open` redirects to the
-// InstFS CDN; CSP checks the redirect target, hence `https:` for images and frames. No inline scripts: the theme
-// bootstrap is a module. Inline styles stay because React, Radix and sonner set them.
-app.use(
-  '*',
-  secureHeaders({
-    contentSecurityPolicy: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'https:', 'data:'],
-      frameSrc: ["'self'", 'https:'],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"],
-      baseUri: ["'none'"],
-      objectSrc: ["'none'"],
-      workerSrc: ["'none'"],
-    },
-    referrerPolicy: 'no-referrer',
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: false,
-  }),
-);
-const updates = createUpdateChecker(ctx);
-app.route('/api', createApi(ctx, { updates }));
-const servingSpa = mountStatic(app, env);
+const { app, updates, servingSpa } = createApp(ctx, { webDist: env.WEB_DIST });
 
 const scheduler = env.SCHEDULER_DISABLED ? null : startScheduler(ctx);
 // The update check is its own timer, not an ingester: it has no source row and no items, and SCHEDULER_DISABLED (tests, the

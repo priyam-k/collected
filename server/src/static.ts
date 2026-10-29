@@ -2,11 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
-import type { Env } from './env.js';
 
-/** Serves the built SPA from web/dist with an index.html fallback for client routes. */
-export function mountStatic(app: Hono, env: Env): boolean {
-  const dist = env.WEB_DIST ?? path.resolve(env.rootDir, 'web', 'dist');
+/** Serves the built SPA from `dist` with an index.html fallback for client routes; false when there is no build there. */
+export function mountStatic(app: Hono, dist: string): boolean {
   const indexFile = path.join(dist, 'index.html');
   if (!existsSync(indexFile)) return false;
   const root = path.relative(process.cwd(), dist) || '.';

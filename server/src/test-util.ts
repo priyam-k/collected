@@ -12,7 +12,6 @@ export function testContext(): Promise<AppContext> {
     AUTH_DISABLED: true,
     SCHEDULER_DISABLED: true,
     LOG_LEVEL: 'silent',
-    rootDir: '/nonexistent',
   } as Env;
   return coreTestContext<Env>(env);
 }

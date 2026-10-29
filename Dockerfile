@@ -29,8 +29,8 @@ COPY core ./core
 COPY server ./server
 # tsup bundles @collected/shared and @collected/core into dist/index.js; their runtime packages are server dependencies
 # too, so the deploy below puts them in /out/server/node_modules where the bundle resolves them.
-RUN pnpm --filter server build
-RUN pnpm --filter server --prod --legacy deploy /out/server
+RUN pnpm --filter @collected/server build
+RUN pnpm --filter @collected/server --prod --legacy deploy /out/server
 
 FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runtime
 # Which commit this image was built from, for /api/system/version and the update check (core/src/lib/version.ts).

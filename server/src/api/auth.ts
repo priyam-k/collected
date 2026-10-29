@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { ApiToken, Me } from '@collected/shared';
 import { exchangeSignIn, googleSignInConfigured, signInUrl } from '@collected/core/auth/google';
-import { createSession, createToken, deleteSession, emailAllowed, isPerson, listTokens, revokeToken, upsertUser, userByEmail } from '@collected/core/auth/session';
+import { SYNTHETIC_PERSONS, createSession, createToken, deleteSession, emailAllowed, isPerson, listTokens, revokeToken, upsertUser, userByEmail } from '@collected/core/auth/session';
 import { type AuthVariables } from '../auth/cloudflare-access.js';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from '../auth/cookies.js';
 import type { AppContext } from '../context.js';
@@ -35,11 +35,12 @@ export function authRoutes(ctx: AppContext) {
 
   r.get('/me', async (c) => {
     const identity = c.get('user') ?? null;
-    const email = isPerson(identity) && identity !== 'dev' ? identity! : null;
+    const synthetic = identity ? SYNTHETIC_PERSONS[identity] : undefined;
+    const email = isPerson(identity) && !synthetic ? identity! : null;
     const row = email ? await userByEmail(ctx, email) : null;
     const body: Me = {
       identity,
-      user: identity === 'dev' ? { email: 'dev@localhost', name: 'Local development', picture: null } : row ? { email: row.email, name: row.name, picture: row.picture } : email ? { email, name: null, picture: null } : null,
+      user: synthetic ? { ...synthetic, picture: null } : row ? { email: row.email, name: row.name, picture: row.picture } : email ? { email, name: null, picture: null } : null,
       authDisabled: ctx.env.AUTH_DISABLED,
       signIn: { google: googleSignInConfigured(ctx.env), access: !!(ctx.env.CF_ACCESS_TEAM_DOMAIN && ctx.env.CF_ACCESS_AUD) },
     };
@@ -90,11 +91,12 @@ export function authRoutes(ctx: AppContext) {
     return c.json({ ok: true });
   });
 
-  /** The signed-in person's user row; the dev identity gets a synthetic one so the CLI can be exercised locally. */
+  /** The signed-in person's user row; `dev` and `local` get a synthetic one so the token routes work without a sign-in. */
   async function personRow(c: { get(k: 'user'): string | null }) {
     const identity = c.get('user');
     if (!isPerson(identity)) bad('sign in as a person to manage tokens', 403);
-    return identity === 'dev' ? upsertUser(ctx, { email: 'dev@localhost', name: 'Local development' }) : (await userByEmail(ctx, identity!)) ?? upsertUser(ctx, { email: identity! });
+    const synthetic = SYNTHETIC_PERSONS[identity!];
+    return synthetic ? upsertUser(ctx, synthetic) : (await userByEmail(ctx, identity!)) ?? upsertUser(ctx, { email: identity! });
   }
 
   r.get('/tokens', async (c) => {

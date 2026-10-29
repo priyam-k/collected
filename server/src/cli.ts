@@ -46,85 +46,14 @@ switch (cmd) {
     console.log(JSON.stringify(await buildExport(ctx), null, 2));
     break;
   case 'demo': {
-    const demoStartedAt = new Date().toISOString();
-    const { clearDemoData, tagDemoRows } = await import('@collected/core/lib/demo');
+    const { clearDemoData, isDemoSource, loadDemo } = await import('@collected/core/lib/demo');
     if (rest[0] === 'clear') {
       console.log(JSON.stringify(await clearDemoData(ctx)));
       break;
     }
-    if (rest[0] === 'canvas') {
-      const { fixtureCanvasClient } = await import('@collected/core/ingest/canvas/fixture-client');
-      const { syncCanvas } = await import('@collected/core/ingest/canvas/ingest');
-      console.log(JSON.stringify(await syncCanvas(ctx, fixtureCanvasClient())));
-    } else if (rest[0] === 'gradescope') {
-      const { fixtureGradescopeClient } = await import('@collected/core/ingest/gradescope/fixture-client');
-      const { syncGradescope } = await import('@collected/core/ingest/gradescope/ingest');
-      console.log(JSON.stringify(await syncGradescope(ctx, fixtureGradescopeClient())));
-    } else if (rest[0] === 'gcal') {
-      const { MockCalendarApi, demoCalendars, demoScript } = await import('@collected/core/ingest/gcal/mock-api');
-      const { syncGcal } = await import('@collected/core/ingest/gcal/ingest');
-      const { mergeSourceMeta, setSourceStatus, getSourceRow } = await import('@collected/core/lib/sources');
-      const api = new MockCalendarApi(demoCalendars, demoScript());
-      const row = await getSourceRow(ctx, 'gcal');
-      const { counts, meta } = await syncGcal(ctx, api, { ...(row.meta as object), selectedCalendars: demoCalendars.map((c) => c.id), syncTokens: {} });
-      await mergeSourceMeta(ctx, 'gcal', { ...meta, defaultCalendarId: demoCalendars[0]!.id, demo: true });
-      await setSourceStatus(ctx, 'gcal', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
-      console.log(JSON.stringify(counts));
-    } else if (rest[0] === 'todoist') {
-      const { MockTodoistApi } = await import('@collected/core/ingest/todoist/mock-api');
-      const { syncTodoist } = await import('@collected/core/ingest/todoist/ingest');
-      const { setSourceStatus, mergeSourceMeta } = await import('@collected/core/lib/sources');
-      const day = (d: number, h = 18) => {
-        const x = new Date();
-        x.setDate(x.getDate() + d);
-        x.setHours(h, 0, 0, 0);
-        return x;
-      };
-      const api = new MockTodoistApi({
-        projects: [{ id: 'p-school', name: 'School' }, { id: 'p-home', name: 'Home' }],
-        labels: [{ id: 'l1', name: 'homework' }, { id: 'l2', name: 'grocery' }, { id: 'l3', name: 'cleaning' }, { id: 'l4', name: 'errands' }],
-        tasks: [
-          { id: 'd1', content: 'Buy oat milk', project_id: 'p-home', labels: ['grocery'], priority: 1, due: { date: day(0).toISOString().slice(0, 10) } },
-          { id: 'd2', content: 'Eggs, spinach, rice', project_id: 'p-home', labels: ['grocery'], priority: 1, due: null },
-          { id: 'd3', content: 'Vacuum + take out trash', project_id: 'p-home', labels: ['cleaning'], priority: 2, due: { date: day(1).toISOString().slice(0, 10), datetime: day(1, 10).toISOString() } },
-          { id: 'd4', content: 'Renew parking permit', project_id: 'p-home', labels: ['errands'], priority: 3, due: { date: day(3).toISOString().slice(0, 10) } },
-          { id: 'd5', content: 'Email advisor about spring schedule', project_id: 'p-school', labels: [], priority: 2, due: { date: day(2).toISOString().slice(0, 10), datetime: day(2, 9).toISOString() } },
-          { id: 'd6', content: 'Read CIML ch. 1', project_id: 'p-school', labels: ['homework', 'cmsc422'], priority: 1, due: { date: day(1).toISOString().slice(0, 10), datetime: day(1, 23).toISOString() } },
-          { id: 'd7', content: 'Call mom', project_id: 'inbox', labels: [], priority: 4, due: { date: day(0).toISOString().slice(0, 10) } },
-          { id: 'd8', content: 'Wipe counters', project_id: 'p-home', parent_id: 'd3', labels: [], priority: 1, due: null },
-          { id: 'd9', content: 'Mop kitchen', project_id: 'p-home', parent_id: 'd3', labels: [], priority: 1, due: { date: day(1).toISOString().slice(0, 10) } },
-        ],
-      });
-      const counts = await syncTodoist(ctx, api);
-      await mergeSourceMeta(ctx, 'todoist', { projects: api.projects.map((p) => ({ id: p.id, name: p.name })), labels: api.labels.map((l) => l.name), demo: true });
-      await setSourceStatus(ctx, 'todoist', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
-      console.log(JSON.stringify(counts));
-    } else if (rest[0] === 'gtasks') {
-      const { MockGTasksApi } = await import('@collected/core/ingest/gtasks/mock-api');
-      const { syncGtasks } = await import('@collected/core/ingest/gtasks/ingest');
-      const { setSourceStatus, mergeSourceMeta } = await import('@collected/core/lib/sources');
-      const day = (d: number) => {
-        const x = new Date();
-        x.setDate(x.getDate() + d);
-        return `${x.toISOString().slice(0, 10)}T00:00:00.000Z`;
-      };
-      const t = (id: string, title: string, due: string | null, extra: Partial<import('@collected/core/ingest/gtasks/api').GTask> = {}) => ({ id, title, notes: null, due, status: 'needsAction', selfLink: `https://www.googleapis.com/tasks/v1/lists/x/tasks/${id}`, ...extra });
-      const api = new MockGTasksApi({
-        lists: [{ id: 'g-school', title: 'School' }, { id: 'g-life', title: 'Life' }],
-        tasks: {
-          'g-school': [t('g1', 'Outline STAT410 project', day(2)), t('g2', 'Office hours: ask about problem 4', day(1)), t('g3', 'Reread lecture 12 notes', null)],
-          'g-life': [t('g4', 'Book dentist', day(5)), t('g5', 'Return library books', day(0)), t('g6', 'Pay electric bill', day(3), { status: 'completed', completed: new Date().toISOString() })],
-        },
-      });
-      const { counts, lists } = await syncGtasks(ctx, api);
-      await mergeSourceMeta(ctx, 'gtasks', { lists: lists.map((l) => ({ id: l.id, title: l.title })), demo: true });
-      await setSourceStatus(ctx, 'gtasks', 'connected', { lastSuccessAt: new Date().toISOString(), lastError: null });
-      console.log(JSON.stringify(counts));
-    } else usage();
-    const sourceOf: Record<string, string> = { canvas: 'canvas', gradescope: 'gradescope', gcal: 'gcal', todoist: 'todoist', gtasks: 'gtasks' };
-    const tagged = await tagDemoRows(ctx, sourceOf[rest[0]!]!, demoStartedAt);
-    const { runDedup } = await import('@collected/core/sync/dedup');
-    console.log(JSON.stringify({ tagged, dedup: await runDedup(ctx), hint: 'remove with: cli demo clear (or Settings → Export / import → Remove demo data)' }));
+    if (!isDemoSource(rest[0])) usage();
+    const loaded = await loadDemo(ctx, rest[0]);
+    console.log(JSON.stringify({ ...loaded, hint: 'remove with: cli demo clear (or Settings → Export / import → Remove demo data)' }));
     break;
   }
   case 'push': {
