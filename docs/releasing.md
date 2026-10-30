@@ -10,6 +10,18 @@ A release is a git tag. `.github/workflows/release.yml` watches for tags named `
 
 **The web build is a precondition.** `pnpm --filter collected-cli build` copies `web/dist` into `agent/dist/web` and fails with a message when there is no `web/dist/index.html`. Build web first (`pnpm build:cli` does both in order).
 
+## Client and server versions
+
+The CLI and the server are released separately (npm tag and `main` deploy), so they meet at different versions. The rule is **same major = compatible**: a 1.x CLI talks to any 1.x server. Every `/api/*` answer carries `X-Collected-Version` (the server's version) and `X-Collected-Min-Client` (the oldest CLI it talks to), and `GET /api/system/version` reports both as `version` and `minClient`. The CLI reads the headers off whatever request it is making (`agent/src/skew.ts`): behind in minor, it prints one stderr line a day saying to run `collected upgrade`; on another major, or below `minClient`, it refuses with exit 2 before sending anything else.
+
+`minClient` is `MIN_CLIENT_VERSION` in `core/src/lib/version.ts`. **Raising it is a breaking-change decision**, not housekeeping: every CLI below it stops working against the server the moment the server deploys, and the person sees only "run `collected upgrade`". Raise it only when an API change actually breaks older CLIs: a route or query parameter an old command sends is removed or renamed, a response field an old command reads goes away or changes meaning, a write's body shape changes. Adding routes, fields or commands never requires it (an old CLI simply lacks them). When you do raise it:
+
+1. Set it to the first CLI version that works with the change (usually the one you are releasing alongside), and publish that CLI **before** the server change deploys, so `collected upgrade` has something to install.
+2. Say so in `CHANGELOG.md` under the server release, naming the oldest CLI that still works.
+3. Add a DECISIONS entry if the break was avoidable and you chose it anyway.
+
+A new major of the CLI or the server is the same decision at a larger scale: bump both majors together, or not at all.
+
 ## One-time setup
 
 1. Create an npm granular access token: npmjs.com → Access Tokens → Generate New Token → Granular. Scope it to the single package `collected-cli` with read and write, nothing else. It must be publish-capable and should have an expiry.
@@ -40,6 +52,6 @@ Check the run under Actions → release. When it finishes, `npm view collected-c
 
 ## After
 
-- `npm i -g collected-cli@latest` on your own machine and run `collected help` once.
+- `collected upgrade` on your own machine (or `npm i -g collected-cli@latest`) and run `collected --version` once; it should print the version you tagged.
 - If the release changed the config file format or added a command, update `agent/README.md` and the README's "CLI and file sync" section in the same pull request as the bump.
 - A broken release is fixed forward with the next patch version; npm allows unpublishing only within 72 hours and the workflow does not do it for you.

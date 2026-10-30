@@ -17,6 +17,19 @@ collected ui                           # the dashboard at http://127.0.0.1:4848
 
 Or, against your own server, `collected init https://collected.example.com` (see [Set up](#set-up)). Two binaries are installed, `collected` and `collected-agent`; they are the same program. `npx -p collected-cli collected help` runs it without installing. The install is about 60 MB on disk, most of it the SQLite driver (`@libsql/client`, which brings a prebuilt binary for macOS, Linux x64 and arm64, and Windows x64).
 
+### Upgrading
+
+`collected --version` prints the installed version. `collected upgrade` installs the newest one with whatever installed this one: it reads the running script's path to tell a global npm install (`npm install -g collected-cli@latest`; nvm, volta, fnm and Homebrew's node all count) from a pnpm global (`pnpm add -g collected-cli@latest`) or a bun global (`bun add -g collected-cli@latest`), asks npm which version it is about to install, prints the command, and runs it with your terminal attached; afterwards it prints the new version. `--dry-run` prints without running. When it cannot tell how the CLI was installed (a project-local `node_modules`, the `npx` cache, a checkout of the repository) it prints the npm command and exits 1, and you run the right one yourself.
+
+Once a day, at most, a command may end with one line on stderr such as
+
+```
+collected-cli 1.2.0 · server 1.3.0 · run: collected upgrade
+collected-cli 1.2.0 · 1.3.0 on npm · run: collected upgrade
+```
+
+The first means your server runs a newer minor than this CLI: every command still works (same major is compatible), but the server may have commands or fields this CLI does not know. The second means npm has a newer release than the one running, in local mode or against a server. Both can appear on one line. The notice is on stderr only, so `--json` output is unaffected; the day's timestamp and what npm answered live in `~/.collected/state.json`; a network failure is silent unless you pass `--verbose`; `NO_UPDATE_NOTIFIER=1` in the environment keeps the npm check off entirely. A server that is a major version ahead, or that says it needs a newer CLI than this one (`minClient` in `GET /api/system/version`), is refused before anything is sent: the command exits 2 with the same line plus `this server needs collected-cli >= <version>`, and `collected upgrade` is the fix. Local mode has no server to disagree with.
+
 ## Set up
 
 ```sh
@@ -169,11 +182,18 @@ install-launchd [--interval 30]             run the sync every N minutes in the 
 uninstall-launchd
 ```
 
+This program:
+
+```
+--version                                   print the version
+upgrade [--dry-run]                         install the newest collected-cli from npm with whatever installed this one
+```
+
 A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## Config file
 
-`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them. Local mode's optional overrides (OAuth clients, `TZ`, `LOG_LEVEL`) go in `~/.collected/.env` next to it, see [above](#collectedenv-overrides-for-local-mode).
+`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them. `state.json` next to it is the program's own memory: what the file sync has placed, and when the version notice last ran and what it saw. Local mode's optional overrides (OAuth clients, `TZ`, `LOG_LEVEL`) go in `~/.collected/.env` next to it, see [above](#collectedenv-overrides-for-local-mode).
 
 `collected auth model` stores a TypeSafe key for the Jev classifier that sorts files the rules cannot place. Skip it to sort by rules only.
 

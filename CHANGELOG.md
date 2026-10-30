@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- CLI and server versions are checked against each other. Every `/api/*` answer now carries `X-Collected-Version` and `X-Collected-Min-Client`, and `GET /api/system/version` reports `minClient` (the oldest CLI the server talks to; same major is otherwise compatible). The CLI compares off whatever request it was making: behind the server's minor, it prints one stderr line a day (`collected-cli 1.2.0 · server 1.3.0 · run: collected upgrade`); on another major or below `minClient` it refuses with exit 2 before sending anything else. The same daily line says when npm has a newer CLI than the one running, in local mode too; `NO_UPDATE_NOTIFIER=1` keeps that check off the network. `collected --version` prints the version; `collected upgrade [--dry-run]` installs the newest CLI with whatever installed this one (npm, pnpm or bun global; it prints the npm command when it cannot tell). The repository's `.npmrc` is gone (both keys were pnpm defaults and npm warned about them).
+
 ## 1.2.0 — 2026-10-29 · recommended
 
 - The backend is split into `@collected/core` (database, ingesters, syncs, sessions, scheduler) and the `server` HTTP layer over it. Nothing changes for a running instance: the image runs the same bundle, and the migrations now ship from `core/drizzle` (`MIGRATIONS_DIR` in the image).

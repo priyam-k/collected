@@ -5,7 +5,7 @@ RUN npm i -g pnpm@12.3.4
 WORKDIR /app
 
 FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY shared/package.json shared/
 COPY core/package.json core/
 COPY server/package.json server/
