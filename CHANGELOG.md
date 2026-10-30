@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- CLI: `collected daemon install` under a non-default `COLLECTED_AGENT_HOME` writes a timer of its own, `com.collected.sync.<hash>` / `collected-sync-<hash>` (the first 8 hex of sha256 over the home's path), instead of overwriting the default home's `com.collected.sync`; `status` and `uninstall` act on the same unit, and the messages name it. The default `~/.collected` keeps the bare names, and the old `com.collected.agent` migration applies to it only.
 - Landing page and README: a "Set up with your agent" prompt to paste into Claude Code, Cursor, Codex or any agent with a shell. It reads the skill, the CLI README and the self-host guide, asks laptop or server, and walks the setup, asking before anything that opens the browser, creates accounts or costs money. The landing card has a Copy button (clipboard, falling back to selecting the text).
 
 ## 1.2.4 — 2026-10-30 · recommended
@@ -15,7 +16,6 @@ break); `optional` means it is nice to have.
 - Settings → Sources: clicking Save on an incomplete form marks the empty or invalid fields red with the reason under each and moves focus there, instead of a button that silently does nothing.
 - Settings → Sources, Canvas card: the Canvas URL field is prefilled from the saved address (the server now publishes it as `meta.baseUrl`; the cookie stays encrypted and never comes back), accepts a bare host or any page address (`umd.instructure.com`, `umd.instructure.com/courses/1`, `http://…`) and saves it as `https://<host>`, and the Save/Replace cookie button says why it is off (address first, then the cookie) instead of looking like a rejected cookie. Pasted text with no `name=value` in it is flagged inline.
 - CLI: `collected connect canvas` reads Firefox on Windows (`%APPDATA%\Mozilla\Firefox\Profiles`) and Linux (`~/.mozilla/firefox`, the snap and flatpak sandboxes), Chrome/Edge/Brave on Windows (the `Local State` key unwrapped through DPAPI in PowerShell; `v20` app-bound cookies are reported as such with the paste fallback) and Chromium browsers on Linux (the basic `peanuts` store, or the keyring password through `secret-tool`; a locked keyring is named). Before this, every browser read as "not installed" off macOS and the error said the cookie was missing. The "no cookie" error now lists each browser's outcome: not installed, N profiles without the cookie, or why the store could not be read. macOS is unchanged.
-- CLI: `collected daemon install` under a non-default `COLLECTED_AGENT_HOME` writes a timer of its own, `com.collected.sync.<hash>` / `collected-sync-<hash>` (the first 8 hex of sha256 over the home's path), instead of overwriting the default home's `com.collected.sync`; `status` and `uninstall` act on the same unit, and the messages name it. The default `~/.collected` keeps the bare names, and the old `com.collected.agent` migration applies to it only.
 
 ## 1.2.3 — 2026-10-30 · optional
 
