@@ -2,12 +2,11 @@
 #
 # Needs, on the repo:
 #   secrets COLLECTED_GOOGLE_DESKTOP_CLIENT_ID / _SECRET  the Desktop-app OAuth client the CLI's local mode ships (SETUP.md Google step 9)
-#   secret NPM_TOKEN   an npm granular access token, publish-only, limited to the package `collected-cli`
-#                      (npmjs.com → Access Tokens → Generate New Token → Granular; packages and scopes: only
-#                      collected-cli, permissions: read and write; no org or user permissions). Rotate it when it expires.
 #
-# The publish is signed with provenance (`id-token: write` + `--provenance`), so npm shows the exact workflow run and
-# commit the tarball came from. Nothing here deploys anything; `deploy.yml` owns the server.
+# No npm token: the package trusts this workflow (npmjs.com → collected-cli → Settings → Trusted publishers: GitHub
+# Actions, priyam-k/collected, release.yml, no environment, publish allowed). pnpm exchanges the job's OIDC token for a
+# short-lived npm credential, and the publish is signed with provenance (`id-token: write` + `--provenance`), so npm
+# shows the exact workflow run and commit the tarball came from. Nothing here deploys anything; `deploy.yml` owns the server.
 # Every action is pinned to a commit (same SHAs as ci.yml); Dependabot proposes bumps.
 name: release
 
@@ -62,5 +61,3 @@ jobs:
         run: node scripts/smoke-cli-package.mjs
 
       - run: pnpm --filter collected-cli publish --no-git-checks --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

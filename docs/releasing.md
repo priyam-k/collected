@@ -24,9 +24,11 @@ A new major of the CLI or the server is the same decision at a larger scale: bum
 
 ## One-time setup
 
-1. Create an npm granular access token: npmjs.com → Access Tokens → Generate New Token → Granular. Scope it to the single package `collected-cli` with read and write, nothing else. It must be publish-capable and should have an expiry.
-2. Add it to the repository as the secret `NPM_TOKEN` (Settings → Secrets and variables → Actions).
-3. For the very first publish the package does not exist yet, so the token must be allowed to create packages ("all packages" for that one run, then narrow it), or publish the first version once by hand with `pnpm --filter collected-cli publish --access public` from a logged-in machine.
+The workflow publishes without any npm token. On npmjs.com → `collected-cli` → Settings → Trusted publishers, one entry: GitHub Actions, organization or user `priyam-k`, repository `collected`, workflow filename `release.yml` (the filename only), environment empty, "Allow npm publish" ticked. pnpm exchanges the job's OIDC token for a short-lived credential; a mismatch in any field shows up in the log as `Skipped OIDC … 404` and the publish fails, so recreate the entry rather than guess.
+
+A fork publishing under its own package name does the first publish by hand (`pnpm --filter collected-cli publish --access public` from a logged-in machine; trusted publishing is configured on an existing package), then adds its own trusted publisher entry.
+
+The two repository secrets the release does need are `COLLECTED_GOOGLE_DESKTOP_CLIENT_ID` and `COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET` (artifacts/SETUP.md, Google step 9); the publish refuses a bundle without them.
 
 ## Cutting a release
 
