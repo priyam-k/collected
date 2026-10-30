@@ -404,7 +404,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
             <div className="flex min-w-0">
               <select
                 aria-label="Cookie name"
-                className="h-9 shrink-0 rounded-l-xl border border-r-0 border-line2 bg-surface pl-2.5 pr-1 font-mono text-[12px] text-sub outline-none hover:text-ink focus-visible:relative focus-visible:z-10 focus-visible:shadow-[var(--focus-ring)]"
+                className="h-9 shrink-0 rounded-l-xl border border-r-0 border-line2 bg-surface pl-3 pr-3 font-mono text-[12px] text-sub outline-none hover:text-ink focus-visible:relative focus-visible:z-10 focus-visible:shadow-[var(--focus-ring)]"
                 value={cookieName}
                 onChange={(e) => setCookieName(e.target.value as CanvasCookieName)}
               >
