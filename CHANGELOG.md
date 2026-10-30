@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+## 1.2.3 — 2026-10-30 · optional
+
 - CLI: one timer for everything a laptop keeps current. Bare `collected sync` now means every enabled source (local mode, the same run as `sync all`) and then the file sync, or the file sync alone against a server; `--dry-run` plans the files and syncs no source, and `sync <source|all>` stays the sources-only form. `collected daemon install|uninstall|status` works in both modes and runs that command every 15 minutes in local mode or 30 against a server (`--interval N`; `daemon.intervalMinutes` in `agent.json` wins), logging to `<data dir>/daemon.log` or `~/.collected/daemon.log`. `install-launchd` and `uninstall-launchd` still work as aliases and say so; `daemon install` unloads and deletes the old `com.collected.agent` LaunchAgent when it finds one, so the file sync never runs on two timers. `collected status` reports the daemon in both modes.
 
 ## 1.2.2 — 2026-10-30 · optional
