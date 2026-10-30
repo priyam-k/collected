@@ -10,7 +10,7 @@ Documentation for people who run or use collected. The engineering notes (archit
 
 Related, elsewhere in the repo:
 
-- [`README.md`](../README.md) — local development in four commands.
+- [`README.md`](../README.md) — the three ways to run it (laptop, self-host, hosted) and local development. The backend is `core/` (database, ingesters, syncs, scheduler) with `server/` as its HTTP layer; the CLI's local mode (`collected init --local`, documented in [`agent/README.md`](../agent/README.md#local-mode)) runs the same core on one machine with no server.
 - [`.env.example`](../.env.example) — every environment variable, commented.
 - [`scripts/backup.sh`](../scripts/backup.sh), [`scripts/deploy.sh`](../scripts/deploy.sh) — what the self-host guide's backup and update steps call.
 - The in-app Privacy and Terms pages (`/privacy`, `/terms`) describe what a hosted instance stores and why; their source is `web/src/pages/public/`.

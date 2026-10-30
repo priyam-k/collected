@@ -14,7 +14,9 @@ pnpm cli demo canvas            # fixture data so the widgets are not empty (als
 pnpm dev                        # server on :3000, web on :5173
 ```
 
-Open http://localhost:5173. `pnpm cli demo clear` removes the demo rows again.
+Open http://localhost:5173/dashboard. `pnpm cli demo clear` removes the demo rows again.
+
+The workspaces: `core` (database, ingesters, syncs, scheduler; no HTTP), `server` (the Hono routes over core, `@collected/server`), `web`, `shared`, and `agent` (the `collected-cli` package, which also runs core in-process for local mode: `pnpm build:cli`, then `node agent/dist/cli.js init --local`). Filter by package name: `pnpm --filter @collected/server …`, `pnpm --filter collected-cli …`.
 
 ## Running the checks
 
