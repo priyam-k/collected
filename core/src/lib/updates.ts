@@ -4,6 +4,7 @@ import type { AppContext } from '../context.js';
 import { entriesNewerThan, parseChangelog } from './changelog.js';
 import { MB, readText, withTimeout } from './http.js';
 import { getSetting, setSetting } from './settings.js';
+import { MIN_CLIENT_VERSION } from './version.js';
 
 /** Where the last result lives across restarts. Written only by this module; the settings route refuses `system.*`. */
 export const UPDATE_SETTING_KEY = 'system.update';
@@ -28,7 +29,7 @@ export function matchesUpdateAllowList(filename: string): boolean {
 }
 
 export function systemVersion(ctx: AppContext): SystemVersion {
-  return { version: ctx.version, commit: ctx.build.commit, builtAt: ctx.build.builtAt, repo: ctx.env.UPSTREAM_REPO };
+  return { version: ctx.version, commit: ctx.build.commit, builtAt: ctx.build.builtAt, repo: ctx.env.UPSTREAM_REPO, minClient: MIN_CLIENT_VERSION };
 }
 
 /** What is persisted: everything in UpdateStatus except `current` and `steps`, which come from the running process. */

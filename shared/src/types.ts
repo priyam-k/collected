@@ -548,6 +548,8 @@ export interface SystemVersion {
   builtAt: string | null;
   /** "owner/name" of the upstream GitHub repository the update check compares against. */
   repo: string;
+  /** The oldest collected-cli this server talks to (core/src/lib/version.ts MIN_CLIENT_VERSION); same major is otherwise compatible. */
+  minClient: string;
 }
 
 /** One CHANGELOG.md section. `level` says whether pulling it is worth a self-hoster's time. */

@@ -7,6 +7,7 @@ import { accessAuth, verifyAccess, type AuthVariables } from '../auth/cloudflare
 import type { AppContext } from '../context.js';
 import { MB } from '@collected/core/lib/http';
 import { createUpdateChecker, type UpdateChecker } from '@collected/core/lib/updates';
+import { MIN_CLIENT_HEADER, MIN_CLIENT_VERSION, VERSION_HEADER } from '@collected/core/lib/version';
 import { authRoutes } from './auth.js';
 import { calendarRoutes } from './calendar.js';
 import { canvasRoutes } from './canvas.js';
@@ -75,6 +76,14 @@ export function crossSite(headers: { origin?: string; secFetchSite?: string }, p
 export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; google?: GoogleRouteOptions } = {}) {
   const updates = deps.updates ?? createUpdateChecker(ctx);
   const api = new Hono<{ Variables: AuthVariables }>();
+
+  // Every answer, a 401 or a 404 included, says which server this is and the oldest CLI it talks to, so the CLI can
+  // compare versions off whatever request it was making anyway (agent/src/skew.ts) with no round trip of its own.
+  api.use('*', async (c, next) => {
+    await next();
+    c.res.headers.set(VERSION_HEADER, ctx.version);
+    c.res.headers.set(MIN_CLIENT_HEADER, MIN_CLIENT_VERSION);
+  });
 
   // Two paths skip Access: the Canvas cookie drop-off authenticates itself (helper key or Access), and the health
   // probe is what Docker's HEALTHCHECK calls from inside the container with no JWT. Externally both still sit

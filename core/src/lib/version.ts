@@ -3,6 +3,20 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { BuildInfo } from '../context.js';
 
+/**
+ * The oldest `collected-cli` this server still talks to. The server advertises it in `GET /api/system/version` and in
+ * the `X-Collected-Min-Client` header next to `X-Collected-Version` on every `/api/*` answer; a CLI below it, or on
+ * another major, refuses to run against the server and says to upgrade (agent/src/skew.ts). Raise it only when an API
+ * change breaks older CLIs (a route or field an old command depends on is removed or changes meaning), never for a
+ * release that merely adds something: raising it is a breaking change for everyone who installed the CLI, and it goes
+ * in the changelog as one (docs/releasing.md). Same major = compatible is the rule the CLI applies when this is absent.
+ */
+export const MIN_CLIENT_VERSION = '1.2.0';
+
+/** The response headers every `/api/*` answer carries (server/src/api/index.ts); the CLI reads them off any request it makes. */
+export const VERSION_HEADER = 'X-Collected-Version';
+export const MIN_CLIENT_HEADER = 'X-Collected-Min-Client';
+
 export interface BuildInfoSources {
   /** The COLLECTED_COMMIT env the Dockerfile sets. */
   fromEnv?: string | undefined;
