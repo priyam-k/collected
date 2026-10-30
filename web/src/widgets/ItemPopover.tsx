@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useId, useSyncExternalStore, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Check, ExternalLink, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { friendlyDate } from '@/lib/time';
 import { safeColor } from '@/lib/color';
 import { safeHref } from '@/lib/url';
 import { cn } from '@/lib/utils';
+import { closeItemPopover, readOpenItemPopover, setOpenItemPopover, subscribeOpenItemPopover } from './itemPopoverStore';
 
 /** Canvas descriptions are HTML: text with paragraph breaks kept and the common entities decoded. */
 export function stripHtml(s: string): string {
@@ -138,9 +139,17 @@ export function ItemDetails({ item, onClose }: { item: EffectiveItem; onClose?: 
   );
 }
 
-/** Wraps any element: click opens the item's details beside it instead of jumping to the source. */
+/**
+ * Wraps any element: click opens the item's details beside it instead of jumping to the source. One item popover is
+ * open at a time across the dashboard (`itemPopoverStore`): opening this one closes whichever was open, clicking the
+ * open one again closes it, and Escape or a click outside close it as the primitive does.
+ */
 export function ItemPopover({ item, children, className, side = 'bottom', align = 'start' }: { item: EffectiveItem; children: ReactNode; className?: string; side?: 'top' | 'bottom' | 'left' | 'right'; align?: 'start' | 'center' | 'end' }) {
-  const [open, setOpen] = useState(false);
+  const key = useId();
+  const open = useSyncExternalStore(subscribeOpenItemPopover, readOpenItemPopover, () => null) === key;
+  const setOpen = (next: boolean) => (next ? setOpenItemPopover(key) : closeItemPopover(key));
+  // A row that unmounts while open (the list refetched, the view changed) must not leave the store pointing at it.
+  useEffect(() => () => closeItemPopover(key), [key]);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -148,7 +157,16 @@ export function ItemPopover({ item, children, className, side = 'bottom', align 
           {children}
         </button>
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className="w-80" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent
+        side={side}
+        align={align}
+        className="w-80"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        // Closed because another popover opened: leave focus with the new one's trigger instead of pulling it back here.
+        onCloseAutoFocus={(e) => {
+          if (readOpenItemPopover() !== null) e.preventDefault();
+        }}
+      >
         <ItemDetails item={item} onClose={() => setOpen(false)} />
       </PopoverContent>
     </Popover>

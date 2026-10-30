@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- Item popovers: one open at a time across the dashboard. Clicking event after event in the calendar used to leave each one's popover open, stacked on the last; now opening an item's details (in the calendar views, the to-do list, the course pane, anywhere a row opens one) closes whichever was open, clicking the open item again closes it, and Escape and a click outside still close it. The one that closes because another opened does not pull focus back to its row.
 - Calendar: the Week view's time grid covers the whole day, 12 AM to midnight, instead of 7 AM to 11 PM, so the now line is always on it and nothing early or late is cut off. Hours keep their height and the grid scrolls inside the widget; it opens with the current time about a third of the way down, or at 7 AM on a week without today.
 
 ## 1.2.5 — 2026-10-30 · optional
