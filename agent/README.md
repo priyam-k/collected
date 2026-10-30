@@ -40,6 +40,18 @@ collected courses                                 # proves the connection
 
 `init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas` reads the Canvas session from your browser and hands it to the server; the fallback is pasting the cookie in Settings → Sources.
 
+### Which browsers `connect canvas` can read
+
+Firefox keeps its cookies in the clear, so it works everywhere. Chromium browsers encrypt theirs with a key the operating system guards, and whether a program running as you can get that key depends on the platform. `--browser <name>` picks one (`chrome`, `brave`, `edge`, `arc`, `chromium`, `firefox`); without it they are tried in that order. When nothing is found, the error lists every browser: not installed, how many profiles had no cookie for the host, or why the store could not be read.
+
+| | Firefox | Chrome, Edge, Brave, Chromium | Arc |
+|---|---|---|---|
+| macOS | yes | yes: the Keychain asks once for the "Safe Storage" password; click Allow | yes |
+| Windows | yes (`%APPDATA%\Mozilla\Firefox\Profiles`) | usually no: since Chrome 127 and the matching Edge, cookies are app-bound, which only the browser itself can decrypt. The command says so; paste the cookie in Settings → Sources instead | no |
+| Linux | yes (`~/.mozilla/firefox`, the snap and flatpak sandboxes too) | only with the basic password store (`--password-store=basic`, or no desktop keyring); with GNOME Keyring or KWallet the key is read through `secret-tool` when that works, otherwise the command says the store is locked | no |
+
+Pasting always works: DevTools → Application → Cookies → your Canvas domain, copy `canvas_session=…` (older instances: `_normandy_session`) into the Canvas card. The Canvas address field accepts a bare host or any page address from that Canvas.
+
 No server at all? See [Local mode](#local-mode).
 
 ## Local mode
