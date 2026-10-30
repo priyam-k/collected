@@ -403,7 +403,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
           >
             <div className="flex min-w-0">
               {/* The native arrow sits at a fixed inset and ignores padding, so the select is drawn bare and the chevron is ours. */}
-              <div className="relative shrink-0">
+              <div className="relative flex shrink-0">
                 <select
                   aria-label="Cookie name"
                   className="h-9 appearance-none rounded-l-xl border border-r-0 border-line2 bg-surface pl-3 pr-8 font-mono text-[12px] text-sub outline-none hover:text-ink focus-visible:relative focus-visible:z-10 focus-visible:shadow-[var(--focus-ring)]"
@@ -416,7 +416,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
                     </option>
                   ))}
                 </select>
-                <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-sub" />
+                <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 z-20 size-3.5 -translate-y-1/2 text-sub" />
               </div>
               <Input
                 aria-label="Cookie value"
