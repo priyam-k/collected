@@ -289,20 +289,25 @@ function RunIt() {
   );
 }
 
+/**
+ * The foot of the page: a tall band with the logo, in characters, across its full width, assembling as the page runs
+ * out. The headline card floats over it, at the top on a wide screen with the art below, under the art on a phone.
+ */
 function Closing() {
   const signedIn = isSignedIn(useMe().data);
+  const card = useRef<HTMLDivElement>(null);
   return (
-    <section className="px-3 pb-24 pt-4 sm:px-6">
-      <Reveal className="surface relative mx-auto max-w-[1240px] overflow-hidden rounded-[32px]">
-        {/* The logo, in characters, stacking up from the bottom as the card scrolls into view. */}
-        <AsciiLogo className="absolute inset-0 size-full text-ink opacity-[0.24] dark:text-ink-muted dark:opacity-[0.42]" />
-        <div className="relative flex min-h-[300px] flex-col justify-center px-7 pb-[calc(46vw+24px)] pt-10 sm:min-h-[340px] sm:px-12 sm:py-12 lg:px-14">
-          <h2 className="text-[clamp(32px,4.2vw,54px)] font-[650] leading-[1.02] tracking-[-0.04em]">
+    <section className="relative isolate flex flex-col items-center px-4 pb-8 pt-[72px] sm:min-h-[max(560px,calc(100svh-7.5rem))] sm:px-6 sm:pb-4 sm:pt-[84px]">
+      <AsciiLogo clear={card} className="absolute inset-0 -z-10 size-full text-ink opacity-30 dark:text-ink-muted dark:opacity-55" />
+      <div aria-hidden className="order-1 h-[64vw] w-full shrink-0 sm:order-2 sm:h-auto sm:min-h-[220px] sm:flex-1" />
+      <div ref={card} className="relative order-2 w-full max-w-[540px] sm:order-1">
+        <Reveal className="surface rounded-[28px] px-7 py-8 text-center sm:px-10">
+          <h2 className="text-[clamp(28px,3.2vw,42px)] font-[650] leading-[1.04] tracking-[-0.04em]">
             Put the whole semester
             <br />
             <span className="text-sub">on one board.</span>
           </h2>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg" className="h-12 px-6 text-[15px]">
               <Link to={signedIn ? DASHBOARD : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
             </Button>
@@ -312,8 +317,8 @@ function Closing() {
               </a>
             </Button>
           </div>
-        </div>
-      </Reveal>
+        </Reveal>
+      </div>
     </section>
   );
 }

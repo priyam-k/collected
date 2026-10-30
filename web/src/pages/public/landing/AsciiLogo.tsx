@@ -1,16 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { cn } from '@/lib/utils';
 import { reducedMotion } from './motion';
 
 /**
- * The logo mark and "collected." drawn in light characters, filling the closing card's background. The art is
- * rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to a
- * sparse ramp) and drawn to one canvas. As the card scrolls in, glyphs drop a few rows into place, the columns filling
- * in from both sides toward the middle and each column stacking bottom first, each glyph a little early or late.
- * Progress runs 0 when the card's top enters the viewport to 1 when its bottom is in view, so at the foot of the page
- * the art is whole; the assembly starts once the art's top row is on screen, so none of it happens out of sight.
- * The art sits centred behind the copy on a wide card; on a phone it is stacked, in a band under the buttons.
- * One draw per animation frame, only while the card is on screen.
+ * The logo mark and "collected." drawn in light characters across the full width of the page's closing band. The art
+ * is rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to
+ * a sparse ramp) and drawn to one canvas that covers the band. It is placed in the band's open space, on whichever
+ * side of the `clear` element (the headline card) has more room: below it on a wide screen, the mark beside the word
+ * and the word about two thirds of the width; above it on a phone, the mark over the word, filling the width.
+ * As the band scrolls in, glyphs drop a few rows into place, the columns filling in from both sides toward the middle
+ * and each column stacking bottom first, each glyph a little early or late. Progress runs 0 when the band's top
+ * enters the viewport to 1 at the very bottom of the page, so the art is whole only there; the assembly starts once
+ * the art's top row is on screen, so none of it happens out of sight.
+ * One draw per animation frame, only while the band is on screen. Reduced motion draws it whole, once.
  * Colour and opacity come from CSS (`color`, `opacity`), so it follows the theme. Decorative (aria-hidden).
  */
 
@@ -34,12 +36,15 @@ function hash(x: number, y: number, k = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
+/** A band of the canvas, in CSS pixels from its top, that the art is centred in. */
+type Region = { y0: number; y1: number };
+
 /**
  * The mark (on its 32 grid, as in Logo.tsx) and the wordmark, in the proportions of <Logo>: the word at m / 1.3, a
- * 0.35m gap. Side by side and centred on a wide card; on a narrow one stacked, mark over word, in the band below the
- * copy (the card leaves room for it), since a single row would leave the letters too few cells to read.
+ * 0.35m gap. Side by side on a wide screen, the word about two thirds of the width; stacked, mark over word, on a
+ * phone, since a single row would leave the letters too few cells to read. `region` is in raster pixels.
  */
-function rasterise(cols: number, rows: number, stacked: boolean): Float32Array {
+function rasterise(cols: number, rows: number, stacked: boolean, region: Region): Float32Array {
   const W = cols * S;
   const H = rows * SY;
   const cov = new Float32Array(cols * rows);
@@ -58,11 +63,15 @@ function rasterise(cols: number, rows: number, stacked: boolean): Float32Array {
   const t100 = setFont(100);
   const wordW = t100.width / 100;
   const wordH = (t100.actualBoundingBoxAscent + t100.actualBoundingBoxDescent) / 100;
-  const fs = stacked ? Math.min((W * 0.86) / wordW, (H * 0.86) / (1.3 * 1.2 + wordH)) : Math.min((W * 0.94) / (1.3 * 1.35 + wordW), (H * 0.74) / 1.3);
+  const RH = Math.max(SY, region.y1 - region.y0);
+  const fs = stacked
+    ? Math.min((W * 0.88) / wordW, (RH * 0.92) / (1.3 * 1.2 + wordH))
+    : Math.min((W * 0.66) / wordW, (W * 0.94) / (1.3 * 1.35 + wordW), (RH * 0.94) / 1.3);
   const m = fs * 1.3;
   const tm = setFont(fs);
   const asc = tm.actualBoundingBoxAscent;
   const desc = tm.actualBoundingBoxDescent;
+  const cy = (region.y0 + region.y1) / 2;
   let mx: number;
   let my: number;
   let wx: number;
@@ -70,13 +79,13 @@ function rasterise(cols: number, rows: number, stacked: boolean): Float32Array {
   if (stacked) {
     const total = m * 1.2 + asc + desc;
     mx = (W - m) / 2;
-    my = H - total - SY * 3;
+    my = cy - total / 2;
     wx = (W - tm.width) / 2;
     wy = my + m * 1.2 + asc;
   } else {
     // The word's ink box centred on the mark, as the flex row in <Logo> does.
     mx = (W - (m * 1.35 + tm.width)) / 2;
-    my = (H - m) / 2;
+    my = cy - m / 2;
     wx = mx + m * 1.35;
     wy = my + m / 2 + (asc - desc) / 2;
   }
@@ -107,9 +116,10 @@ function rasterise(cols: number, rows: number, stacked: boolean): Float32Array {
 
 /**
  * Coverage to glyphs, with each glyph's start time (as scroll progress): the sides before the middle, within a column
- * the bottom before the top, and some scatter. Nothing starts before the art's top row is in view.
+ * the bottom before the top, and some scatter. Nothing starts before the art's top row is in view; `share` is the
+ * canvas's part of the whole scroll run (the band, then whatever of the page lies below it).
  */
-function glyphs(cov: Float32Array, cols: number, rows: number): Glyph[] {
+function glyphs(cov: Float32Array, cols: number, rows: number, share: number): Glyph[] {
   const out: Glyph[] = [];
   const top = RAMP.length - 1;
   let r0 = rows;
@@ -124,7 +134,7 @@ function glyphs(cov: Float32Array, cols: number, rows: number): Glyph[] {
         q0 = Math.min(q0, q);
         q1 = Math.max(q1, q);
       }
-  const start = Math.min(0.5, r0 / Math.max(1, rows));
+  const start = Math.min(0.6, (r0 / Math.max(1, rows)) * share);
   const span = 0.99 - FALL - start;
   const mid = (q0 + q1) / 2;
   const half = Math.max(1, (q1 - q0) / 2);
@@ -143,7 +153,7 @@ function glyphs(cov: Float32Array, cols: number, rows: number): Glyph[] {
 }
 
 
-export function AsciiLogo({ className }: { className?: string }) {
+export function AsciiLogo({ className, clear }: { className?: string; clear?: RefObject<HTMLElement | null> }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -169,11 +179,25 @@ export function AsciiLogo({ className }: { className?: string }) {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
-      // About 160 cells across a desktop card; phones keep cells small enough that the word still reads.
-      cw = Math.max(3.8, Math.min(8, W / 160));
+      // About 190 cells across a desktop window; phones keep cells small enough that the word still reads.
+      cw = Math.max(3.8, Math.min(10, W / 190));
       cols = Math.floor(W / cw);
       rows = Math.floor(H / (cw * R));
-      art = glyphs(rasterise(cols, rows, window.innerWidth < 640), cols, rows);
+      // The open side of the band: below the card when it sits high, above it when it sits low. Offsets, not the
+      // card's client rect, so its reveal translate does not move the art.
+      const card = clear?.current;
+      const pad = cw * R * 1.5;
+      let region: Region = { y0: pad, y1: H - pad };
+      if (card) {
+        const top = card.offsetTop;
+        const bottom = top + card.offsetHeight;
+        region = H - bottom >= top ? { y0: bottom + pad, y1: H - pad } : { y0: pad, y1: top - pad };
+      }
+      const scale = S / cw;
+      const cov = rasterise(cols, rows, window.innerWidth < 640, { y0: region.y0 * scale, y1: region.y1 * scale });
+      const box = canvas.getBoundingClientRect();
+      const below = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + box.bottom));
+      art = glyphs(cov, cols, rows, H / (H + below));
       drawn = -1;
     };
 
@@ -207,10 +231,11 @@ export function AsciiLogo({ className }: { className?: string }) {
       ctx.globalAlpha = 1;
     };
 
+    // 0 as the band's top enters the viewport, 1 when the page can scroll no further.
     const progress = () => {
-      const box = (canvas.parentElement ?? canvas).getBoundingClientRect();
-      const vh = window.innerHeight;
-      return Math.max(0, Math.min(1, (vh - box.top) / Math.max(1, box.height)));
+      const top = canvas.getBoundingClientRect().top;
+      const run = document.documentElement.scrollHeight - (window.scrollY + top);
+      return Math.max(0, Math.min(1, (window.innerHeight - top) / Math.max(1, run)));
     };
 
     let raf = 0;
@@ -263,6 +288,6 @@ export function AsciiLogo({ className }: { className?: string }) {
       mo.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [clear]);
   return <canvas ref={ref} aria-hidden className={cn('pointer-events-none block', className)} />;
 }
