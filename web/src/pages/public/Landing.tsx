@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowDown, ArrowRight, Bot, Briefcase, CalendarDays, ClipboardCheck, Database, GraduationCap, Laptop, ListChecks, ListTodo, MousePointerClick, Server, ShieldCheck } from 'lucide-react';
-import { AsciiOrb } from '@/components/AsciiOrb';
+import { ArrowDown, ArrowRight, Bot, Briefcase, CalendarDays, ClipboardCheck, Database, GraduationCap, Laptop, ListChecks, ListTodo, MousePointerClick, Server, ShieldCheck, SquareTerminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoBoard } from '@/demo/DemoBoard';
 import { isSignedIn, useMe } from '@/lib/queries';
 import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { AgentPrompt } from './landing/AgentPrompt';
+import { AsciiLogo } from './landing/AsciiLogo';
 import { Bento } from './landing/Bento';
 import { DotField } from './landing/DotField';
 import { Hub } from './landing/Hub';
@@ -138,7 +138,7 @@ function DemoShowcase() {
       </div>
       <Reveal className="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-center text-[13.5px] text-sub">
         <span className="flex items-center gap-1.5">
-          <MousePointerClick className="size-4" strokeWidth={1.7} /> It is the real dashboard. Press Edit to drag and resize cards, check things off, open a course.
+          <MousePointerClick className="size-4" strokeWidth={1.7} /> This is the actual dashboard, running on sample data. Drag and resize cards in Edit, check things off, open a course.
         </span>
         <span className="text-ter">Nothing is saved; reload to reset.</span>
         <Link to="/demo" className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">
@@ -150,7 +150,8 @@ function DemoShowcase() {
 }
 
 function Agents() {
-  const harnesses = ['Claude Code', 'Codex', 'Gemini CLI', 'Cursor', 'a cron job'];
+  const harnesses = ['Claude Code', 'Codex', 'Gemini CLI', 'Cursor'];
+  const chip = 'flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium';
   return (
     <section className="px-5 py-24 sm:py-32">
       <div id="agents" className="mx-auto grid max-w-6xl scroll-mt-28 items-center gap-12 lg:grid-cols-[1fr_1.15fr]">
@@ -162,13 +163,18 @@ function Agents() {
             announcements, the job tracker. Add <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[14px] text-ink">--json</code> and any agent that can run a shell command can plan your week
             with you.
           </p>
-          <ul className="mt-7 flex flex-wrap gap-2">
+          <ul className="mt-7 flex flex-wrap gap-2" aria-label="Works with">
             {harnesses.map((h) => (
-              <li key={h} className="flex h-8 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium shadow-[var(--shadow-card)]">
-                {h === 'a cron job' ? null : <Bot className="size-3.5 text-sub" strokeWidth={1.8} />}
+              <li key={h} className={cn(chip, 'bg-surface shadow-[var(--shadow-card)]')}>
+                <Bot className="size-3.5 text-sub" strokeWidth={1.8} />
                 {h}
               </li>
             ))}
+            {/* The catch-all: an outline chip, so it reads as "or anything else", not a fifth product. */}
+            <li className={cn(chip, 'border border-dashed border-line-strong text-sub')}>
+              <SquareTerminal className="size-3.5" strokeWidth={1.8} />
+              or anything with a shell
+            </li>
           </ul>
         </Reveal>
         <Reveal delay={100} className="relative">
@@ -286,9 +292,11 @@ function RunIt() {
 function Closing() {
   const signedIn = isSignedIn(useMe().data);
   return (
-    <section className="px-5 pb-24 pt-4">
-      <Reveal className="surface mx-auto grid max-w-6xl items-center gap-10 overflow-hidden rounded-[32px] p-8 sm:p-12 lg:grid-cols-[1.2fr_1fr]">
-        <div>
+    <section className="px-3 pb-24 pt-4 sm:px-6">
+      <Reveal className="surface relative mx-auto max-w-[1240px] overflow-hidden rounded-[32px]">
+        {/* The logo, in characters, stacking up from the bottom as the card scrolls into view. */}
+        <AsciiLogo className="absolute inset-0 size-full text-ink opacity-[0.24] dark:text-ink-muted dark:opacity-[0.42]" />
+        <div className="relative flex min-h-[300px] flex-col justify-center px-7 pb-[calc(46vw+24px)] pt-10 sm:min-h-[340px] sm:px-12 sm:py-12 lg:px-14">
           <h2 className="text-[clamp(32px,4.2vw,54px)] font-[650] leading-[1.02] tracking-[-0.04em]">
             Put the whole semester
             <br />
@@ -304,9 +312,6 @@ function Closing() {
               </a>
             </Button>
           </div>
-        </div>
-        <div className="hidden h-[260px] place-items-center rounded-[24px] bg-well lg:grid">
-          <AsciiOrb className="h-[230px] w-[300px]" />
         </div>
       </Reveal>
     </section>
