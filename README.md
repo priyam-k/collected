@@ -63,10 +63,10 @@ Three ways, from least to most setup.
 
 ### On your laptop
 
-Needs Node 22.12 or newer and nothing else.
+Needs Node 22.12 or newer and nothing else. With Homebrew on macOS or Linux, `brew install priyam-k/collected/collected-cli` brings its own Node; otherwise `npm i -g collected-cli`.
 
 ```sh
-npm i -g collected-cli
+brew install priyam-k/collected/collected-cli   # or: npm i -g collected-cli
 collected init --local                # no server: a SQLite database in ~/.collected/data
 collected connect canvas              # reads your Canvas session cookie from the browser you are signed in with, and syncs
 collected connect google calendar     # Google's consent screen in your browser; no Google Cloud project
@@ -120,7 +120,7 @@ The backend lives in `core/` (database, ingesters, syncs, scheduler); `server/` 
 ## CLI and file sync
 
 ```sh
-npm i -g collected-cli
+brew install priyam-k/collected/collected-cli   # or: npm i -g collected-cli
 collected init --local                          # the whole app on this machine; or: collected init https://collected.example.com && collected login
 collected connect canvas                        # reads the Canvas session cookie from your browser (into the local database, or posted to your server); --token prompts for an access token instead, if your school allows them
 collected files link cs101 ~/School/CS101       # where this course's files should land
@@ -129,7 +129,7 @@ collected agenda                                # what is due this week (`--fres
 collected help
 ```
 
-The same commands work in local mode and against a server; in local mode `collected ui` is the dashboard and `collected sync <source|all>` runs a source sync in-process. The server (or the local database) stores only the *names* of your target folders; the paths live in `~/.collected/agent.json` on your machine. Nothing the server says can make the CLI write outside a folder you linked, and a file you edited after it was placed is never overwritten. `collected --version` prints the version and `collected upgrade` installs the newest one with whatever installed this one. Details and every command: [`agent/README.md`](agent/README.md).
+The same commands work in local mode and against a server; in local mode `collected ui` is the dashboard and `collected sync <source|all>` runs a source sync in-process. The server (or the local database) stores only the *names* of your target folders; the paths live in `~/.collected/agent.json` on your machine. Nothing the server says can make the CLI write outside a folder you linked, and a file you edited after it was placed is never overwritten. `collected --version` prints the version and `collected upgrade` installs the newest one with whatever installed this one, Homebrew included. Details and every command: [`agent/README.md`](agent/README.md).
 
 ## For AI agents
 

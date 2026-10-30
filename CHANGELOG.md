@@ -7,6 +7,8 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+- Homebrew: `brew install priyam-k/collected/collected-cli`; `collected upgrade` runs `brew upgrade` for that install.
+
 ## 1.3.0 — 2026-10-30 · recommended
 
 - Canvas: the cookie field takes just the value, with the cookie name picked from a list.

@@ -6,10 +6,21 @@ The dashboard reads are the same data the web app shows (assignments, agenda, gr
 
 ## Install
 
-Needs Node 22.12 or newer and nothing else: the package carries the whole app for local mode (the backend, the database migrations, the demo fixtures and the built dashboard), so a machine with Node is a machine that can run collected.
+On macOS and Linux with [Homebrew](https://brew.sh), the tap installs the CLI and the Node it needs:
+
+```sh
+brew install priyam-k/collected/collected-cli
+```
+
+Anywhere with Node 22.12 or newer, npm does the same and nothing else is needed: the package carries the whole app for local mode (the backend, the database migrations, the demo fixtures and the built dashboard), so a machine with Node is a machine that can run collected.
 
 ```sh
 npm i -g collected-cli
+```
+
+Then:
+
+```sh
 collected init --local                 # no server: a SQLite database in ~/.collected/data
 collected demo canvas                  # something to look at
 collected ui                           # the dashboard at http://127.0.0.1:4848
@@ -19,7 +30,7 @@ Or, against your own server, `collected init https://collected.example.com` (see
 
 ### Upgrading
 
-`collected --version` prints the installed version. `collected upgrade` installs the newest one with whatever installed this one: it reads the running script's path to tell a global npm install (`npm install -g collected-cli@latest`; nvm, volta, fnm and Homebrew's node all count) from a pnpm global (`pnpm add -g collected-cli@latest`) or a bun global (`bun add -g collected-cli@latest`), asks npm which version it is about to install, prints the command, and runs it with your terminal attached; afterwards it prints the new version. `--dry-run` prints without running. When it cannot tell how the CLI was installed (a project-local `node_modules`, the `npx` cache, a checkout of the repository) it prints the npm command and exits 1, and you run the right one yourself.
+`collected --version` prints the installed version. `collected upgrade` installs the newest one with whatever installed this one: it reads the running script's path to tell a Homebrew install (`brew upgrade collected-cli`) from a global npm install (`npm install -g collected-cli@latest`; nvm, volta, fnm and Homebrew's node all count), a pnpm global (`pnpm add -g collected-cli@latest`) or a bun global (`bun add -g collected-cli@latest`), asks npm which version it is about to install, prints the command, and runs it with your terminal attached; afterwards it prints the new version. `--dry-run` prints without running. When it cannot tell how the CLI was installed (a project-local `node_modules`, the `npx` cache, a checkout of the repository) it prints the npm command and exits 1, and you run the right one yourself.
 
 Once a day, at most, a command may end with one line on stderr such as
 

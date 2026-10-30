@@ -2,6 +2,11 @@
 #
 # Needs, on the repo:
 #   secrets COLLECTED_GOOGLE_DESKTOP_CLIENT_ID / _SECRET  the Desktop-app OAuth client the CLI's local mode ships (SETUP.md Google step 9)
+#   secret  HOMEBREW_TAP_TOKEN (optional)                 a fine-grained PAT that lets the `brew` job push the formula to the tap
+#                                                         priyam-k/homebrew-collected: resource owner priyam-k, repository access
+#                                                         "Only select repositories" → homebrew-collected, repository permission
+#                                                         Contents: Read and write, nothing else. Without it the publish still
+#                                                         happens and the `brew` job prints what to do instead of failing.
 #
 # No npm token: the package trusts this workflow (npmjs.com → collected-cli → Settings → Trusted publishers: GitHub
 # Actions, priyam-k/collected, release.yml, no environment, publish allowed). pnpm exchanges the job's OIDC token for a
@@ -61,3 +66,57 @@ jobs:
         run: node scripts/smoke-cli-package.mjs
 
       - run: pnpm --filter collected-cli publish --no-git-checks --provenance --access public
+
+  # Points the Homebrew tap (priyam-k/homebrew-collected, `brew install priyam-k/collected/collected-cli`) at the version
+  # just published. The formula's template lives here in homebrew/Formula/collected-cli.rb; scripts/bump-formula.mjs
+  # rewrites its url and sha256 from the tarball the registry serves (the registry lags a publish, so it waits up to
+  # five minutes), and the result is committed to the tap as "collected-cli <version>". The template in this repo is not
+  # committed back; run the script locally when you want it to catch up. Only the publish needs the OIDC token, so this
+  # job has none.
+  brew:
+    needs: publish
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Point the formula at the published tarball
+        run: node scripts/bump-formula.mjs "${GITHUB_REF_NAME#cli-v}" --wait 300
+      - name: Push the formula to the tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAP_REPO: priyam-k/homebrew-collected
+        run: |
+          version="${GITHUB_REF_NAME#cli-v}"
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set, so the tap $TAP_REPO was not updated to $version."
+            echo "Create a fine-grained PAT (resource owner priyam-k, only $TAP_REPO, Contents: Read and write), store it as"
+            echo "the repository secret HOMEBREW_TAP_TOKEN, and re-run this job; or by hand: node scripts/bump-formula.mjs $version,"
+            echo "then copy homebrew/Formula/collected-cli.rb and homebrew/README.md into the tap and commit."
+            exit 0
+          fi
+          # The token travels in a header git reads from config, never on the command line or in the remote URL.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$HOMEBREW_TAP_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$auth" clone --quiet "https://github.com/$TAP_REPO.git" tap
+          cd tap
+          git config "http.https://github.com/.extraheader" "$auth"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # A tap created empty has no branch yet; a tap with history is on its default branch. Either way: main.
+          git checkout -B main
+          mkdir -p Formula
+          cp ../homebrew/Formula/collected-cli.rb Formula/collected-cli.rb
+          cp ../homebrew/README.md README.md
+          git add Formula/collected-cli.rb README.md
+          if git diff --cached --quiet; then
+            echo "the tap already names collected-cli $version; nothing to push"
+            exit 0
+          fi
+          git commit --quiet -m "collected-cli $version"
+          git push --quiet origin HEAD:main
+          echo "pushed collected-cli $version to $TAP_REPO"
