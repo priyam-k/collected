@@ -290,34 +290,32 @@ function RunIt() {
 }
 
 /**
- * The foot of the page: a tall band with the logo, in characters, edge to edge across the full width, assembling as
- * the page runs out. The headline card floats over the middle of the art, which shows faintly through its edges.
+ * The foot of the page, a sign-off: the headline and the two ways on, plain on the page ground with room around them,
+ * then the logo in characters as a band edge to edge across the full width, assembling as the page runs out and
+ * running straight into the footer.
  */
 function Closing() {
   const signedIn = isSignedIn(useMe().data);
-  const card = useRef<HTMLDivElement>(null);
   return (
-    <section className="relative isolate flex min-h-[max(500px,140vw)] flex-col items-center justify-center px-4 py-16 sm:min-h-[max(560px,calc(100svh-7.5rem),26vw)] sm:px-6 sm:py-20">
-      <AsciiLogo center={card} className="absolute inset-0 -z-10 size-full text-ink opacity-30 dark:text-ink-muted dark:opacity-55" />
-      <div ref={card} className="relative w-full max-w-[540px]">
-        <Reveal className="surface closing-card rounded-[28px] px-7 py-8 text-center sm:px-10">
-          <h2 className="text-[clamp(28px,3.2vw,42px)] font-[650] leading-[1.04] tracking-[-0.04em]">
-            Put the whole semester
-            <br />
-            <span className="text-sub">on one board.</span>
-          </h2>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="h-12 px-6 text-[15px]">
-              <Link to={signedIn ? DASHBOARD : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 px-6 text-[15px]">
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">
-                View on GitHub
-              </a>
-            </Button>
-          </div>
-        </Reveal>
-      </div>
+    <section>
+      <Reveal className="px-5 py-20 text-center sm:py-24">
+        <h2 className="text-[clamp(30px,3.6vw,48px)] font-[650] leading-[1.04] tracking-[-0.04em]">
+          Put the whole semester
+          <br />
+          <span className="text-sub">on one board.</span>
+        </h2>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Button asChild size="lg" className="h-12 px-6 text-[15px]">
+            <Link to={signedIn ? DASHBOARD : '/signin'}>{signedIn ? 'Open dashboard' : 'Sign in'}</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="h-12 px-6 text-[15px]">
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+              View on GitHub
+            </a>
+          </Button>
+        </div>
+      </Reveal>
+      <AsciiLogo className="h-[118vw] w-full text-ink opacity-30 sm:h-[17vw] dark:text-ink-muted dark:opacity-55" />
     </section>
   );
 }

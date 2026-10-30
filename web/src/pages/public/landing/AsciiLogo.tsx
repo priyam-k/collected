@@ -1,13 +1,14 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { reducedMotion } from './motion';
 
 /**
- * The logo mark and "collected." drawn in light characters across the page's closing band, edge to edge. The art is
- * rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to a
- * sparse ramp) and drawn to one canvas that covers the band. It is centred vertically on the `center` element (the
- * headline card), which floats over it: on a wide screen the mark at the left edge and the word across the rest, about
- * four fifths of the width; on a phone the mark over the word, the word filling the width.
+ * The logo mark and "collected." drawn in light characters as the band at the foot of the page, edge to edge. The art
+ * is rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to
+ * a sparse ramp) and drawn to one canvas. The canvas sizes its own height to the art: its width sets the cell size,
+ * the cell size sets the rows, so the band is as tall as the logo plus a little air and nothing more. On a wide screen
+ * the mark sits at the left edge and the word runs across the rest, about four fifths of the width; on a phone the
+ * mark sits over the word, the word filling the width.
  * As the band scrolls in, glyphs drop a few rows into place, the columns filling in from both sides toward the middle
  * and each column stacking bottom first, each glyph a little early or late. Progress runs 0 when the band's top
  * enters the viewport to 1 at the very bottom of the page, so the art is whole only there; the assembly starts once
@@ -27,6 +28,11 @@ const S = 4;
 const SY = S * R;
 /** Each glyph's fall lasts this share of the scroll. */
 const FALL = 0.12;
+/** Cells across the band on a desktop window: the word's lowercase letters come out about 19 cells high. */
+const ACROSS = 285;
+/** Empty rows above the art (room for the first glyphs to fall from) and below it. */
+const PAD_TOP = 3;
+const PAD_BOTTOM = 1;
 
 type Glyph = { x: number; y: number; ch: string; t0: number; jx: number };
 
@@ -36,56 +42,55 @@ function hash(x: number, y: number, k = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
+const WORD = 'collected.';
+
+/** The wordmark's font at `px`, and its measure. */
+function setFont(ctx: CanvasRenderingContext2D, px: number): TextMetrics {
+  ctx.font = `640 ${px}px ${SANS}`;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${-0.035 * px}px`;
+  return ctx.measureText(WORD);
+}
+
+type Fit = { fs: number; wx: number; asc: number; desc: number; m: number; mx: number; h: number };
+
 /**
- * The mark (on its 32 grid, as in Logo.tsx) and the wordmark, edge to edge. On a wide screen they sit in one row
- * across the whole width: the word's ink about four fifths of it, its final "." a small margin from the right edge,
- * the mark hugging the left margin and taking what is left (a fifth of its size as the gap), centred on the word's ink.
- * On a phone, mark over word: the word across the full width, the mark centred above it at about five sixths of the
- * width. `cy` is the art's vertical centre in raster pixels.
+ * Where the mark (on its 32 grid, as in Logo.tsx) and the wordmark go across a raster `W` wide. On a wide screen they
+ * sit in one row: the word's ink about four fifths of the width, its final "." a small margin from the right edge, the
+ * mark hugging the left margin and taking what is left (a fifth of its size as the gap), centred on the word's ink. On
+ * a phone, mark over word: the word across the full width, the mark centred above it at about five sixths of the
+ * width. `h` is the art's height, mark and word together, in raster pixels.
  */
-function rasterise(cols: number, rows: number, stacked: boolean, cy: number): Float32Array {
-  const W = cols * S;
-  const H = rows * SY;
-  const cov = new Float32Array(cols * rows);
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return cov;
-  const word = 'collected.';
-  const setFont = (px: number) => {
-    ctx.font = `640 ${px}px ${SANS}`;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = `${-0.035 * px}px`;
-    return ctx.measureText(word);
-  };
-  const t100 = setFont(100);
+function fit(ctx: CanvasRenderingContext2D, W: number, stacked: boolean): Fit {
+  const t100 = setFont(ctx, 100);
   // The word's ink, not its advance: the trailing letter spacing would otherwise pull the "." off the edge.
   const inkW = (t100.actualBoundingBoxLeft + t100.actualBoundingBoxRight) / 100;
   const margin = Math.max(S * 2, W * 0.022);
-  const fs = ((stacked ? W - 2 * margin : W * 0.8) / inkW);
-  const tm = setFont(fs);
+  const fs = (stacked ? W - 2 * margin : W * 0.8) / inkW;
+  const tm = setFont(ctx, fs);
   const asc = tm.actualBoundingBoxAscent;
   const desc = tm.actualBoundingBoxDescent;
   // The word's ink box ends at W - margin; wx is its pen position.
   const wx = W - margin - tm.actualBoundingBoxRight;
   const inkLeft = wx - tm.actualBoundingBoxLeft;
-  let m: number;
-  let mx: number;
-  let my: number;
-  let wy: number;
   if (stacked) {
-    m = W * 0.84;
-    const gap = m * 0.16;
-    const total = m + gap + asc + desc;
-    mx = (W - m) / 2;
-    my = cy - total / 2;
-    wy = my + m + gap + asc;
-  } else {
-    m = Math.max(0, (inkLeft - margin) / 1.2);
-    mx = margin;
-    my = cy - m / 2;
-    wy = cy + (asc - desc) / 2;
+    const m = W * 0.84;
+    return { fs, wx, asc, desc, m, mx: (W - m) / 2, h: m * 1.16 + asc + desc };
   }
+  const m = Math.max(0, (inkLeft - margin) / 1.2);
+  return { fs, wx, asc, desc, m, mx: margin, h: Math.max(m, asc + desc) };
+}
+
+/** The art drawn on a raster `cols` by `rows` cells, its top at raster `y0`, and its coverage sampled per cell. */
+function rasterise(ctx: CanvasRenderingContext2D, f: Fit, cols: number, rows: number, stacked: boolean, y0: number): Float32Array {
+  const W = cols * S;
+  const H = rows * SY;
+  const cov = new Float32Array(cols * rows);
+  ctx.canvas.width = W;
+  ctx.canvas.height = H;
+  const { m, mx } = f;
+  const cy = y0 + f.h / 2;
+  const my = stacked ? y0 : cy - m / 2;
+  const wy = stacked ? y0 + m * 1.16 + f.asc : cy + (f.asc - f.desc) / 2;
   const k = m / 32;
   ctx.fillStyle = '#000';
   const rr = (x: number, y: number, w: number, h: number, r: number) => {
@@ -99,7 +104,9 @@ function rasterise(cols: number, rows: number, stacked: boolean, cy: number): Fl
   ctx.beginPath();
   ctx.arc(mx + 23.5 * k, my + 23.5 * k, 6 * k, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillText(word, wx, wy);
+  // Resizing the canvas reset its state, the font with it.
+  setFont(ctx, f.fs);
+  ctx.fillText(WORD, f.wx, wy);
 
   const px = ctx.getImageData(0, 0, W, H).data;
   for (let r = 0; r < rows; r++)
@@ -150,7 +157,7 @@ function glyphs(cov: Float32Array, cols: number, rows: number, share: number): G
 }
 
 
-export function AsciiLogo({ className, center }: { className?: string; center?: RefObject<HTMLElement | null> }) {
+export function AsciiLogo({ className }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -167,24 +174,28 @@ export function AsciiLogo({ className, center }: { className?: string; center?: 
     let art: Glyph[] = [];
     let p = still ? 1 : 0;
     let drawn = -1;
+    let laidW = 0;
     let alive = true;
 
+    const raster = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     const layout = () => {
       W = canvas.clientWidth;
-      H = canvas.clientHeight;
-      if (!W || !H) return;
+      if (!W || !raster) return;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // About 285 cells across a desktop window; phones keep cells large enough to read as characters.
+      cw = Math.max(3.8, Math.min(10, W / ACROSS));
+      cols = Math.floor(W / cw);
+      const stacked = window.innerWidth < 640;
+      const f = fit(raster, cols * S, stacked);
+      rows = PAD_TOP + Math.ceil(f.h / SY) + PAD_BOTTOM;
+      // The band is as tall as the art: set the height, then read it back (the ResizeObserver sees the same width
+      // again and leaves it).
+      H = rows * cw * R;
+      canvas.style.height = `${H}px`;
+      laidW = W;
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
-      // About 190 cells across a desktop window; phones keep cells small enough that the word still reads.
-      cw = Math.max(3.8, Math.min(10, W / 190));
-      cols = Math.floor(W / cw);
-      rows = Math.floor(H / (cw * R));
-      // Centred on the `center` element (the headline card), which floats over the middle of the art. Offsets, not
-      // the card's client rect, so its reveal translate does not move the art.
-      const card = center?.current;
-      const mid = card ? card.offsetTop + card.offsetHeight / 2 : H / 2;
-      const cov = rasterise(cols, rows, window.innerWidth < 640, mid * (S / cw));
+      const cov = rasterise(raster, f, cols, rows, stacked, PAD_TOP * SY + ((rows - PAD_TOP - PAD_BOTTOM) * SY - f.h) / 2);
       const box = canvas.getBoundingClientRect();
       const below = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + box.bottom));
       art = glyphs(cov, cols, rows, H / (H + below));
@@ -262,6 +273,7 @@ export function AsciiLogo({ className, center }: { className?: string; center?: 
     const io = new IntersectionObserver((e) => listen(!!e[0]?.isIntersecting));
     io.observe(canvas);
     const ro = new ResizeObserver(() => {
+      if (canvas.clientWidth === laidW) return;
       layout();
       if (!still) p = progress();
       draw();
@@ -278,6 +290,6 @@ export function AsciiLogo({ className, center }: { className?: string; center?: 
       mo.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [center]);
+  }, []);
   return <canvas ref={ref} aria-hidden className={cn('pointer-events-none block', className)} />;
 }

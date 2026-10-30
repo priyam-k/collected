@@ -470,18 +470,6 @@
   will-change: transform;
 }
 .dark .demo-frame { box-shadow: var(--shadow-lift), 0 60px 120px -40px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
-/* The closing headline card over the ASCII logo: solid at its middle, thinning toward its edges so the glyphs behind
-   show faintly through them, softened by a light blur so the art reads as behind the card, not cut out around it. */
-.closing-card {
-  background:
-    linear-gradient(180deg, var(--sheen), transparent 120px),
-    radial-gradient(farthest-side, color-mix(in srgb, var(--surface) 96%, transparent) 55%, color-mix(in srgb, var(--surface) 74%, transparent));
-  -webkit-backdrop-filter: blur(2.5px) saturate(120%);
-  backdrop-filter: blur(2.5px) saturate(120%);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .closing-card { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
 /* How it works: rails of ticks between the panels carry a lit band along. */
 .flow { position: relative; }
 .flow-x { width: 40px; height: 12px; background: repeating-linear-gradient(90deg, var(--tick) 0 3px, transparent 3px 7px); }
