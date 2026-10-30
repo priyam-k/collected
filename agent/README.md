@@ -1,6 +1,6 @@
 # collected-cli
 
-The command-line client for [collected](https://github.com/priyam-k/collected), the self-hosted student dashboard. It talks to your own collected server: read what is due, make small edits, browse Canvas read-only, and keep course files synced into folders on this machine.
+The command-line client for [collected](https://collected.priyamkabra.com) ([source](https://github.com/priyam-k/collected)), the open-source student dashboard. It runs the whole thing on your laptop in local mode, or talks to your own collected server: read what is due, make small edits, browse Canvas read-only, and keep course files synced into folders on this machine.
 
 The dashboard reads are the same data the web app shows (assignments, agenda, grades, announcements, dates, sources, the jobs tracker). The file sync is laptop-only by design: the server knows the *names* of your target folders, this machine knows the paths, and the server never sees file bytes.
 
