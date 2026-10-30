@@ -7,6 +7,8 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.3.0 — 2026-10-30 · recommended
+
 - Canvas: connect with a personal access token (`collected connect canvas --token`, or paste it in Settings → Sources); the browser cookie is the second way.
 - CLI: `connect canvas` reads Zen, LibreWolf, Floorp and Waterfox cookies too, and mentions the Keychain only when a Chromium store is about to be opened.
 
