@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- CLI: one timer for everything a laptop keeps current. Bare `collected sync` now means every enabled source (local mode, the same run as `sync all`) and then the file sync, or the file sync alone against a server; `--dry-run` plans the files and syncs no source, and `sync <source|all>` stays the sources-only form. `collected daemon install|uninstall|status` works in both modes and runs that command every 15 minutes in local mode or 30 against a server (`--interval N`; `daemon.intervalMinutes` in `agent.json` wins), logging to `<data dir>/daemon.log` or `~/.collected/daemon.log`. `install-launchd` and `uninstall-launchd` still work as aliases and say so; `daemon install` unloads and deletes the old `com.collected.agent` LaunchAgent when it finds one, so the file sync never runs on two timers. `collected status` reports the daemon in both modes.
+
 ## 1.2.2 — 2026-10-30 · optional
 
 - CLI: `collected pull` and the file sync follow Canvas's extra redirect to its file CDN. Canvas answers the verifier link with one more 302 before the bytes, and the downloader stopped there with "CDN redirected again". Up to three further hops are followed, each held to the same rule as the first: https, a public host, never a sign-in page, no credentials sent.

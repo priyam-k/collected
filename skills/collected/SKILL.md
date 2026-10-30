@@ -9,7 +9,7 @@ description: Read and update a student's collected dashboard (courses, assignmen
 
 If the CLI is missing: `npm i -g collected-cli`, then `collected init <server url>` and `collected login` (the user does the browser step), or `collected init --local` for no server at all. If a command answers `401` or `redirected to … cloudflareaccess.com`, the token is gone: tell the user to run `collected login`.
 
-The CLI may instead be in local mode (`collected status` prints `local · <data dir>`; set up with `collected init --local`): no server, the whole app runs inside the command over a database on this machine, and `login` has nothing to do. Reads are instant from the local database, but a read first syncs any source whose last success is older than 30 minutes, so pass `--stale-ok` on repeated calls in one conversation and `--fresh` when the user asks for the latest. `collected ui` opens the dashboard (http://127.0.0.1:4848, runs until Ctrl-C), in either mode. If a command ends with a stderr line like `collected-cli 1.2.0 · 1.3.0 on npm · run: collected upgrade`, tell the user and offer to run `collected upgrade`; an exit code 2 with `this server needs collected-cli >= <version>` means the upgrade is required before anything else works.
+The CLI may instead be in local mode (`collected status` prints `local · <data dir>`; set up with `collected init --local`): no server, the whole app runs inside the command over a database on this machine, and `login` has nothing to do. Reads are instant from the local database, but a read first syncs any source whose last success is older than 30 minutes, so pass `--stale-ok` on repeated calls in one conversation and `--fresh` when the user asks for the latest. `collected ui` opens the dashboard (http://127.0.0.1:4848, runs until Ctrl-C), in either mode. If reads keep paying for a sync or `collected status` says `daemon not installed`, suggest `collected daemon install`: a user timer that keeps the sources (local mode) and the course files current in the background. If a command ends with a stderr line like `collected-cli 1.2.0 · 1.3.0 on npm · run: collected upgrade`, tell the user and offer to run `collected upgrade`; an exit code 2 with `this server needs collected-cli >= <version>` means the upgrade is required before anything else works.
 
 ## Reads (safe to run freely)
 
@@ -56,7 +56,7 @@ The CLI's token cannot export the database, change credentials, settings or layo
 
 ## Files on this machine
 
-The file sync puts course files into local folders by rule. `collected files courses` shows which courses are linked and where their targets land; `collected sync --dry-run --no-model` shows what a run would do without doing it; `collected status` shows the last run. Do not run `collected sync` unprompted: it moves files. Never edit `~/.collected/agent.json` or `state.json`; they hold credentials and the record of which files the sync owns.
+The file sync puts course files into local folders by rule. `collected files courses` shows which courses are linked and where their targets land; `collected sync --dry-run --no-model` shows what a run would do without doing it; `collected status` shows the last run. Do not run `collected sync` unprompted: it moves files (and in local mode syncs every source first; `collected sync all` is the sources alone). Never edit `~/.collected/agent.json` or `state.json`; they hold credentials and the record of which files the sync owns.
 
 ## Reading the output
 

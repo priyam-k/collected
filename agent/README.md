@@ -75,15 +75,7 @@ A read (`agenda`, `todo`, `assignments`, `dates`, `grades`, `announcements`, `co
 
 A sync that fails never blocks the answer: one line on stderr, and the command prints what the database has. A source that needs a credential or failed last time is not retried from a read. A source already being synced by another process (`collected ui`, the daemon, another terminal) is left alone: every run holds a lock file under `sync.lock/`, so two processes never sync the same source at once.
 
-### Keeping it fresh in the background: `collected daemon`
-
-```sh
-collected daemon install               # a user-level timer running `collected sync all` every 15 minutes
-collected daemon status                # installed or not, and the last run from <data dir>/daemon.log
-collected daemon uninstall
-```
-
-macOS gets `~/Library/LaunchAgents/com.collected.sync.plist` (loaded with `launchctl bootstrap gui/$UID`); Linux a systemd user service and timer under `~/.config/systemd/user/` (`collected-sync.timer`, enabled with `systemctl --user enable --now`); on Windows the command prints the `schtasks` line to run yourself. The unit calls the exact binary you ran `install` from, so after moving or upgrading the CLI run `install` again. The period is `daemon.intervalMinutes` in `agent.json` (minimum 5). Nothing secret goes into the unit: credentials live in the database, and the unit carries paths only.
+Without the dashboard open and without a read asking, nothing syncs on its own; `collected daemon install` ([Keep it current](#keep-it-current)) adds the timer that does.
 
 ### Google Calendar and Google Tasks: `collected connect google`
 
@@ -153,10 +145,9 @@ Local mode only (`collected init --local`):
 ```
 ui [--port 4848] [--no-open]                the dashboard at http://127.0.0.1:<port> until Ctrl-C, syncing in the background
 connect google [calendar|tasks] [--no-open] the Google sign-in in your browser, on a temporary loopback port; no project needed
-daemon install | uninstall | status         a user timer running `sync all` every 15 minutes (daemon.intervalMinutes)
 demo <canvas|gradescope|gcal|todoist|gtasks>   load that source's fixture data into the local database
 demo clear                                  remove everything the demo loaders created
-sync <source|all>                           run a source sync in-process and wait for it (same as resync)
+sync <source|all>                           run a source sync in-process and wait for it (same as resync); bare `sync` runs them all, then the files
 --fresh | --stale-ok                        on any read: sync first regardless of age, or never (default: older than freshness.maxAgeMinutes)
 ```
 
@@ -169,17 +160,18 @@ canvas get "<api path>" [--all]
 pull <canvas-file-id> --to <folder>
 ```
 
-File sync:
+File sync, and keeping it all current:
 
 ```
 files courses                               what the server wants synced and where it lands here
 files link <course-id> <path>               root folder for a course
 files link <course-id> <target> <path>      one named target (e.g. readings, slides) to a folder
 files unlink <course-id> [target]
-sync [--dry-run] [--course X] [--no-model]  run the file sync now
-status                                      last sync and what has been placed
-install-launchd [--interval 30]             run the sync every N minutes in the background (macOS)
-uninstall-launchd
+sync [--dry-run] [--course X] [--no-model]  everything this machine keeps current: in local mode every enabled source, then
+                                            the file sync; against a server the file sync alone (--dry-run plans the files, syncs nothing)
+status                                      last file sync, what has been placed, and whether the daemon is installed
+daemon install [--interval N]               a user timer running `collected sync` every N minutes (15 in local mode, 30 against a server)
+daemon status | uninstall                   (install-launchd and uninstall-launchd still work and mean these)
 ```
 
 This program:
@@ -193,7 +185,7 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 
 ## Config file
 
-`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir`, `freshness.maxAgeMinutes` and `daemon.intervalMinutes`), the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them. `state.json` next to it is the program's own memory: what the file sync has placed, and when the version notice last ran and what it saw. Local mode's optional overrides (OAuth clients, `TZ`, `LOG_LEVEL`) go in `~/.collected/.env` next to it, see [above](#collectedenv-overrides-for-local-mode).
+`~/.collected/agent.json` (override the directory with `COLLECTED_AGENT_HOME`). It holds the server URL (or `local`, with the data directory under `local.dataDir` and `freshness.maxAgeMinutes`), `daemon.intervalMinutes` for the timer, the credential, this machine's name, the cache directory, the per-course folder links, and the optional classifier settings. It is written `0600` and is the only place filesystem paths live; the server never learns them. `state.json` next to it is the program's own memory: what the file sync has placed, and when the version notice last ran and what it saw. Local mode's optional overrides (OAuth clients, `TZ`, `LOG_LEVEL`) go in `~/.collected/.env` next to it, see [above](#collectedenv-overrides-for-local-mode).
 
 `collected auth model` stores a TypeSafe key for the Jev classifier that sorts files the rules cannot place. Skip it to sort by rules only.
 
@@ -204,9 +196,23 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 - Downloads follow only `https` redirects to public hosts, with a size cap and a timeout; no auth header crosses a redirect.
 - Secrets are read from a prompt or stdin, never from a command-line argument.
 
-## launchd
+## Keep it current
 
-`collected install-launchd --interval 30` writes `~/Library/LaunchAgents/com.collected.agent.plist` and loads it, so the file sync runs every 30 minutes while you are logged in; the log is `~/.collected/agent.log`. `collected uninstall-launchd` removes it. On Linux use a user cron entry or a systemd timer that runs `collected sync`. (The source sync in local mode has its own timer: `collected daemon install`, above.)
+```sh
+collected daemon install               # a user-level timer running `collected sync` in the background
+collected daemon install --interval 20 # every 20 minutes instead of the default
+collected daemon status                # installed or not, loaded or not, the last run and the log's tail
+collected daemon uninstall
+```
+
+A laptop has two things to keep current: the course files, in either mode, and in local mode the sources in the database as well. Bare `collected sync` is both, in that order, so one timer is enough. What it runs depends on the mode:
+
+- **Local mode**: every enabled source is synced in-process (the same run as `collected sync all`, all sources together, waited for), then the file sync for every course that has it on. Every 15 minutes by default. The log is `<data dir>/daemon.log`.
+- **Against a server**: the file sync only; the server keeps its own sources fresh on its scheduler. Every 30 minutes by default. The log is `~/.collected/daemon.log`.
+
+`daemon.intervalMinutes` in `agent.json` sets the period for good and wins over `--interval`; the minimum is 5. macOS gets `~/Library/LaunchAgents/com.collected.sync.plist` (loaded with `launchctl bootstrap gui/$UID`, so it runs while you are logged in); Linux a systemd user service and timer under `~/.config/systemd/user/` (`collected-sync.timer`, enabled with `systemctl --user enable --now`); on Windows the command prints the `schtasks` line to run yourself. The unit calls the exact binary you ran `install` from, so after moving or upgrading the CLI run `install` again. Nothing secret goes into the unit: credentials live in the database or in `agent.json`, and the unit carries paths only. The log names courses, assignment titles and placed paths, so it is created `0600` before the system does.
+
+`collected status` shows the timer's state in one line next to the last file sync. `collected install-launchd [--interval N]` and `collected uninstall-launchd`, the file sync's old timer commands, still work: they are `daemon install` and `daemon uninstall` under the old names, with a note saying so. A machine that still has the old `com.collected.agent` LaunchAgent gets it unloaded and deleted the next time `daemon install` (or `uninstall`) runs, so the file sync never runs on two timers; its old log, `~/.collected/agent.log`, can be deleted.
 
 ## License
 

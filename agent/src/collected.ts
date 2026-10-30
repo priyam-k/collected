@@ -312,7 +312,8 @@ async function date(api: Api, args: string[]): Promise<Out> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function resync(api: Api, args: string[]): Promise<Out> {
+/** `resync [source|all]`, and the source half of bare `collected sync` in local mode (machine-sync.ts). */
+export async function resync(api: Api, args: string[]): Promise<Out> {
   const which = args[0] ?? 'all';
   const since = new Date().toISOString();
   let ids: string[];

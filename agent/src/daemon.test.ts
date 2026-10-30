@@ -1,28 +1,33 @@
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DAEMON_LABEL, daemonPlan, describeStatus, readLog, type DaemonSpec } from './daemon.js';
+import { daemonIntervalMinutes, defaultConfig, type AgentConfig } from './config.js';
+import { DAEMON_LABEL, LEGACY_LABEL, daemonLine, daemonLogDir, daemonPlan, describeStatus, readLog, removeLegacyLaunchAgent, type DaemonSpec, type DaemonStatus } from './daemon.js';
 
 const spec = (over: Partial<DaemonSpec> = {}): DaemonSpec => ({
   platform: 'darwin',
   node: '/opt/homebrew/bin/node',
   cli: '/Users/me/.npm-global/lib/node_modules/collected-cli/dist/cli.js',
   intervalMinutes: 15,
-  dataDir: '/Users/me/.collected/data',
+  logDir: '/Users/me/.collected/data',
   home: '/Users/me',
   ...over,
 });
 
+const localCfg = (daemon?: AgentConfig['daemon']): AgentConfig => ({ ...defaultConfig('local'), local: { dataDir: '/Users/me/.collected/data' }, ...(daemon ? { daemon } : {}) });
+const clientCfg = (daemon?: AgentConfig['daemon']): AgentConfig => ({ ...defaultConfig('https://collected.example.com'), ...(daemon ? { daemon } : {}) });
+
 describe('daemonPlan', () => {
-  it('macOS: a LaunchAgent plist calling the running binary, logging to the data dir, no secrets', () => {
+  it('macOS: a LaunchAgent plist calling the running binary with bare `sync`, logging to the data dir, no secrets', () => {
     const plan = daemonPlan(spec({ agentHome: '/Users/me/alt<home>' }));
     expect(plan.kind).toBe('launchd');
     expect(plan.files).toHaveLength(1);
     const [f] = plan.files;
     expect(f!.path).toBe(`/Users/me/Library/LaunchAgents/${DAEMON_LABEL}.plist`);
     expect(f!.content).toContain(`<key>Label</key><string>${DAEMON_LABEL}</string>`);
-    expect(f!.content).toContain('<string>/opt/homebrew/bin/node</string>\n    <string>/Users/me/.npm-global/lib/node_modules/collected-cli/dist/cli.js</string>\n    <string>sync</string>\n    <string>all</string>');
+    expect(f!.content).toContain('<string>/opt/homebrew/bin/node</string>\n    <string>/Users/me/.npm-global/lib/node_modules/collected-cli/dist/cli.js</string>\n    <string>sync</string>\n  </array>');
+    expect(f!.content).not.toContain('<string>all</string>');
     expect(f!.content).toContain('<key>StartInterval</key><integer>900</integer>');
     expect(f!.content).toContain('<key>StandardOutPath</key><string>/Users/me/.collected/data/daemon.log</string>');
     expect(f!.content).toContain('<key>COLLECTED_AGENT_HOME</key><string>/Users/me/alt&lt;home&gt;</string>');
@@ -36,13 +41,35 @@ describe('daemonPlan', () => {
     expect(plan.files[0]!.content).not.toContain('COLLECTED_AGENT_HOME');
   });
 
+  it('client mode: the same unit, bare `sync`, every 30 minutes by default, logging next to agent.json', () => {
+    const cfg = clientCfg();
+    expect(daemonIntervalMinutes(cfg)).toBe(30);
+    expect(daemonLogDir(cfg)).toBe(path.join(process.env.COLLECTED_AGENT_HOME ?? path.join(process.env.HOME ?? '', '.collected')));
+    const plan = daemonPlan(spec({ intervalMinutes: daemonIntervalMinutes(cfg), logDir: '/Users/me/.collected' }));
+    expect(plan.files[0]!.path).toBe(`/Users/me/Library/LaunchAgents/${DAEMON_LABEL}.plist`);
+    expect(plan.files[0]!.content).toContain('<string>sync</string>\n  </array>');
+    expect(plan.files[0]!.content).toContain('<key>StartInterval</key><integer>1800</integer>');
+    expect(plan.logFile).toBe('/Users/me/.collected/daemon.log');
+  });
+
+  it('the interval: agent.json wins, then --interval, then 15 in local mode and 30 against a server, never under 5', () => {
+    expect(daemonIntervalMinutes(localCfg())).toBe(15);
+    expect(daemonIntervalMinutes(clientCfg())).toBe(30);
+    expect(daemonIntervalMinutes(localCfg(), 45)).toBe(45);
+    expect(daemonIntervalMinutes(clientCfg(), 10)).toBe(10);
+    expect(daemonIntervalMinutes(localCfg({ intervalMinutes: 20 }), 45)).toBe(20);
+    expect(daemonIntervalMinutes(clientCfg({ intervalMinutes: 60 }))).toBe(60);
+    expect(daemonIntervalMinutes(clientCfg(), 1)).toBe(5);
+    expect(daemonLogDir(localCfg())).toBe('/Users/me/.collected/data');
+  });
+
   it('Linux: a systemd user service and timer', () => {
-    const plan = daemonPlan(spec({ platform: 'linux', node: '/usr/bin/node', cli: '/home/me/.local/lib/node_modules/collected-cli/dist/cli.js', dataDir: '/home/me/.collected/data', home: '/home/me', intervalMinutes: 20 }));
+    const plan = daemonPlan(spec({ platform: 'linux', node: '/usr/bin/node', cli: '/home/me/.local/lib/node_modules/collected-cli/dist/cli.js', logDir: '/home/me/.collected/data', home: '/home/me', intervalMinutes: 20 }));
     expect(plan.kind).toBe('systemd');
     expect(plan.files.map((f) => f.path)).toEqual(['/home/me/.config/systemd/user/collected-sync.service', '/home/me/.config/systemd/user/collected-sync.timer']);
     const [service, timer] = plan.files;
     expect(service!.content).toContain('Type=oneshot');
-    expect(service!.content).toContain('ExecStart="/usr/bin/node" "/home/me/.local/lib/node_modules/collected-cli/dist/cli.js" sync all');
+    expect(service!.content).toContain('ExecStart="/usr/bin/node" "/home/me/.local/lib/node_modules/collected-cli/dist/cli.js" sync\n');
     expect(service!.content).toContain('StandardOutput=append:/home/me/.collected/data/daemon.log');
     expect(service!.content).not.toContain('Environment=');
     expect(timer!.content).toContain('OnUnitActiveSec=20min');
@@ -54,7 +81,41 @@ describe('daemonPlan', () => {
     const plan = daemonPlan(spec({ platform: 'win32', node: 'C:\\Program Files\\nodejs\\node.exe', cli: 'C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\collected-cli\\dist\\cli.js' }));
     expect(plan.kind).toBe('schtasks');
     expect(plan.files).toEqual([]);
-    expect(plan.manual).toBe('schtasks /Create /F /SC MINUTE /MO 15 /TN collected-sync /TR "\\"C:\\Program Files\\nodejs\\node.exe\\" \\"C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\collected-cli\\dist\\cli.js\\" sync all"');
+    expect(plan.manual).toBe('schtasks /Create /F /SC MINUTE /MO 15 /TN collected-sync /TR "\\"C:\\Program Files\\nodejs\\node.exe\\" \\"C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\collected-cli\\dist\\cli.js\\" sync"');
+  });
+});
+
+describe('the legacy file-sync timer', () => {
+  let dir: string;
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('is unloaded and deleted when install finds com.collected.agent.plist, and nothing happens without it', () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'collected-launchagents-'));
+    const unloaded: string[] = [];
+    const unload = (file: string) => unloaded.push(file);
+    expect(removeLegacyLaunchAgent(dir, unload)).toBeNull();
+    expect(unloaded).toEqual([]);
+
+    const legacy = path.join(dir, `${LEGACY_LABEL}.plist`);
+    const ours = path.join(dir, `${DAEMON_LABEL}.plist`);
+    writeFileSync(legacy, '<plist/>');
+    writeFileSync(ours, '<plist/>');
+    expect(removeLegacyLaunchAgent(dir, unload)).toBe(legacy);
+    expect(unloaded).toEqual([legacy]);
+    expect(existsSync(legacy)).toBe(false);
+    expect(existsSync(ours)).toBe(true);
+    // Idempotent: a second install finds nothing to migrate.
+    expect(removeLegacyLaunchAgent(dir, unload)).toBeNull();
+    expect(unloaded).toEqual([legacy]);
+  });
+
+  it('a home without a LaunchAgents folder (Linux) is left alone', () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'collected-home-'));
+    const missing = path.join(dir, 'Library', 'LaunchAgents');
+    expect(removeLegacyLaunchAgent(missing, () => { throw new Error('must not unload'); })).toBeNull();
+    expect(existsSync(missing)).toBe(false);
+    mkdirSync(missing, { recursive: true });
+    expect(removeLegacyLaunchAgent(missing, () => { throw new Error('must not unload'); })).toBeNull();
   });
 });
 
@@ -72,9 +133,15 @@ describe('status from the log', () => {
     const r = readLog(log);
     expect(r.lastRunAt).toBe(when.toISOString());
     expect(r.tail).toEqual(['line 4', 'line 5', 'line 6', 'line 7', 'line 8', 'line 9', 'line 10', 'line 11']);
-    const text = describeStatus({ installed: true, files: ['/x/plist'], loaded: true, logFile: log, ...r });
+    const installed: DaemonStatus = { installed: true, files: ['/x/plist'], loaded: true, logFile: log, ...r };
+    const text = describeStatus(installed);
     expect(text).toContain('installed: /x/plist (loaded)');
     expect(text).toContain(`last run ${when.toISOString()}`);
-    expect(describeStatus({ installed: false, files: [], loaded: null, logFile: log, lastRunAt: null, tail: [] })).toContain('not installed');
+    const none: DaemonStatus = { installed: false, files: [], loaded: null, logFile: log, lastRunAt: null, tail: [] };
+    expect(describeStatus(none)).toContain('not installed');
+    // The one line `collected status` prints, in both modes.
+    expect(daemonLine(installed)).toBe(`daemon installed (loaded) · last run ${when.toISOString()}`);
+    expect(daemonLine({ ...installed, loaded: false, lastRunAt: null })).toBe('daemon installed (not loaded: run collected daemon install again) · last run none logged yet');
+    expect(daemonLine(none)).toBe('daemon not installed (collected daemon install keeps this machine current)');
   });
 });

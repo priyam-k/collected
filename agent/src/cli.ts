@@ -9,14 +9,13 @@ import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas } from './connect.js';
 import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
 import { localDotenvPath } from './dotenv.js';
-import { daemonStatus, describeStatus, installDaemon, uninstallDaemon } from './daemon.js';
+import { daemonLine, daemonStatus, describeStatus, installDaemon, uninstallDaemon } from './daemon.js';
 import { READ_SOURCES, ensureFresh, takeFreshnessFlags } from './freshness.js';
 import { assertSecureUrl } from './guard.js';
-import { installLaunchd, uninstallLaunchd } from './launchd.js';
+import { machineSync } from './machine-sync.js';
 import { pullFile } from './pull.js';
 import { SkewError, maybeNotice } from './skew.js';
 import { loadState, patchState } from './state.js';
-import { runSync } from './sync.js';
 import { fetchNpmLatest, runUpgrade } from './upgrade.js';
 import { cliVersion } from './version.js';
 
@@ -32,7 +31,7 @@ const localOpts = { logLevel: verbose ? 'info' : undefined, verbose };
 /** The once-a-day npm check at the end of a command waits this long at most; `collected upgrade` itself waits 10 s. */
 const NOTICE_REGISTRY_TIMEOUT_MS = 3_000;
 /** Commands that end without the version notice: nothing was asked of a server, or the command is the notice's own remedy. */
-const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon']);
+const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon', 'install-launchd', 'uninstall-launchd']);
 
 function usage(): never {
   console.log(`${HELP}
@@ -44,9 +43,8 @@ function usage(): never {
                                               (default ${defaultLocalDataDir()}); then: collected demo canvas, collected courses
     ui [--port 4848] [--no-open]              local mode: the dashboard at http://127.0.0.1:<port>, syncing in the background, until Ctrl-C
                                               (against a server: prints its address and opens it)
-    daemon install | uninstall | status       local mode: a user timer that runs \`sync all\` every 15 minutes (config daemon.intervalMinutes)
     demo <canvas|gradescope|gcal|todoist|gtasks> | demo clear    local mode: load the fixture data into the local database, or remove it
-    sync <source|all>                         local mode: run that source's sync now and wait (same as resync)
+    sync <source|all>                         local mode: run that source's sync now and wait (same as resync); bare \`sync\` runs them all, then the files
     --fresh | --stale-ok                      on any read, local mode: sync first regardless of age, or never sync first
                                               (default: sync a source whose last success is older than freshness.maxAgeMinutes, 30)
     auth service-token <id> [secret] | auth helper-key [key] | auth token [token] | auth model [typesafe-api-key]
@@ -54,9 +52,12 @@ function usage(): never {
     login                                     sign in: opens Settings → Account on the server, then paste the token here
     files courses                             what the server wants synced and where it lands here
     files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
-    sync [--dry-run] [--course X] [--no-model]    run the file sync now
-    status                                    last file sync and what has been placed
-    install-launchd [--interval 30] | uninstall-launchd
+    sync [--dry-run] [--course X] [--no-model]    everything this machine keeps current: in local mode every enabled source, then the
+                                              file sync; against a server the file sync alone (--dry-run plans the files, syncs nothing)
+    status                                    last file sync, what has been placed, and the daemon
+    daemon install [--interval N] | uninstall | status
+                                              a user timer running \`collected sync\` every N minutes (15 in local mode, 30 against a server;
+                                              daemon.intervalMinutes in agent.json wins); install-launchd / uninstall-launchd still mean the same
     connect canvas [--browser X] [--domain host] [--dry-run]
                                               read the Canvas session cookie from your browser and send it to the server
     connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
@@ -218,12 +219,19 @@ try {
       await (await import('./ui.js')).runUi(cfg, { port, open, ...localOpts, say });
       break;
     }
-    case 'daemon': {
+    case 'daemon':
+    case 'install-launchd':
+    case 'uninstall-launchd': {
+      // The file sync's old timer commands are the same timer now; say so once and carry on.
+      const what = command === 'daemon' ? rest[0] : command === 'install-launchd' ? 'install' : 'uninstall';
+      if (command !== 'daemon') console.error(`note: \`collected ${command}\` is now \`collected daemon ${what}\`; same timer, one for both the sources and the files`);
       const cfg = cfgOf();
-      if (!isLocal(cfg)) throw new Error('`collected daemon` keeps a local database fresh; a server runs its own scheduler. (The file sync has `install-launchd`.)');
-      const what = rest[0];
-      if (what === 'install') say(installDaemon(cfg));
-      else if (what === 'uninstall') say(uninstallDaemon() ? 'removed' : 'nothing installed');
+      if (what === 'install') {
+        const { values } = parseArgs({ args: command === 'daemon' ? rest.slice(1) : argv, options: { interval: { type: 'string' } } });
+        const interval = values.interval === undefined ? undefined : Number(values.interval);
+        if (interval !== undefined && (!Number.isFinite(interval) || interval <= 0)) throw new Error(`--interval needs a number of minutes, not "${values.interval}"`);
+        say(installDaemon(cfg, { interval }));
+      } else if (what === 'uninstall') say(uninstallDaemon() ? 'removed' : 'nothing installed');
       else if (what === 'status') say(describeStatus(daemonStatus(cfg)));
       else usage();
       break;
@@ -339,15 +347,11 @@ try {
       break;
     }
     case 'sync': {
+      // Everything this machine keeps current (machine-sync.ts): the sources in local mode, then the files; the files alone against a server.
       const { values } = parseArgs({ args: argv, options: { 'dry-run': { type: 'boolean' }, course: { type: 'string' }, 'no-model': { type: 'boolean' } } });
       const cfg = loadConfig();
-      const t0 = Date.now();
-      const s = await runSync(cfg, { dryRun: values['dry-run'], course: values.course, noModel: values['no-model'], log: say });
-      const parts = [`${s.placed} new`, `${s.updated} updated`, `${s.moved} moved`, `${s.adopted} adopted`, `${s.removed} removed`, `${s.unchanged} unchanged`, `${s.skipped} skipped`];
-      if (s.pending) parts.push(`${s.pending} waiting for the model`);
-      if (s.classified) parts.push(`${s.classified} classified`);
-      say(`${values['dry-run'] ? 'dry run: ' : ''}${s.courses} course${s.courses === 1 ? '' : 's'}: ${parts.join(', ')}${s.errors.length ? `, ${s.errors.length} error${s.errors.length === 1 ? '' : 's'}` : ''} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
-      await finish(command, s.errors.length ? 1 : 0);
+      const r = await machineSync(cfg, { api: await apiFor(cfg), dryRun: values['dry-run'], course: values.course, noModel: values['no-model'], log: say });
+      await finish(command, r.sourceErrors || r.fileErrors ? 1 : 0);
       break;
     }
     // eslint-disable-next-line no-fallthrough
@@ -363,21 +367,12 @@ try {
       const cfg = loadConfig();
       const st = loadState();
       const n = Object.keys(st.placements).length;
-      say(`${isLocal(cfg) ? `local · ${localDataDir(cfg)}` : `server ${cfg.server}`} · device ${cfg.device} · model ${cfg.model.enabled ? 'on' : 'off'}\nlast run ${st.lastRunAt ?? 'never'} · ${n} file${n === 1 ? '' : 's'} placed`);
+      say(`${isLocal(cfg) ? `local · ${localDataDir(cfg)}` : `server ${cfg.server}`} · device ${cfg.device} · model ${cfg.model.enabled ? 'on' : 'off'}\nlast file sync ${st.lastRunAt ?? 'never'} · ${n} file${n === 1 ? '' : 's'} placed\n${daemonLine(daemonStatus(cfg))}`);
       const byCourse = new Map<string, number>();
       for (const p of Object.values(st.placements)) byCourse.set(p.courseId, (byCourse.get(p.courseId) ?? 0) + 1);
       for (const [c, k] of byCourse) say(`  ${c}: ${k}`);
       break;
     }
-    case 'install-launchd': {
-      const { values } = parseArgs({ args: argv, options: { interval: { type: 'string', default: '30' } } });
-      const file = installLaunchd(Number(values.interval) || 30);
-      say(`installed ${file}; log: ~/.collected/agent.log`);
-      break;
-    }
-    case 'uninstall-launchd':
-      say(uninstallLaunchd() ? 'removed' : 'nothing installed');
-      break;
     default:
       usage();
   }

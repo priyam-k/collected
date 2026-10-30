@@ -65,7 +65,7 @@ collected connect google calendar     # Google's consent screen in your browser;
 collected ui                          # the dashboard at http://127.0.0.1:4848
 ```
 
-Local mode runs the same backend a server runs, inside the CLI, so every command and the whole dashboard work on one machine with no server, Docker, domain or OAuth client, and the data stays in `~/.collected`. The dashboard keeps sources syncing while it is open, a read such as `collected agenda` syncs a stale source before it answers, and `collected daemon install` adds a user timer that syncs every 15 minutes in the background. `collected demo canvas` loads fixture data if you want to look around first. Every command, `~/.collected/.env` and the freshness rules: [`agent/README.md`](agent/README.md#local-mode).
+Local mode runs the same backend a server runs, inside the CLI, so every command and the whole dashboard work on one machine with no server, Docker, domain or OAuth client, and the data stays in `~/.collected`. The dashboard keeps sources syncing while it is open, a read such as `collected agenda` syncs a stale source before it answers, and `collected daemon install` adds a user timer that runs `collected sync` (every source, then the course files) every 15 minutes in the background. `collected demo canvas` loads fixture data if you want to look around first. Every command, `~/.collected/.env` and the freshness rules: [`agent/README.md`](agent/README.md#local-mode).
 
 ### Self-host
 
@@ -116,7 +116,7 @@ npm i -g collected-cli
 collected init --local                          # the whole app on this machine; or: collected init https://collected.example.com && collected login
 collected connect canvas                        # reads the Canvas session from your browser (into the local database, or posted to your server)
 collected files link cs101 ~/School/CS101       # where this course's files should land
-collected sync                                  # pull new files now; `collected install-launchd` runs it every 30 minutes
+collected sync                                  # everything this machine keeps current: sources (local mode), then course files; `collected daemon install` runs it on a timer
 collected agenda                                # what is due this week (`--fresh` to sync first, `--stale-ok` to never wait)
 collected help
 ```
