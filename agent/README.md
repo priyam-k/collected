@@ -148,6 +148,9 @@ link add <course> <label> <url>   |   link rm <course> <label>
 schedule set <course> <kind> "<days> <start>-<end> [@ room]"   |   schedule rm <course> <kind>
 notes set <course> "<text>"       |   notes clear <course>
 date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [...]   |   date rm <id>
+event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]   a Google Calendar event
+event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD]   all day; <when> is "2026-11-03 14:00", "today 14:00", "tomorrow 9:30" or "fri 17:00"
+event calendars                             the connected Google calendars, with the default marked
 jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
 resync [canvas|gradescope|gcal|todoist|jobs|all]
 ```

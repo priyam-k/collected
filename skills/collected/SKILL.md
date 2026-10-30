@@ -1,6 +1,6 @@
 ---
 name: collected
-description: Read and update a student's collected dashboard (courses, assignments, due dates, calendar, Todoist tasks, grades, Canvas content, course files) through the `collected` CLI. Use when the user asks about their classes, what is due, their schedule, a syllabus or assignment text, or wants a task, note, hotlink, exam date or course file handled.
+description: Read and update a student's collected dashboard (courses, assignments, due dates, calendar, Todoist tasks, grades, Canvas content, course files) through the `collected` CLI. Use when the user asks about their classes, what is due, their schedule, a syllabus or assignment text, or wants a task, calendar event, note, hotlink, exam date or course file handled.
 ---
 
 # collected
@@ -39,7 +39,7 @@ The server holds the user's Canvas session; these never write to Canvas.
 
 ## Writes (confirm with the user first, then run)
 
-These change the dashboard, Todoist or Google Tasks. Say what you are about to do and wait for a yes unless the user already asked for exactly that change.
+These change the dashboard, Todoist, Google Tasks or Google Calendar. Say what you are about to do and wait for a yes unless the user already asked for exactly that change.
 
 - `collected task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]`: a task in the user's default to-do app (Settings → To-do sync). Todoist parses dates from the text (`"essay draft fri 5pm #School"`); Google Tasks takes the text as the title, so pass `--due` for a date.
 - `collected task done <task-id>`: closes a Todoist or Google Tasks task by the id `todo --json` shows (never reopens)
@@ -48,6 +48,7 @@ These change the dashboard, Todoist or Google Tasks. Say what you are about to d
 - `collected schedule set <course> <kind> "<days> <start>-<end> [@ room]"` (e.g. `schedule set enme480 lecture "mon,wed 14:00-14:50 @ CHE 2110"`) and `collected schedule rm <course> <kind>`
 - `collected notes set <course> "<text>"` and `collected notes clear <course>`
 - `collected date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N]` and `collected date rm <id>`
+- `collected event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]`, or `--on YYYY-MM-DD [--until YYYY-MM-DD]` for an all-day event: writes to the user's Google Calendar (not the dashboard alone), so confirm first like the other writes. `<when>` is `2026-11-03 14:00`, `today 14:00`, `tomorrow 9:30` or `fri 17:00` (the next Friday) in the user's timezone; without `--for`/`--end` the event is an hour; without `--calendar` it goes to the default calendar. `collected event calendars` lists the calendars with the default marked; it says `Google Calendar is not connected` when there is nowhere to write.
 - `collected jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]`
 - `collected resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]`: runs a sync now and waits. Cheap; use it when data looks stale.
 - In local mode (`collected status` says `local · <data dir>`, no server) a read syncs a source on its own when its last success is older than 30 minutes, which can take a few seconds; add `--stale-ok` to a read when speed matters more than freshness, `--fresh` when it must be current. A failed sync is one line on stderr and the read still answers.

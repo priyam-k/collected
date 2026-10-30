@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import type { Course, CourseGrades, EffectiveItem, Job, Meeting, Source } from '@collected/shared';
 import type { CollectedApi as Api } from './api.js';
-import { dayOf, describeSchedule, htmlToText, linkedFiles, localDate, parseMeetings, table, when } from './format.js';
+import { dayOf, describeSchedule, htmlToText, linkedFiles, localDate, parseDuration, parseMeetings, parseWhen, table, when } from './format.js';
 
 /*
  * `collected <command>`: the dashboard from a terminal, for a person or an agent. Reads print a table, or JSON with
@@ -38,6 +38,9 @@ export const HELP = `collected: your classes, assignments and calendar from the 
     notes set <course> "<text>"               notes clear <course>
     date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N --session lecture]
     date rm <id>
+    event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]   a Google Calendar event
+    event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD] [--calendar …]   an all-day event;  <when> is "2026-11-03 14:00", "today 14:00", "tomorrow 9:30" or "fri 17:00"
+    event calendars                           the connected Google calendars, with the default
     jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
     resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]   run a sync now and wait for it
 
@@ -310,6 +313,86 @@ async function date(api: Api, args: string[]): Promise<Out> {
   throw new Error('usage: date add …  |  date rm <id>');
 }
 
+interface GcalCalendar {
+  id: string;
+  summary: string;
+  primary?: boolean;
+}
+interface GcalSourceMeta {
+  calendars?: GcalCalendar[];
+  defaultCalendarId?: string;
+}
+
+/** The Google Calendar source as `GET /api/sources` shows it: its calendars and the default, or nothing when it is not connected. */
+export function gcalCalendars(all: Source[]): { connected: boolean; defaultCalendarId: string | null; calendars: GcalCalendar[] } {
+  const src = all.find((s) => s.id === 'gcal');
+  const meta = (src?.meta ?? {}) as GcalSourceMeta;
+  const calendars = meta.calendars ?? [];
+  return { connected: src?.status === 'connected' && calendars.length > 0, defaultCalendarId: meta.defaultCalendarId ?? calendars.find((c) => c.primary)?.id ?? null, calendars };
+}
+
+/** `--calendar <id or name>`: an id exactly, else a name case-insensitively; it has to be one calendar. */
+export function resolveCalendar(calendars: GcalCalendar[], key: string): GcalCalendar {
+  const byId = calendars.find((c) => c.id === key);
+  if (byId) return byId;
+  const k = key.trim().toLowerCase();
+  const hits = calendars.filter((c) => c.summary.trim().toLowerCase() === k);
+  if (hits.length === 1) return hits[0]!;
+  const names = calendars.map((c) => `${c.summary} (${c.id})`).join(', ');
+  throw new Error(hits.length ? `"${key}" matches ${hits.length} calendars; give the id instead. Calendars: ${names}` : `no calendar "${key}". Calendars: ${names || '(none)'}`);
+}
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const nextDay = (ymd: string): string => {
+  const d = new Date(`${ymd}T12:00:00`);
+  d.setDate(d.getDate() + 1);
+  return localDate(d.toISOString());
+};
+const EVENT_USAGE = 'usage: event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]  |  event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD]  |  event calendars';
+
+/** `event add` writes to the user's Google Calendar through the server (POST /api/calendar/events), which creates it in Google and keeps a copy locally. */
+async function event(api: Api, args: string[]): Promise<Out> {
+  if (args[0] === 'calendars') {
+    const g = gcalCalendars(await api.get<Source[]>('/api/sources'));
+    if (!g.connected) return { json: g, text: 'Google Calendar is not connected' };
+    const marks = (c: GcalCalendar) => [c.id === g.defaultCalendarId ? 'default' : '', c.primary ? 'primary' : ''].filter(Boolean).join(', ');
+    return { json: g, text: table(['Calendar', 'Id', ''], g.calendars.map((c) => [c.summary, c.id, marks(c)])) };
+  }
+  if (args[0] !== 'add') throw new Error(EVENT_USAGE);
+  const { values, positionals } = parseArgs({ args: args.slice(1), options: { at: { type: 'string' }, for: { type: 'string' }, end: { type: 'string' }, on: { type: 'string' }, until: { type: 'string' }, calendar: { type: 'string' }, location: { type: 'string' }, note: { type: 'string' } }, allowPositionals: true });
+  const title = positionals.join(' ').trim();
+  if (!title) throw new Error(EVENT_USAGE);
+  if (!!values.at === !!values.on) throw new Error(`give --at "<when>" for a timed event or --on YYYY-MM-DD for an all-day one\n${EVENT_USAGE}`);
+  const body: Record<string, unknown> = { title, ...(values.location ? { location: values.location } : {}), ...(values.note ? { description: values.note } : {}) };
+  if (values.at) {
+    if (values.until) throw new Error('--until goes with --on; a timed event ends with --for or --end');
+    if (values.for && values.end) throw new Error('give --for or --end, not both');
+    const start = parseWhen(values.at);
+    const end = values.for ? new Date(start.getTime() + parseDuration(values.for) * 60_000) : values.end ? parseWhen(values.end) : null;
+    if (end && end <= start) throw new Error(`--end (${when(end.toISOString())}) must be after --at (${when(start.toISOString())})`);
+    Object.assign(body, { allDay: false, start: start.toISOString(), ...(end ? { end: end.toISOString() } : {}) });
+  } else {
+    if (values.for || values.end) throw new Error('--for and --end go with --at; an all-day event spans --on to --until');
+    if (!YMD.test(values.on!) || Number.isNaN(Date.parse(values.on!))) throw new Error('--on must be YYYY-MM-DD');
+    if (values.until && (!YMD.test(values.until) || Number.isNaN(Date.parse(values.until)))) throw new Error('--until must be YYYY-MM-DD');
+    if (values.until && values.until < values.on!) throw new Error('--until must not be before --on');
+    // Google's all-day end is exclusive; --until is the last day the event is on.
+    Object.assign(body, { allDay: true, start: values.on, ...(values.until ? { end: nextDay(values.until) } : {}) });
+  }
+  if (values.calendar) {
+    const g = gcalCalendars(await api.get<Source[]>('/api/sources'));
+    if (!g.connected) throw new Error('Google Calendar is not connected');
+    body.calendarId = resolveCalendar(g.calendars, values.calendar).id;
+  }
+  const row = await api.send<EffectiveItem & { raw: { calendarId?: string; calendarName?: string | null } }>('POST', '/api/calendar/events', body);
+  const span = row.allDay
+    ? row.endsAt && localDate(row.endsAt) > nextDay(localDate(row.startsAt!))
+      ? `${dayOf(row.startsAt)} – ${dayOf(new Date(new Date(row.endsAt).getTime() - 86_400_000).toISOString())}`
+      : dayOf(row.startsAt)
+    : `${when(row.startsAt)}${row.endsAt ? `–${new Date(row.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`;
+  return { json: row, text: `added: ${row.title} · ${span} · ${row.raw?.calendarName ?? row.raw?.calendarId ?? 'calendar'} · ${row.id}` };
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** `resync [source|all]`, and the source half of bare `collected sync` in local mode (machine-sync.ts). */
@@ -407,7 +490,7 @@ async function canvas(api: Api, args: string[]): Promise<Out> {
 
 /* ---------- dispatch ---------- */
 
-const COMMANDS: Record<string, (api: Api, args: string[]) => Promise<Out>> = { courses, course, assignments, agenda, todo, grades, announcements, dates, sources, jobs, task, done, link, schedule, notes, date, resync, canvas };
+const COMMANDS: Record<string, (api: Api, args: string[]) => Promise<Out>> = { courses, course, assignments, agenda, todo, grades, announcements, dates, sources, jobs, task, done, link, schedule, notes, date, event, resync, canvas };
 
 export const isCollectedCommand = (cmd: string | undefined): cmd is string => !!cmd && cmd in COMMANDS;
 
