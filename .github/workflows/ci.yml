@@ -1,10 +1,11 @@
-# Checks for branches and pull requests. No secrets, no deploy; `deploy.yml` owns main.
+# Checks for every branch and pull request, main included: typecheck, unit tests, e2e, the packed CLI, and the image
+# build without pushing it. No secrets, no deploy; `deploy.yml` owns deploying main. Running on main too is what gives
+# the README badge a real status and runs e2e against what actually shipped.
 name: ci
 
 on:
   pull_request:
   push:
-    branches-ignore: [main]
 
 permissions:
   contents: read

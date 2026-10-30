@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/collected-cli"><img src="https://img.shields.io/npm/v/collected-cli?style=flat&label=collected-cli" alt="collected-cli on npm"></a>
-  <a href="https://github.com/priyam-k/collected/actions/workflows/deploy.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/priyam-k/collected/deploy.yml?branch=main&style=flat&label=main" alt="Checks on main"></a>
+  <a href="https://github.com/priyam-k/collected/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/priyam-k/collected/ci.yml?branch=main&style=flat&label=ci" alt="Checks on main"></a>
   <a href="https://github.com/priyam-k/collected/pkgs/container/collected"><img src="https://img.shields.io/badge/image-ghcr.io%2Fpriyam--k%2Fcollected-2496ED?style=flat&logo=docker&logoColor=white" alt="Container image on GHCR"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/priyam-k/collected?style=flat" alt="License AGPL-3.0"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/collected-cli?style=flat" alt="Node 22.12 or newer"></a>
