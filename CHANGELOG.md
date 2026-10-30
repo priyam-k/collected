@@ -7,12 +7,12 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
-- Canvas: the cookie field takes just the value, with the cookie name picked from a list; personal access tokens are the alternative for schools that allow them.
-
 ## 1.3.0 — 2026-10-30 · recommended
 
-- Canvas: connect with a personal access token (`collected connect canvas --token`, or paste it in Settings → Sources); the browser cookie is the second way.
-- CLI: `connect canvas` reads Zen, LibreWolf, Floorp and Waterfox cookies too, and mentions the Keychain only when a Chromium store is about to be opened.
+- Canvas: the cookie field takes just the value, with the cookie name picked from a list.
+- Canvas: personal access tokens as an alternative for schools that allow them (`collected connect canvas --token`).
+- CLI: `connect canvas` reads Zen, LibreWolf, Floorp and Waterfox cookies too, and only mentions the Keychain when it will prompt.
+- Landing: the agent setup prompt explains each step, offers to skip, and saves the skill for later sessions.
 
 ## 1.2.6 — 2026-10-30 · optional
 
