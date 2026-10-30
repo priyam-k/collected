@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+## 1.2.0 — 2026-10-29 · recommended
+
 - The backend is split into `@collected/core` (database, ingesters, syncs, sessions, scheduler) and the `server` HTTP layer over it. Nothing changes for a running instance: the image runs the same bundle, and the migrations now ship from `core/drizzle` (`MIGRATIONS_DIR` in the image).
 - CLI local mode: `collected init --local` runs the whole backend inside the command over a SQLite database on this machine (`~/.collected/data` by default), with no server, Docker or `.env`. Every command works unchanged; `collected demo <source>` loads fixture data to look around and `collected sync <source|all>` runs a source's sync in-process. The Canvas demo loader now creates courses from the fixture's enrollments when the database has none.
 - CLI local mode is a complete product on one machine: `collected ui` serves the dashboard at `http://127.0.0.1:4848` (loopback only, no sign-in, `/` goes to the board, the scheduler runs while it is open, Ctrl-C stops it cleanly); reads sync a connected source whose last success is older than `freshness.maxAgeMinutes` (30) before answering, with `--fresh` and `--stale-ok` to force either way and a failed sync never blocking the answer; `collected daemon install|uninstall|status` installs a user-level timer (LaunchAgent on macOS, systemd user timer on Linux, a printed `schtasks` line on Windows) running `sync all` every 15 minutes. Every sync run now holds a lock file under `<data dir>/sync.lock/`, and two processes opening one database no longer race the migrations. Settings → Account reads as this machine's when running under `collected ui`.
