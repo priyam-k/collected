@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canvasCookieBlocker, canvasFileUrl, canvasOrigin, normalizeCanvasBaseUrl, previewKind } from './canvas';
+import { canvasCookieBlocker, canvasCookieHeader, canvasCookiePaste, canvasFileUrl, canvasOrigin, normalizeCanvasBaseUrl, previewKind } from './canvas';
 
 describe('canvasOrigin', () => {
   it('takes the first instructure or canvas.* https origin', () => {
@@ -60,8 +60,24 @@ describe('canvasCookieBlocker', () => {
   it('names the missing piece, address first, and clears once both are usable', () => {
     expect(canvasCookieBlocker(null, '')).toBe('Enter your Canvas address first');
     expect(canvasCookieBlocker(null, 'canvas_session=x')).toBe('Enter your Canvas address first');
-    expect(canvasCookieBlocker('https://umd.instructure.com', '  ')).toBe('Paste the cookie');
+    expect(canvasCookieBlocker('https://umd.instructure.com', '  ')).toBe('Paste the cookie value');
     expect(canvasCookieBlocker('https://umd.instructure.com', 'just some token text')).toBe('That is not a cookie yet');
     expect(canvasCookieBlocker('https://umd.instructure.com', 'canvas_session=abc; _csrf=1')).toBeNull();
+  });
+});
+
+describe('canvasCookieHeader', () => {
+  it('prefixes a bare value with the picked name, base64 padding included', () => {
+    expect(canvasCookieHeader('canvas_session', '  abc123  ')).toBe('canvas_session=abc123');
+    expect(canvasCookieHeader('_normandy_session', 'abc==')).toBe('_normandy_session=abc==');
+    expect(canvasCookieHeader('canvas_session', ' ')).toBe('');
+  });
+  it('sends a paste that names its cookie as written, and says which session cookie it is', () => {
+    expect(canvasCookieHeader('_normandy_session', 'canvas_session=abc')).toBe('canvas_session=abc');
+    expect(canvasCookiePaste('canvas_session=abc')).toEqual({ asIs: true, name: 'canvas_session' });
+    expect(canvasCookiePaste('_csrf=1; _normandy_session=x')).toEqual({ asIs: true, name: '_normandy_session' });
+    expect(canvasCookiePaste('_normandy_session=x; canvas_session=y')).toEqual({ asIs: true, name: 'canvas_session' });
+    expect(canvasCookiePaste('other=1')).toEqual({ asIs: true, name: null });
+    expect(canvasCookiePaste('abc==')).toEqual({ asIs: false, name: null });
   });
 });

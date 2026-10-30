@@ -4,12 +4,19 @@ import { Button } from '@/components/ui/button';
 
 /** The paste-into-your-agent setup prompt. README.md carries the same text under "Set up with your AI agent"; keep them equal. */
 export const AGENT_PROMPT =
-  'Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, and it is readable by agents like you. ' +
-  'Start by reading https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md. ' +
-  'Then ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? ' +
-  'Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then connect Canvas with a personal access token (Canvas → Account → Settings → + New Access Token; run `collected connect canvas --token`, which prompts for it; if your school disabled tokens, `collected connect canvas` reads the browser cookie instead), ' +
-  'ask before `collected connect google calendar` and `collected connect google tasks` since they open my browser, tell me how to paste a Todoist token in Settings → Sources, run `collected daemon install`, then `collected ui` and show me `collected agenda`. ' +
-  'Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step and ask before anything that creates accounts or costs money. ' +
+  'Set up collected for me. ' +
+  'It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, readable by agents like you. ' +
+  'First read https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md, and save the skill file where you keep skills (Claude Code: ~/.claude/skills/collected/SKILL.md) so you can use collected in later sessions; if you cannot write there, ask me to. ' +
+  'Ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? ' +
+  'Before each step, say in one line what it does and why, and let me skip it. ' +
+  'Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`. ' +
+  'Canvas: run `collected connect canvas`; it reads my Canvas session cookie from the browser I am signed in with (Chrome, Brave, Edge, Arc, Firefox or Zen; on macOS one Keychain prompt appears, click Allow). ' +
+  'If that fails or I would rather do it myself: in Canvas, DevTools → Application → Cookies → my Canvas domain, copy the value of canvas_session (older schools: _normandy_session) and paste it in Settings → Sources → Canvas, which has a field for just the value; on Windows use Firefox or that paste. ' +
+  'If my school allows personal access tokens, `collected connect canvas --token` is the simpler route. ' +
+  'Google: ask whether I want Calendar and Tasks connected now; `collected connect google calendar` and `collected connect google tasks` open my browser for consent, and I can do them later from Settings → Sources. ' +
+  'Todoist: tell me where to paste a token (Settings → Sources). ' +
+  'Then `collected daemon install` so it stays current, `collected ui` for the dashboard, and show me `collected agenda`. ' +
+  'Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step, asking before anything that creates accounts or costs money. ' +
   'Never ask me to paste secrets into this chat; the CLI prompts for them itself.';
 
 /** Selects the prompt's text so a blocked clipboard still leaves one keystroke to copy it. */
@@ -57,7 +64,7 @@ export function AgentPrompt() {
           <span aria-live="polite">{state === 'copied' ? 'Copied' : state === 'selected' ? `Selected, press ${key}` : 'Copy'}</span>
         </Button>
       </div>
-      <pre className="max-h-[164px] overflow-auto rounded-[14px] bg-well px-4 py-3 font-mono text-[12px] leading-[1.65] text-ink whitespace-pre-wrap [overflow-wrap:anywhere] sm:text-[12.5px]">
+      <pre className="max-h-[220px] overflow-auto rounded-[14px] bg-well px-4 py-3 font-mono text-[12px] leading-[1.65] text-ink whitespace-pre-wrap [overflow-wrap:anywhere] sm:text-[12.5px]">
         <code ref={text}>{AGENT_PROMPT}</code>
       </pre>
       <p className="px-1.5 pt-2.5 text-[12.5px] text-ter">Works with Claude Code, Cursor, Codex and anything that can run a shell</p>

@@ -37,15 +37,7 @@ The one-click one (optional, free, no paid plan or organisation): register a Tod
 The token lands in the same encrypted slot the pasted token uses; Disconnect clears it and revokes it at Todoist. The paste form stays under "or paste an API token" as the fallback.
 
 ### Canvas
-Build the `collected` CLI once (`pnpm --filter agent build`, then `collected init http://localhost:3000` and `collected auth helper-key <LOCAL_HELPER_KEY>`; see "Laptop agent" below). The primary way is a personal access token: in Canvas, Account → Settings → Approved Integrations → "+ New Access Token" (leave the expiry blank; it never expires), copy it, then
-
-```sh
-collected connect canvas --token      # prompts for the token (or reads it from stdin), checks it against Canvas, saves it, syncs
-```
-
-The token goes out as `Authorization: Bearer` on every Canvas request; nothing in the ingester needs the browser session once a token is stored (DECISIONS 060). Saving a token replaces any stored cookie and vice versa. In client mode the CLI's own token is allowed exactly this one write (`PUT /api/sources/canvas/config`).
-
-The second way reads the session cookie out of your browser's own cookie store and posts it to the running app:
+Build the `collected` CLI once (`pnpm --filter agent build`, then `collected init http://localhost:3000` and `collected auth helper-key <LOCAL_HELPER_KEY>`; see "Laptop agent" below). The default way is the session cookie, because many schools (UMD among them) turn personal access tokens off. The CLI reads it out of your browser's own cookie store and posts it to the running app:
 
 ```sh
 collected connect canvas              # reads the default browser, posts to the server in agent.json
@@ -55,7 +47,15 @@ collected connect canvas --browser arc   # chrome | brave | edge | arc | chromiu
 
 Firefox and its forks are read in the clear; a Chromium store is Keychain-encrypted, and **macOS asks for your Keychain password just before one is opened — click "Allow", not "Always Allow".** Only the session cookies are sent, over the https (or localhost) server URL. A cookie expires with the browser session; a token does not.
 
-Or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy `canvas_session` (older Canvas instances call it `_normandy_session`; either works) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
+Or by hand: Chrome DevTools → Application → Cookies → `umd.instructure.com` → copy the value of `canvas_session` (older Canvas instances call it `_normandy_session`; pick that name in the list next to the field) into Settings → Sources → Canvas. Also paste the iCal feed URL from Canvas → Calendar → Calendar Feed, for the fallback.
+
+If your school allows personal access tokens, a token is the alternative: in Canvas, Account → Settings → Approved Integrations → "+ New Access Token" (leave the expiry blank; it never expires), copy it, then
+
+```sh
+collected connect canvas --token      # prompts for the token (or reads it from stdin), checks it against Canvas, saves it, syncs
+```
+
+The token goes out as `Authorization: Bearer` on every Canvas request; nothing in the ingester needs the browser session once a token is stored (DECISIONS 060). Saving a token replaces any stored cookie and vice versa. In client mode the CLI's own token is allowed exactly this one write (`PUT /api/sources/canvas/config`). It can also be pasted in Settings → Sources → Canvas under "Use a personal access token instead".
 
 ### Gradescope
 Email + password into Settings → Sources → Gradescope. Then in Settings → Courses, set each course's Gradescope course id (the number in the course URL) and `submits_via`.
@@ -226,7 +226,7 @@ The CLI signs in with a token: `collected login` opens Settings → Account, you
 
 ## Phase 3 — after deploy
 
-- Connect Canvas on prod: point the CLI at prod (`collected init https://collected.example.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas --token` (or plain `collected connect canvas` for the browser cookie). Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
+- Connect Canvas on prod: point the CLI at prod (`collected init https://collected.example.com` + `collected auth service-token <id>`, per the "Laptop agent" section below) and run `collected connect canvas` (or `collected connect canvas --token` if the school allows access tokens). Through Cloudflare Access the CLI needs the **service token** it stored in `agent.json`; without it Access answers with its login page whatever headers are sent (DECISIONS 038).
 - Enter Gradescope credentials and Todoist token in prod settings.
 - Fill in Gradescope course ids and `submits_via` per course.
 - Enable the Todoist push sync once the homework section looks right for a day. If Google Tasks is the app instead, enable its push under Settings → To-do apps → Google Tasks (list `School`, course code in the title); both can be on while switching, each with its own mapping and fuse, but leave only one on afterwards. `pnpm cli push todoist --dry-run` / `pnpm cli push gtasks --dry-run` preview either.

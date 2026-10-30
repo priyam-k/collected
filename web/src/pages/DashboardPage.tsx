@@ -29,7 +29,7 @@ function FirstRun() {
             <div className="font-semibold">Connect Canvas {canvasOk && <span className="ml-1 font-medium text-positive">Connected</span>}</div>
             <div className="mt-1 leading-relaxed text-sub">
               On your laptop: <code className={code}>npm i -g collected-cli</code>, then <code className={code}>collected init {window.location.origin}</code>, <code className={code}>collected login</code> and{' '}
-              <code className={code}>collected connect canvas --token</code> with a Canvas access token (Account → Settings → + New Access Token). Or paste the token under <Link to="/settings/sources" className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">Sources</Link>.
+              <code className={code}>collected connect canvas</code>, which reads your Canvas session cookie from your browser. Or paste the cookie, or a personal access token if your school allows them, under <Link to="/settings/sources" className="font-medium text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">Sources</Link>.
             </div>
           </div>
         </li>

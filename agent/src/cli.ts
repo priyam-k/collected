@@ -58,10 +58,11 @@ function usage(): never {
     daemon install [--interval N] | uninstall | status
                                               a user timer running \`collected sync\` every N minutes (15 in local mode, 30 against a server;
                                               daemon.intervalMinutes in agent.json wins); install-launchd / uninstall-launchd still mean the same
-    connect canvas --token [--domain host] [--dry-run]
-                                              paste a Canvas access token (Canvas → Account → Settings → New Access Token): checked, then saved. The simplest way
     connect canvas [--browser X] [--domain host] [--dry-run]
-                                              or read the Canvas session cookie from your browser and send it to the server
+                                              read the Canvas session cookie from your browser and send it to the server
+    connect canvas --token [--domain host] [--dry-run]
+                                              or, if your school allows tokens, paste a Canvas access token (Canvas → Account →
+                                              Settings → New Access Token): checked, then saved
     connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
                                               (overrides, if you have your own OAuth client: ${localDotenvPath()})
 

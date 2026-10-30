@@ -7,6 +7,8 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+- Canvas: the cookie field takes just the value, with the cookie name picked from a list; personal access tokens are the alternative for schools that allow them.
+
 ## 1.3.0 — 2026-10-30 · recommended
 
 - Canvas: connect with a personal access token (`collected connect canvas --token`, or paste it in Settings → Sources); the browser cookie is the second way.

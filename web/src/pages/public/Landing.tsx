@@ -248,7 +248,7 @@ function RunIt() {
             The whole backend runs inside the CLI, over a SQLite database on this machine, and{' '}
             <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected ui</code> opens the same dashboard. Sources keep syncing while it is open.
           </p>
-          <Commands lines={['npm i -g collected-cli', 'collected init --local', 'collected connect canvas --token', 'collected connect google calendar', 'collected ui']} />
+          <Commands lines={['npm i -g collected-cli', 'collected init --local', 'collected connect canvas', 'collected connect google calendar', 'collected ui']} />
           <p className="mt-4 text-[13.5px] text-ter">
             No server. No Google Cloud project. Data stays in <span className="font-mono text-[12.5px] text-sub">~/.collected</span>.
           </p>

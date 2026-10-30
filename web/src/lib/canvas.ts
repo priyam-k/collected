@@ -87,7 +87,30 @@ export function normalizeCanvasBaseUrl(input: string): string | null {
 /** Why the Sources page's cookie button is off, in the user's terms; null when it can be pressed. */
 export function canvasCookieBlocker(baseUrl: string | null, cookie: string): string | null {
   if (!baseUrl) return 'Enter your Canvas address first';
-  if (!cookie.trim()) return 'Paste the cookie';
+  if (!cookie.trim()) return 'Paste the cookie value';
   if (!cookie.includes('=')) return 'That is not a cookie yet';
   return null;
+}
+
+/** The two names Canvas gives its session cookie: `canvas_session`, or `_normandy_session` on older instances. */
+export const CANVAS_COOKIE_NAMES = ['canvas_session', '_normandy_session'] as const;
+export type CanvasCookieName = (typeof CANVAS_COOKIE_NAMES)[number];
+
+/**
+ * What a paste into the cookie value field already says. `asIs` when it names a cookie itself (`canvas_session=…`,
+ * or a whole Cookie header): it is sent as written, and `name` is the session cookie it carries, if one, so the name
+ * select can follow it. A value that only ends in `=` (base64 padding) is a bare value, not a name.
+ */
+export function canvasCookiePaste(value: string): { asIs: boolean; name: CanvasCookieName | null } {
+  const v = value.trim();
+  const asIs = v.includes(';') || /^[^=\s]+=(?!=*$)/.test(v);
+  if (!asIs) return { asIs, name: null };
+  return { asIs, name: CANVAS_COOKIE_NAMES.find((n) => new RegExp(`(?:^|[;\\s])${n}=`).test(v)) ?? null };
+}
+
+/** The `cookieHeader` the Sources form sends: `<name>=<value>` for a bare value, a paste that names its cookie as written. */
+export function canvasCookieHeader(name: CanvasCookieName, value: string): string {
+  const v = value.trim();
+  if (!v) return '';
+  return canvasCookiePaste(v).asIs ? v : `${name}=${v}`;
 }

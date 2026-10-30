@@ -142,7 +142,7 @@ describe('connectCanvas', () => {
     const err = await connectCanvas(cfg(), { log, api, keychainPassword: reader, home, platform: 'darwin' }).catch((e: Error) => e);
     expect(err).toBeInstanceOf(Error);
     const lines = (err as Error).message.split('\n');
-    expect(lines[0]).toMatch(/no Canvas session cookie.*chrome\/brave\/edge\/arc\/chromium\/firefox\/zen\/librewolf\/floorp\/waterfox.*connect canvas --token.*Settings → Sources/);
+    expect(lines[0]).toMatch(/no Canvas session cookie.*chrome\/brave\/edge\/arc\/chromium\/firefox\/zen\/librewolf\/floorp\/waterfox.*Settings → Sources.*connect canvas --token/);
     expect(lines.slice(1)).toEqual([
       '  chrome: 1 profile, no session cookie for umd.instructure.com',
       '  brave: not installed',

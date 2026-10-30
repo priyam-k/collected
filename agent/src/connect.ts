@@ -4,10 +4,11 @@ import type { AgentConfig } from './config.js';
 import { BROWSER_ORDER, chromiumUserDataDir, describeScan, isBrowserId, isFirefoxFamily, scanBrowser, type BrowserId, type DpapiUnprotect, type FoundCookie, type KeychainReader, type LinuxKeyringReader } from './browser-cookies.js';
 
 /*
- * `collected connect canvas`: give the server a Canvas credential. `--token` is the primary way: a personal access
- * token the user mints in Canvas (Account → Settings → Approved Integrations → New Access Token), typed at a prompt
- * or piped on stdin, checked against Canvas, then stored through `PUT /api/sources/canvas/config`. Without `--token`
- * the command reads the Canvas session cookie out of a local browser and posts it, replacing local/canvas_cookie.py.
+ * `collected connect canvas`: give the server a Canvas credential. The default reads the Canvas session cookie out of
+ * a local browser and posts it, replacing local/canvas_cookie.py; many schools (UMD among them) turn personal access
+ * tokens off, which is why the cookie is the way in. `--token` is the alternative where a school allows them: a token
+ * the user mints in Canvas (Account → Settings → Approved Integrations → New Access Token), typed at a prompt or
+ * piped on stdin, checked against Canvas, then stored through `PUT /api/sources/canvas/config`.
  * Only the credential leaves this machine, over the server URL that agent.json already validated. Neither a token
  * nor a cookie value is ever printed — names and the host only.
  */
@@ -83,7 +84,7 @@ export async function connectCanvas(cfg: AgentConfig, opts: ConnectOptions): Pro
     if (!dir || !existsSync(dir)) return;
     warnedChromium = true;
     if (platform === 'darwin') log('macOS may ask for your Keychain password — click "Allow" (not "Always Allow").');
-    else if (platform === 'win32') log('Firefox works directly; Chrome and Edge keep theirs app-bound, so those usually need an access token (connect canvas --token) or the paste in Settings → Sources.');
+    else if (platform === 'win32') log('Firefox works directly; Chrome and Edge keep theirs app-bound, so those usually need the paste in Settings → Sources, or an access token (connect canvas --token) if your school allows tokens.');
   };
 
   // Every browser's outcome is kept, so the error says what was looked at: not installed, N profiles without the
@@ -118,7 +119,7 @@ export async function connectCanvas(cfg: AgentConfig, opts: ConnectOptions): Pro
           ? ' On Linux, Firefox and its forks always work; Chromium browsers only with the basic password store.'
           : '';
     throw new Error(
-      `no Canvas session cookie (${SESSION_COOKIE_NAMES.join(' / ')}) for ${host} in ${where}. The simplest fix is an access token: run \`collected connect canvas --token\` and paste one from ${TOKEN_HOWTO}. Otherwise open https://${host} in ${where2} and sign in first, or paste the cookie in Settings → Sources.${platformHint}\n${notes.map((n) => `  ${n}`).join('\n')}`,
+      `no Canvas session cookie (${SESSION_COOKIE_NAMES.join(' / ')}) for ${host} in ${where}. Open https://${host} in ${where2} and sign in first, or paste the cookie yourself in Settings → Sources → Canvas (DevTools → Application → Cookies → ${host}, the value of canvas_session). If your school allows tokens, \`collected connect canvas --token\` takes one from ${TOKEN_HOWTO}.${platformHint}\n${notes.map((n) => `  ${n}`).join('\n')}`,
     );
   }
 

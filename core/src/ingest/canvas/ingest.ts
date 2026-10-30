@@ -206,7 +206,7 @@ export const canvasIngester: Ingester = {
   timeoutMs: 240_000,
   async run(ctx, signal) {
     const config = await getSourceConfig<CanvasConfig>(ctx, 'canvas');
-    if (!config) throw new NotConfiguredError('Canvas is not set up: add an access token in Settings → Sources');
+    if (!config) throw new NotConfiguredError('Canvas is not set up: add a session cookie (or an access token) in Settings → Sources');
     const parsed = sourceConfigSchemas.canvas.parse(config);
     const client = await CanvasClient.fromConfig(parsed, ctx.log);
     try {
