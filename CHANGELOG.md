@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- Calendar: the Week view's time grid covers the whole day, 12 AM to midnight, instead of 7 AM to 11 PM, so the now line is always on it and nothing early or late is cut off. Hours keep their height and the grid scrolls inside the widget; it opens with the current time about a third of the way down, or at 7 AM on a week without today.
+
 ## 1.2.5 — 2026-10-30 · optional
 
 - CLI: `collected event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]` creates a timed event in Google Calendar through the server's `POST /api/calendar/events` (the same route the widget's quick add uses, in client and local mode alike); `--on YYYY-MM-DD [--until YYYY-MM-DD]` makes an all-day event, `--until` being the last day it is on. `<when>` is `2026-11-03 14:00` (or `T14:00`), `today 14:00`, `tomorrow 9:30` or a weekday and time (`fri 17:00`, the next Friday; today when the time is still ahead), read in the machine's timezone and sent as ISO; `--for` takes `30m`, `1h`, `1h30m` and refuses days; without an end the server's 60 minutes apply. `--calendar` matches an id exactly or a calendar name case-insensitively and names the calendars when it cannot; omitted, the server's default calendar is used. The answer is `added: <title> · <when> · <calendar> · <item id>`, or the created item with `--json`. `collected event calendars` lists the connected calendars with the default and primary marked, or says Google Calendar is not connected.

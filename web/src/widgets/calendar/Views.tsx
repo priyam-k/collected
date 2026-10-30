@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { addDays, endOfDay, format, getHours, getMinutes, isSameMonth } from 'date-fns';
 import type { EffectiveItem } from '@collected/shared';
 import { cn } from '@/lib/utils';
 import { ItemPopover } from '@/widgets/ItemPopover';
 import { useScrollEdges } from '@/widgets/shared';
-import { HOUR_END, HOUR_START, MIN_EVENT_PX, PX_PER_HOUR, dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, placeDay, sortItems, timeLabel } from './utils';
+import { GRID_MINUTES, MIN_EVENT_PX, PX_PER_HOUR, SCROLL_TO_HOUR, dayKey, daysBetween, groupByDay, isToday, itemColor, itemEnd, itemTime, placeDay, sortItems, timeLabel } from './utils';
 
 const tint = (color: string | null, pct: number) => `color-mix(in srgb, ${color ?? 'var(--ink)'} ${pct}%, var(--surface))`;
 
@@ -141,24 +141,30 @@ export function WeekStrip({ items, from }: { items: EffectiveItem[]; from: Date 
   );
 }
 
+/** "12 AM", "7 AM", "12 PM", "11 PM". */
+const hourLabel = (h: number) => (h === 0 ? '12 AM' : h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`);
+/** The scroller's top padding (pt-2.5): the grid's midnight line sits this far below its top edge. */
+const GRID_PAD_TOP = 10;
+
 /* ---------- lg: week grid with hours ---------- */
 export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: Date; now: Date }) {
   const fade = useScrollEdges();
   const dayList = daysBetween(from, addDays(from, 6));
   const grouped = groupByDay(items, dayList);
-  const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
-  const nowTop = (getHours(now) + getMinutes(now) / 60 - HOUR_START) * PX_PER_HOUR;
+  // the whole day; the grid scrolls inside the widget rather than squeezing 24 rows into its height
+  const gridPx = (GRID_MINUTES / 60) * PX_PER_HOUR;
+  const hours = Array.from({ length: GRID_MINUTES / 60 }, (_, h) => h);
+  const nowTop = (getHours(now) + getMinutes(now) / 60) * PX_PER_HOUR;
   const scrollRef = useRef<HTMLDivElement>(null);
   const setScroller = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
     return fade(el);
   }, [fade]);
-  // Start the day view a little above "now" (or at 8 AM outside today's week).
-  useEffect(() => {
+  // Open with "now" a third of the way down the visible area; a week without today opens at 7 AM.
+  useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const hasToday = dayList.some(isToday);
-    el.scrollTop = Math.max(0, (hasToday ? nowTop : (8 - HOUR_START) * PX_PER_HOUR) - 60);
+    el.scrollTop = dayList.some(isToday) ? GRID_PAD_TOP + nowTop - el.clientHeight / 3 : SCROLL_TO_HOUR * PX_PER_HOUR;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from.getTime()]);
   const col = 'grid-cols-[48px_repeat(7,minmax(0,1fr))]';
@@ -181,11 +187,11 @@ export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: D
       </div>
       {/* pt keeps the first hour label, centred on its line, from being clipped at the top of the scroller */}
       <div ref={setScroller} className="scroll-fade relative min-h-0 flex-1 overflow-auto px-2.5 pb-2 pt-2.5">
-        <div className={cn('grid', col)} style={{ height: (hours.length - 1) * PX_PER_HOUR + 8 }}>
+        <div className={cn('grid', col)} style={{ height: gridPx + 8 }}>
           <div className="relative">
             {hours.map((h) => (
-              <span key={h} className="absolute right-2.5 -translate-y-1/2 text-[11px] text-ter" style={{ top: (h - HOUR_START) * PX_PER_HOUR }}>
-                {h === 12 ? '12 PM' : h > 12 ? `${h - 12} PM` : `${h} AM`}
+              <span key={h} className="absolute right-2.5 -translate-y-1/2 text-[11px] text-ter" style={{ top: h * PX_PER_HOUR }}>
+                {hourLabel(h)}
               </span>
             ))}
           </div>
@@ -199,7 +205,7 @@ export function WeekGrid({ items, from, now }: { items: EffectiveItem[]; from: D
                 className={cn('relative border-l border-line', today && 'rounded-[10px] bg-well/55')}
                 style={{ backgroundImage: `repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent ${PX_PER_HOUR}px)` }}
               >
-                {today && nowTop >= 0 && nowTop <= (hours.length - 1) * PX_PER_HOUR && (
+                {today && (
                   <>
                     <div className="absolute inset-x-0 z-10 h-[2px] rounded-full bg-brand" style={{ top: nowTop }} />
                     <div className="absolute -left-[5px] z-10 size-2.5 rounded-full bg-brand shadow-[0_0_0_2px_var(--surface)]" style={{ top: nowTop - 4 }} />

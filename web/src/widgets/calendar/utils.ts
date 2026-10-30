@@ -89,16 +89,18 @@ export function autoView(width: number, height: number): CalView {
 }
 
 /* ---------- week grid layout ---------- */
-export const HOUR_START = 7;
-export const HOUR_END = 23;
+/** The grid covers the whole day, midnight to midnight; it scrolls inside the widget at this many px per hour. */
+export const GRID_MINUTES = 24 * 60;
 export const PX_PER_HOUR = 52;
+/** Where the grid opens on a week without today in it. */
+export const SCROLL_TO_HOUR = 7;
 export const MIN_EVENT_PX = 22;
 
 export interface Placed {
   item: EffectiveItem;
   start: Date;
   end: Date;
-  /** Minutes after HOUR_START, clamped to the grid. */
+  /** Minutes after midnight, clamped to the day. */
   top: number;
   bottom: number;
   col: number;
@@ -106,14 +108,14 @@ export interface Placed {
 }
 
 /**
- * Lays out one day's timed events: each is clamped to the 7 AM – 11 PM grid (an event outside it sits at the
- * edge it's past), then events that overlap, counting the minimum drawn height, are clustered and dealt into
+ * Lays out one day's timed events: each is clamped to its start's day (an event running past midnight stops at
+ * the bottom of the grid), then events that overlap, counting the minimum drawn height, are clustered and dealt into
  * side-by-side columns; every event in a cluster is 1/columns wide.
  */
 export function placeDay(timed: EffectiveItem[]): Placed[] {
-  const gridMin = (HOUR_END - HOUR_START) * 60;
+  const gridMin = GRID_MINUTES;
   const minDur = (MIN_EVENT_PX / PX_PER_HOUR) * 60;
-  const minuteOf = (d: Date, day: Date) => (d.getTime() - day.getTime()) / 60_000 - HOUR_START * 60;
+  const minuteOf = (d: Date, day: Date) => (d.getTime() - day.getTime()) / 60_000;
   const placed: Placed[] = timed.map((item) => {
     const start = itemTime(item)!;
     const end = itemEnd(item) ?? new Date(start.getTime() + 30 * 60_000);
@@ -122,7 +124,7 @@ export function placeDay(timed: EffectiveItem[]): Placed[] {
     let top = Math.max(0, minuteOf(start, day));
     let bottom = Math.min(gridMin, minuteOf(end, day));
     if (bottom - top < minDur) {
-      // too short to draw, or wholly before 7 AM / after 11 PM: give it the minimum height, kept inside the grid
+      // too short to draw: give it the minimum height, kept inside the grid (one starting at 11:55 PM moves up)
       top = Math.min(top, gridMin - minDur);
       bottom = top + minDur;
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveItem } from '@collected/shared';
-import { HOUR_END, HOUR_START, placeDay, type Placed } from './utils';
+import { GRID_MINUTES, placeDay, type Placed } from './utils';
 
 /** A timed event on Oct 28 from h1:m1 to h2:m2 (local time). */
 function ev(id: string, start: [number, number], end: [number, number]): EffectiveItem {
@@ -28,14 +28,21 @@ describe('placeDay', () => {
     expect(p('c')).toMatchObject({ col: 1, cols: 2 });
   });
 
-  it('clamps events to the grid', () => {
-    const gridMin = (HOUR_END - HOUR_START) * 60;
-    const p = place(ev('early', [6, 0], [8, 0]), ev('late', [22, 0], [23, 59]), ev('night', [23, 30], [23, 45]), ev('dawn', [5, 0], [6, 0]));
-    expect(p('early')).toMatchObject({ top: 0, bottom: 60 });
-    expect(p('late').bottom).toBe(gridMin);
-    expect(p('night').bottom).toBe(gridMin);
-    expect(p('night').top).toBeLessThan(gridMin);
-    expect(p('dawn').top).toBe(0);
-    expect(p('dawn').bottom).toBeGreaterThan(0);
+  it('places events by minutes after midnight, early morning and late night included', () => {
+    const p = place(ev('dawn', [5, 0], [6, 0]), ev('early', [6, 0], [8, 0]), ev('late', [22, 0], [23, 59]));
+    expect(p('dawn')).toMatchObject({ top: 300, bottom: 360 });
+    expect(p('early')).toMatchObject({ top: 360, bottom: 480 });
+    expect(p('late')).toMatchObject({ top: 1320, bottom: 1439 });
+  });
+
+  it('clamps events to the day', () => {
+    const across = ev('across', [23, 0], [23, 0]);
+    (across as { endsAt: string }).endsAt = new Date(2026, 9, 29, 1, 0).toISOString();
+    const p = place(across, ev('night', [23, 55], [23, 59]), ev('midnight', [0, 0], [0, 5]));
+    expect(p('across')).toMatchObject({ top: 1380, bottom: GRID_MINUTES });
+    expect(p('night').bottom).toBe(GRID_MINUTES);
+    expect(p('night').top).toBeLessThan(23 * 60 + 55);
+    expect(p('midnight').top).toBe(0);
+    expect(p('midnight').bottom).toBeGreaterThan(5);
   });
 });
