@@ -42,4 +42,24 @@ describe('POST /api/sources/sync', () => {
     expect(list.length).toBeGreaterThan(0);
     expect(list.every((s) => s.running === false)).toBe(true);
   });
+
+  it('publishes the Canvas base URL in meta after a config save, and never the cookie', async () => {
+    const ctx = await testContext();
+    const app = new Hono().route('/api/sources', sourcesRoutes(ctx, { ingesters: [], run: async () => ({ ok: true, result: { counts: {} }, ms: 1 }) }));
+    const res = await app.request('/api/sources/canvas/config', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=SECRETVALUE' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { hasConfig: boolean; meta: Record<string, unknown> };
+    expect(body.hasConfig).toBe(true);
+    expect(body.meta.baseUrl).toBe('https://canvas.school.edu');
+    expect(JSON.stringify(body)).not.toContain('SECRETVALUE');
+    // A cleared cookie keeps the address: the form prefills it for the replacement.
+    await app.request('/api/sources/canvas/config', { method: 'DELETE' });
+    const after = (await (await app.request('/api/sources/canvas')).json()) as { hasConfig: boolean; meta: Record<string, unknown> };
+    expect(after.hasConfig).toBe(false);
+    expect(after.meta.baseUrl).toBe('https://canvas.school.edu');
+  });
 });

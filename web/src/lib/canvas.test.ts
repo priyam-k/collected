@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canvasFileUrl, canvasOrigin, previewKind } from './canvas';
+import { canvasCookieBlocker, canvasFileUrl, canvasOrigin, normalizeCanvasBaseUrl, previewKind } from './canvas';
 
 describe('canvasOrigin', () => {
   it('takes the first instructure or canvas.* https origin', () => {
@@ -38,5 +38,30 @@ describe('canvasFileUrl', () => {
   it('encodes the id', () => {
     expect(canvasFileUrl(123)).toBe('/api/canvas/files/123/open');
     expect(canvasFileUrl('1/../x?y', { download: true })).toBe('/api/canvas/files/1%2F..%2Fx%3Fy/open?download=1');
+  });
+});
+
+describe('normalizeCanvasBaseUrl', () => {
+  it('turns a bare host, a URL with a path, or http into https://<host>', () => {
+    expect(normalizeCanvasBaseUrl('umd.instructure.com')).toBe('https://umd.instructure.com');
+    expect(normalizeCanvasBaseUrl('  umd.instructure.com/courses/1?x=1#y  ')).toBe('https://umd.instructure.com');
+    expect(normalizeCanvasBaseUrl('http://umd.instructure.com')).toBe('https://umd.instructure.com');
+    expect(normalizeCanvasBaseUrl('HTTPS://Canvas.School.EDU/')).toBe('https://canvas.school.edu');
+    expect(normalizeCanvasBaseUrl('canvas.school.edu:8443/login')).toBe('https://canvas.school.edu:8443');
+  });
+  it('yields null when there is no host to use', () => {
+    for (const s of ['', '   ', 'https://', 'umd', 'umd instructure', 'canvas.', 'https://user:pw@umd.instructure.com', 'not a url at all']) {
+      expect(normalizeCanvasBaseUrl(s)).toBeNull();
+    }
+  });
+});
+
+describe('canvasCookieBlocker', () => {
+  it('names the missing piece, address first, and clears once both are usable', () => {
+    expect(canvasCookieBlocker(null, '')).toBe('Enter your Canvas address first');
+    expect(canvasCookieBlocker(null, 'canvas_session=x')).toBe('Enter your Canvas address first');
+    expect(canvasCookieBlocker('https://umd.instructure.com', '  ')).toBe('Paste the cookie');
+    expect(canvasCookieBlocker('https://umd.instructure.com', 'just some token text')).toBe('That is not a cookie yet');
+    expect(canvasCookieBlocker('https://umd.instructure.com', 'canvas_session=abc; _csrf=1')).toBeNull();
   });
 });

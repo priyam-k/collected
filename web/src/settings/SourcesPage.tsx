@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { isLocalOwner, useClearSourceConfig, useDisconnectTodoist, useMe, usePatchSourceMeta, useSaveSourceConfig, useSetSourceEnabled, useSourceSummary, useSources, useSyncSource } from '@/lib/queries';
+import { canvasCookieBlocker, normalizeCanvasBaseUrl } from '@/lib/canvas';
 import { safeColor } from '@/lib/color';
 import { friendlyDate, relative } from '@/lib/time';
 import { safeHref } from '@/lib/url';
@@ -271,13 +272,19 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   const canvas = useSave('canvas');
   const icalSave = useSave('canvas_ical');
   const [cookie, setCookie] = useState('');
-  // No default host: every school has its own Canvas address, so the user types it when connecting.
-  const [baseUrl, setBaseUrl] = useState('');
-  const baseUrlOk = /^https:\/\/[^\s/]+/.test(baseUrl.trim());
+  // No default host: every school has its own Canvas address. The server mirrors the saved one into meta (it is
+  // not a secret), so a replaced cookie starts from it; the field stays editable.
+  const saved = typeof source.meta.baseUrl === 'string' ? source.meta.baseUrl : '';
+  const [baseUrl, setBaseUrl] = useState(saved);
+  useEffect(() => setBaseUrl((v) => (v.trim() ? v : saved)), [saved]);
+  const normalized = normalizeCanvasBaseUrl(baseUrl);
+  const cookieNotCookie = cookie.trim() !== '' && !cookie.includes('=');
+  const blocker = canvasCookieBlocker(normalized, cookie);
   const [icalUrl, setIcalUrl] = useState('');
   const submitCookie = (e: FormEvent) => {
     e.preventDefault();
-    canvas.save({ baseUrl: baseUrl.trim(), cookieHeader: cookie.trim() }, () => setCookie(''));
+    if (!normalized || blocker) return;
+    canvas.save({ baseUrl: normalized, cookieHeader: cookie.trim() }, () => setCookie(''));
   };
   const submitIcal = (e: FormEvent) => {
     e.preventDefault();
@@ -286,9 +293,10 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <form onSubmit={submitCookie} className="space-y-3">
-        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas.">
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://umd.instructure.com" required />
+        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas. A bare host or a page address both work; it is saved as https://<host>.">
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="canvas.yourschool.edu" aria-invalid={baseUrl.trim() !== '' && !normalized ? true : undefined} />
         </Field>
+        {baseUrl.trim() !== '' && !normalized && <p className="-mt-2 text-xs text-critical">That does not look like a Canvas address: a host like canvas.yourschool.edu or umd.instructure.com.</p>}
         <Field
           label="Session cookie"
           hint={
@@ -298,15 +306,21 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
             </>
           }
         >
-          <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" />
+          <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" aria-invalid={cookieNotCookie ? true : undefined} />
         </Field>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!baseUrlOk || !cookie.trim() || canvas.pending}>
+        {cookieNotCookie && (
+          <p className="-mt-2 text-xs text-critical">
+            That does not look like a cookie: there is no <Cmd>name=value</Cmd> in it. Copy the value column next to <Cmd>canvas_session</Cmd> as <Cmd>canvas_session=…</Cmd>, or the whole Cookie header.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" disabled={!!blocker || canvas.pending}>
             {source.hasConfig ? 'Replace cookie' : 'Save cookie'}
           </Button>
           {source.hasConfig && (
             <RemoveCredential source="canvas" what="The saved cookie is removed." onConfirm={canvas.clear} pending={canvas.pending} />
           )}
+          {blocker && <span className="text-xs text-muted-foreground">{blocker}</span>}
         </div>
       </form>
       <form onSubmit={submitIcal} className="space-y-3">

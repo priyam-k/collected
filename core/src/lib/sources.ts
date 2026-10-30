@@ -27,11 +27,20 @@ export async function getSourceConfig<T>(ctx: AppContext, id: SourceId): Promise
   }
 }
 
+/**
+ * Replace a source's secret config. The Canvas base URL is not a secret and the settings form needs it back to
+ * prefill its field, so it is mirrored into the public `meta.baseUrl` on every write (the cookie stays encrypted);
+ * it survives a clear so a replaced cookie does not mean retyping the school's address.
+ */
 export async function setSourceConfig(ctx: AppContext, id: SourceId, config: unknown | null): Promise<void> {
   await ctx.db
     .update(sources)
     .set({ configEnc: config == null ? null : ctx.crypto.encryptJson(config) })
     .where(eq(sources.id, id));
+  if (id === 'canvas' && config && typeof config === 'object') {
+    const baseUrl = (config as { baseUrl?: unknown }).baseUrl;
+    if (typeof baseUrl === 'string' && baseUrl) await mergeSourceMeta(ctx, 'canvas', { baseUrl });
+  }
 }
 
 export async function mergeSourceMeta(ctx: AppContext, id: SourceId, patch: Record<string, unknown>): Promise<void> {

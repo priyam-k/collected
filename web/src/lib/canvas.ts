@@ -65,3 +65,29 @@ export interface PreviewFile {
   contentType?: string | null;
   size?: number | null;
 }
+
+/**
+ * The Canvas address as the settings form accepts it: a bare host (`umd.instructure.com`), a URL with a path
+ * (`https://umd.instructure.com/courses/1`), or `http://…`, all reduced to `https://<host>`. Null when there is no
+ * host in it (empty, spaces, no dot), so the form can say why its button is off rather than let the server reject it.
+ */
+export function normalizeCanvasBaseUrl(input: string): string | null {
+  const raw = input.trim().replace(/^https?:\/\//i, '');
+  if (!raw || /\s/.test(raw)) return null;
+  let u: URL;
+  try {
+    u = new URL(`https://${raw}`);
+  } catch {
+    return null;
+  }
+  if (u.username || u.password || !u.hostname.includes('.') || u.hostname.endsWith('.')) return null;
+  return `https://${u.host}`;
+}
+
+/** Why the Sources page's cookie button is off, in the user's terms; null when it can be pressed. */
+export function canvasCookieBlocker(baseUrl: string | null, cookie: string): string | null {
+  if (!baseUrl) return 'Enter your Canvas address first';
+  if (!cookie.trim()) return 'Paste the cookie';
+  if (!cookie.includes('=')) return 'That is not a cookie yet';
+  return null;
+}
