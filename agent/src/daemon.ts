@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { agentHome, daemonIntervalMinutes, isLocal, localDataDir, type AgentConfig } from './config.js';
+import { agentHome, daemonIntervalMinutes, expandHome, isLocal, localDataDir, type AgentConfig } from './config.js';
 
 /*
  * `collected daemon install|uninstall|status`: a user-level timer that runs bare `collected sync` every N minutes, which
@@ -14,6 +15,10 @@ import { agentHome, daemonIntervalMinutes, isLocal, localDataDir, type AgentConf
  *
  * Before 1.3 the file sync had a timer of its own, `install-launchd` → `com.collected.agent` → bare `sync`, next to
  * this one. `install` and `uninstall` take that plist out when they find it, so no machine runs the file sync twice.
+ *
+ * The unit is named for the agent home: the default `~/.collected` keeps the bare names below, and any other
+ * `COLLECTED_AGENT_HOME` gets a suffix hashed from its path, so a trial install in a second home never overwrites the
+ * real one's timer and each home runs its own.
  */
 
 export const DAEMON_LABEL = 'com.collected.sync';
@@ -21,6 +26,29 @@ export const DAEMON_LABEL = 'com.collected.sync';
 export const LEGACY_LABEL = 'com.collected.agent';
 export const SYSTEMD_UNIT = 'collected-sync';
 export const DAEMON_LOG = 'daemon.log';
+
+export interface DaemonNames {
+  /** The LaunchAgent label: `com.collected.sync[.<hash>]`. */
+  label: string;
+  /** The systemd service and timer: `collected-sync[-<hash>]`. */
+  unit: string;
+  /** The schtasks task name, same as the unit. */
+  task: string;
+  /** True for `~/.collected`: the names above are bare and the legacy `com.collected.agent` migration applies. */
+  isDefault: boolean;
+}
+
+/**
+ * The unit names for an agent home. The default home (`<userHome>/.collected`, or COLLECTED_AGENT_HOME resolving to it)
+ * gets the bare names, so nothing changes for an existing install; any other home gets `.<hash>` / `-<hash>`, the first
+ * eight hex characters of sha256 over the resolved absolute path, the same every time and different for different homes.
+ */
+export function daemonNames(agentHomeDir: string = agentHome(), userHome: string = homedir()): DaemonNames {
+  const resolved = path.resolve(expandHome(agentHomeDir));
+  if (resolved === path.resolve(userHome, '.collected')) return { label: DAEMON_LABEL, unit: SYSTEMD_UNIT, task: SYSTEMD_UNIT, isDefault: true };
+  const hash = createHash('sha256').update(resolved).digest('hex').slice(0, 8);
+  return { label: `${DAEMON_LABEL}.${hash}`, unit: `${SYSTEMD_UNIT}-${hash}`, task: `${SYSTEMD_UNIT}-${hash}`, isDefault: false };
+}
 
 export interface DaemonSpec {
   platform: NodeJS.Platform;
@@ -43,6 +71,8 @@ export interface DaemonFile {
 
 export interface DaemonPlan {
   kind: 'launchd' | 'systemd' | 'schtasks';
+  /** The unit this plan writes, named for the agent home. */
+  names: DaemonNames;
   files: DaemonFile[];
   logFile: string;
   /** For schtasks: the command the person runs; the CLI prints it and does nothing else. */
@@ -54,7 +84,7 @@ const xml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 const unitWord = (s: string): string => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 export const launchAgentsDir = (home: string): string => path.join(home, 'Library', 'LaunchAgents');
-export const launchAgentPath = (home: string): string => path.join(launchAgentsDir(home), `${DAEMON_LABEL}.plist`);
+export const launchAgentPath = (home: string, label: string = DAEMON_LABEL): string => path.join(launchAgentsDir(home), `${label}.plist`);
 export const legacyLaunchAgentPath = (home: string): string => path.join(launchAgentsDir(home), `${LEGACY_LABEL}.plist`);
 export const systemdDir = (home: string): string => path.join(home, '.config', 'systemd', 'user');
 
@@ -65,6 +95,7 @@ export const daemonLogDir = (cfg: AgentConfig): string => (isLocal(cfg) ? localD
 export function daemonPlan(spec: DaemonSpec): DaemonPlan {
   const logFile = path.join(spec.logDir, DAEMON_LOG);
   const interval = Math.max(5, Math.round(spec.intervalMinutes));
+  const names = daemonNames(spec.agentHome ?? path.join(spec.home, '.collected'), spec.home);
   if (spec.platform === 'darwin') {
     const env = [
       ['PATH', `${spec.home}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin`],
@@ -75,7 +106,7 @@ export function daemonPlan(spec: DaemonSpec): DaemonPlan {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>${DAEMON_LABEL}</string>
+  <key>Label</key><string>${names.label}</string>
   <key>ProgramArguments</key>
   <array>
     <string>${xml(spec.node)}</string>
@@ -93,11 +124,11 @@ ${env.map(([k, v]) => `    <key>${k}</key><string>${xml(v!)}</string>`).join('\n
 </dict>
 </plist>
 `;
-    return { kind: 'launchd', files: [{ path: launchAgentPath(spec.home), content }], logFile };
+    return { kind: 'launchd', names, files: [{ path: launchAgentPath(spec.home, names.label), content }], logFile };
   }
   if (spec.platform === 'win32') {
     const tr = `\\"${spec.node}\\" \\"${spec.cli}\\" sync`;
-    return { kind: 'schtasks', files: [], logFile, manual: `schtasks /Create /F /SC MINUTE /MO ${interval} /TN collected-sync /TR "${tr}"` };
+    return { kind: 'schtasks', names, files: [], logFile, manual: `schtasks /Create /F /SC MINUTE /MO ${interval} /TN ${names.task} /TR "${tr}"` };
   }
   const dir = systemdDir(spec.home);
   const service = `[Unit]
@@ -122,9 +153,10 @@ WantedBy=timers.target
 `;
   return {
     kind: 'systemd',
+    names,
     files: [
-      { path: path.join(dir, `${SYSTEMD_UNIT}.service`), content: service },
-      { path: path.join(dir, `${SYSTEMD_UNIT}.timer`), content: timer },
+      { path: path.join(dir, `${names.unit}.service`), content: service },
+      { path: path.join(dir, `${names.unit}.timer`), content: timer },
     ],
     logFile,
   };
@@ -179,11 +211,14 @@ const job = (cfg: AgentConfig): string => (isLocal(cfg) ? 'every enabled source,
 
 /** Writes the unit files and loads them. Returns what to tell the person. */
 export function installDaemon(cfg: AgentConfig, opts: InstallOptions = {}): string {
-  const plan = daemonPlan(specFor(cfg, opts));
+  const spec = specFor(cfg, opts);
+  const plan = daemonPlan(spec);
+  const { names } = plan;
   const every = daemonIntervalMinutes(cfg, opts.interval);
   const notes: string[] = [];
+  if (!names.isDefault) notes.push(`note: COLLECTED_AGENT_HOME=${spec.agentHome} gets its own timer, ${plan.kind === 'launchd' ? names.label : plan.kind === 'systemd' ? `${names.unit}.timer` : names.task}; the default home's is left alone`);
   if (opts.interval !== undefined && cfg.daemon?.intervalMinutes !== undefined && every !== Math.max(5, opts.interval)) notes.push(`note: daemon.intervalMinutes in agent.json is ${cfg.daemon.intervalMinutes}, so --interval ${opts.interval} is not used`);
-  if (plan.kind === 'schtasks') return [...notes, `Windows: run this once in a terminal to sync every ${every} minutes (collected does not run it for you):\n  ${plan.manual}\nlog: the task's own history (schtasks /Query /TN collected-sync)`].join('\n');
+  if (plan.kind === 'schtasks') return [...notes, `Windows: run this once in a terminal to sync every ${every} minutes (collected does not run it for you):\n  ${plan.manual}\nlog: the task's own history (schtasks /Query /TN ${names.task})`].join('\n');
   mkdirSync(path.dirname(plan.logFile), { recursive: true, mode: 0o700 });
   // The log names courses, assignment titles and placed paths; make it ours before launchd or systemd creates it world-readable.
   if (!existsSync(plan.logFile)) writeFileSync(plan.logFile, '', { mode: 0o600 });
@@ -192,46 +227,48 @@ export function installDaemon(cfg: AgentConfig, opts: InstallOptions = {}): stri
     writeFileSync(f.path, f.content, { mode: 0o644 });
   }
   if (plan.kind === 'launchd') {
-    const legacy = removeLegacyLaunchAgent(launchAgentsDir(homedir()));
+    const legacy = names.isDefault ? removeLegacyLaunchAgent(launchAgentsDir(homedir())) : null;
     if (legacy) notes.push(`removed the old file-sync timer ${legacy}: this one runs the file sync now`);
     const file = plan.files[0]!.path;
     bootout(file);
     let r = run('launchctl', ['bootstrap', `gui/${uid()}`, file]);
     if (r.status !== 0) r = run('launchctl', ['load', '-w', file]);
     if (r.status !== 0) throw new Error(`launchctl could not load ${file}: ${(r.stderr || r.stdout || '').trim()}`);
-    return [...notes, `installed ${file}\ncollected sync runs every ${every} minutes while you are logged in: ${job(cfg)}; log: ${plan.logFile}`].join('\n');
+    return [...notes, `installed ${names.label}: ${file}\ncollected sync runs every ${every} minutes while you are logged in: ${job(cfg)}; log: ${plan.logFile}`].join('\n');
   }
   let r = run('systemctl', ['--user', 'daemon-reload']);
-  if (r.status === 0) r = run('systemctl', ['--user', 'enable', '--now', `${SYSTEMD_UNIT}.timer`]);
-  if (r.status !== 0) throw new Error(`systemctl --user could not enable ${SYSTEMD_UNIT}.timer: ${(r.stderr || r.stdout || '').trim()}`);
-  return [...notes, `installed ${plan.files.map((f) => f.path).join(' and ')}\ncollected sync runs every ${every} minutes: ${job(cfg)}; log: ${plan.logFile}`].join('\n');
+  if (r.status === 0) r = run('systemctl', ['--user', 'enable', '--now', `${names.unit}.timer`]);
+  if (r.status !== 0) throw new Error(`systemctl --user could not enable ${names.unit}.timer: ${(r.stderr || r.stdout || '').trim()}`);
+  return [...notes, `installed ${names.unit}.timer: ${plan.files.map((f) => f.path).join(' and ')}\ncollected sync runs every ${every} minutes: ${job(cfg)}; log: ${plan.logFile}`].join('\n');
 }
 
-/** Unloads and removes whatever `install` (or the old `install-launchd`) wrote; false when nothing was there. */
-export function uninstallDaemon(): boolean {
+/** Unloads and removes whatever `install` (or, in the default home, the old `install-launchd`) wrote for this agent home; false when nothing was there. */
+export function uninstallDaemon(names: DaemonNames = daemonNames()): boolean {
   const home = homedir();
   if (process.platform === 'darwin') {
-    const legacy = removeLegacyLaunchAgent(launchAgentsDir(home));
-    const file = launchAgentPath(home);
+    const legacy = names.isDefault ? removeLegacyLaunchAgent(launchAgentsDir(home)) : null;
+    const file = launchAgentPath(home, names.label);
     if (!existsSync(file)) return legacy !== null;
     bootout(file);
     unlinkSync(file);
     return true;
   }
   if (process.platform === 'win32') {
-    console.log('Windows: schtasks /Delete /F /TN collected-sync');
+    console.log(`Windows: schtasks /Delete /F /TN ${names.task}`);
     return false;
   }
   const dir = systemdDir(home);
-  const files = [`${SYSTEMD_UNIT}.timer`, `${SYSTEMD_UNIT}.service`].map((f) => path.join(dir, f));
+  const files = [`${names.unit}.timer`, `${names.unit}.service`].map((f) => path.join(dir, f));
   if (!files.some(existsSync)) return false;
-  run('systemctl', ['--user', 'disable', '--now', `${SYSTEMD_UNIT}.timer`]);
+  run('systemctl', ['--user', 'disable', '--now', `${names.unit}.timer`]);
   for (const f of files) if (existsSync(f)) unlinkSync(f);
   run('systemctl', ['--user', 'daemon-reload']);
   return true;
 }
 
 export interface DaemonStatus {
+  /** The unit asked about: the LaunchAgent label, `<unit>.timer`, or the schtasks name. */
+  unit: string;
   installed: boolean;
   files: string[];
   /** Loaded in launchd / active in systemd, when that could be asked. */
@@ -242,19 +279,22 @@ export interface DaemonStatus {
   tail: string[];
 }
 
-export function daemonStatus(cfg: AgentConfig): DaemonStatus {
+export function daemonStatus(cfg: AgentConfig, names: DaemonNames = daemonNames()): DaemonStatus {
   const home = homedir();
   const logFile = path.join(daemonLogDir(cfg), DAEMON_LOG);
   let files: string[] = [];
   let loaded: boolean | null = null;
+  let unit = names.task;
   if (process.platform === 'darwin') {
-    files = [launchAgentPath(home)].filter(existsSync);
-    if (files.length) loaded = run('launchctl', ['print', `gui/${uid()}/${DAEMON_LABEL}`]).status === 0;
+    unit = names.label;
+    files = [launchAgentPath(home, names.label)].filter(existsSync);
+    if (files.length) loaded = run('launchctl', ['print', `gui/${uid()}/${names.label}`]).status === 0;
   } else if (process.platform !== 'win32') {
-    files = [`${SYSTEMD_UNIT}.timer`, `${SYSTEMD_UNIT}.service`].map((f) => path.join(systemdDir(home), f)).filter(existsSync);
-    if (files.length) loaded = (run('systemctl', ['--user', 'is-active', `${SYSTEMD_UNIT}.timer`]).stdout ?? '').trim() === 'active';
+    unit = `${names.unit}.timer`;
+    files = [`${names.unit}.timer`, `${names.unit}.service`].map((f) => path.join(systemdDir(home), f)).filter(existsSync);
+    if (files.length) loaded = (run('systemctl', ['--user', 'is-active', `${names.unit}.timer`]).stdout ?? '').trim() === 'active';
   }
-  return { installed: files.length > 0, files, loaded, logFile, ...readLog(logFile) };
+  return { unit, installed: files.length > 0, files, loaded, logFile, ...readLog(logFile) };
 }
 
 export function readLog(logFile: string): { lastRunAt: string | null; tail: string[] } {
@@ -272,7 +312,7 @@ const loadedNote = (s: DaemonStatus): string => (s.loaded === null ? '' : s.load
 
 /** `collected daemon status`: the unit, the last run and the log's tail. */
 export function describeStatus(s: DaemonStatus): string {
-  const head = s.installed ? `installed: ${s.files.join(', ')}${loadedNote(s)}` : 'not installed (collected daemon install)';
+  const head = s.installed ? `${s.unit} installed: ${s.files.join(', ')}${loadedNote(s)}` : `${s.unit} not installed (collected daemon install)`;
   const last = s.lastRunAt ? `last run ${s.lastRunAt} (${s.logFile})` : `no run logged yet (${s.logFile})`;
   return [head, last, ...s.tail.map((l) => `  ${l}`)].join('\n');
 }
