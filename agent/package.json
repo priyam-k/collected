@@ -1,6 +1,6 @@
 {
   "name": "collected-cli",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "private": false,
   "type": "module",
   "description": "Command-line client for collected, the self-hosted student dashboard, and the whole app on one machine in local mode: `collected init --local` keeps Canvas, Gradescope, calendar and to-do data in a SQLite file here, `collected ui` serves the dashboard on the loopback. Read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders; against your own server or with no server at all.",

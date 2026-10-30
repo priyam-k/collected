@@ -7,6 +7,8 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.2.6 — 2026-10-30 · optional
+
 - Calendar: only one event popover open at a time.
 - Calendar: the week grid covers the whole day and opens scrolled to now.
 
