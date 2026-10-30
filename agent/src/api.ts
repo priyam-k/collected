@@ -73,33 +73,47 @@ export async function readJson<T>(p: string, res: Response): Promise<T> {
 /** Query string for the items a course's facts files are built from. */
 export const itemsQuery = (courseId: string, kind: 'assignment' | 'announcement'): string => new URLSearchParams({ kind, course: courseId, includeDone: '1', includeInformational: '1', includeHidden: '1', limit: '1000' }).toString();
 
-/** The redirect the file-open route answers with, checked before the CDN is contacted; throws the ApiError the command shows. */
+/** Where a download redirect may point: https, a public host, never an Access login wall. Throws the ApiError the command shows. */
+export function checkDownloadLocation(fileId: string, location: string, base: string, status: number): URL {
+  let target: URL;
+  try {
+    target = new URL(location, base);
+  } catch {
+    throw new ApiError(`file ${fileId}: unreadable download location`, status);
+  }
+  if (/(^|\.)cloudflareaccess\.com$/.test(target.hostname)) throw new ApiError(`file ${fileId}: Cloudflare Access login redirect; credentials not accepted`, status);
+  if (target.protocol !== 'https:') throw new ApiError(`file ${fileId}: download location is not https (${target.protocol})`, status);
+  if (isPrivateHost(target.hostname)) throw new ApiError(`file ${fileId}: download location points at a private host (${target.hostname})`, status);
+  return target;
+}
+
+/** The redirect the file-open route answers with, checked before anything outside the server is contacted. */
 export async function downloadTarget(fileId: string, first: Response, base: string): Promise<URL> {
   const location = first.headers.get('location');
   if (first.status < 300 || first.status >= 400 || !location) {
     const body = await first.text().catch(() => '');
     throw new ApiError(`file ${fileId}: expected a redirect, got ${first.status} ${body.slice(0, 200)}`, first.status);
   }
-  let target: URL;
-  try {
-    target = new URL(location, base);
-  } catch {
-    throw new ApiError(`file ${fileId}: unreadable download location`, first.status);
-  }
-  if (/(^|\.)cloudflareaccess\.com$/.test(target.hostname)) throw new ApiError(`file ${fileId}: Cloudflare Access login redirect; credentials not accepted`, first.status);
-  if (target.protocol !== 'https:') throw new ApiError(`file ${fileId}: download location is not https (${target.protocol})`, first.status);
-  if (isPrivateHost(target.hostname)) throw new ApiError(`file ${fileId}: download location points at a private host (${target.hostname})`, first.status);
-  return target;
+  return checkDownloadLocation(fileId, location, base, first.status);
 }
 
+/** Canvas answers its `/download?verifier=` link with one more redirect to the InstFS CDN; a loop or a chain past this is refused. */
+export const MAX_DOWNLOAD_HOPS = 3;
+
 /**
- * The second hop of a download: fetch the one-shot CDN link into `dest` without following further redirects, within
+ * The hops after the server's redirect: fetch the file into `dest`, following at most `MAX_DOWNLOAD_HOPS` further
+ * redirects, each checked like the first (https, public host, no Access wall), no credentials on any of them, within
  * `maxFileMb`, atomically (`.part` then rename). Shared by the HTTP and the in-process client; the first hop differs.
  */
 export async function downloadFromCdn(fileId: string, target: URL, dest: string, maxFileMb: number | undefined): Promise<void> {
   const limit = (maxFileMb ?? 100) * 1024 * 1024;
-  const res = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
-  if (res.status >= 300 && res.status < 400) throw new ApiError(`file ${fileId}: CDN redirected again (${res.status}); not following`, res.status);
+  let res = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+  for (let hop = 0; res.status >= 300 && res.status < 400; hop++) {
+    const location = res.headers.get('location');
+    if (hop >= MAX_DOWNLOAD_HOPS || !location) throw new ApiError(`file ${fileId}: CDN redirected again (${res.status}); not following past ${MAX_DOWNLOAD_HOPS} hops`, res.status);
+    target = checkDownloadLocation(fileId, location, target.toString(), res.status);
+    res = await fetch(target, { redirect: 'manual', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+  }
   if (!res.ok || !res.body) throw new ApiError(`file ${fileId}: CDN answered ${res.status}`, res.status);
   const declared = Number(res.headers.get('content-length'));
   if (declared > limit) throw new ApiError(`file ${fileId}: ${(declared / 1024 / 1024).toFixed(0)} MB is over this machine's ${maxFileMb ?? 100} MB cap`, 413);

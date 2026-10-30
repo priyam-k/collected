@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- CLI: `collected pull` and the file sync follow Canvas's extra redirect to its file CDN. Canvas answers the verifier link with one more 302 before the bytes, and the downloader stopped there with "CDN redirected again". Up to three further hops are followed, each held to the same rule as the first: https, a public host, never a sign-in page, no credentials sent.
 ## 1.2.1 — 2026-10-30 · optional
 
 - CLI and server versions are checked against each other. Every `/api/*` answer now carries `X-Collected-Version` and `X-Collected-Min-Client`, and `GET /api/system/version` reports `minClient` (the oldest CLI the server talks to; same major is otherwise compatible). The CLI compares off whatever request it was making: behind the server's minor, it prints one stderr line a day (`collected-cli 1.2.0 · server 1.3.0 · run: collected upgrade`); on another major or below `minClient` it refuses with exit 2 before sending anything else. The same daily line says when npm has a newer CLI than the one running, in local mode too; `NO_UPDATE_NOTIFIER=1` keeps that check off the network. `collected --version` prints the version; `collected upgrade [--dry-run]` installs the newest CLI with whatever installed this one (npm, pnpm or bun global; it prints the npm command when it cannot tell). The repository's `.npmrc` is gone (both keys were pnpm defaults and npm warned about them).

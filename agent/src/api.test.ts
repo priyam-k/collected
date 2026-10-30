@@ -38,6 +38,27 @@ describe('Api', () => {
     expect(() => new Api(cfg({ server: 'http://localhost:3000' }))).not.toThrow();
   });
 
+  it('follows Canvas to the CDN: the verifier link answers with one more redirect before the bytes', async () => {
+    const { calls } = stubFetch([
+      redirectTo('https://umd.instructure.com/files/91789738/download?download_frd=1&verifier=abc'),
+      redirectTo('https://inst-fs-iad-prod.inscloudgate.net/files/x/handout.pdf?token=y'),
+      body('pdf bytes'),
+    ]);
+    const dest = path.join(tmp, 'handout.pdf');
+    await new Api(cfg()).download('91789738', dest);
+    expect(readFileSync(dest, 'utf8')).toBe('pdf bytes');
+    expect(calls.map((c) => new URL(c.url).hostname)).toEqual(['collected.example.com', 'umd.instructure.com', 'inst-fs-iad-prod.inscloudgate.net']);
+    expect(calls[1]!.init.headers ?? {}).not.toHaveProperty('Authorization');
+    expect(calls[2]!.init.redirect).toBe('manual');
+  });
+
+  it('refuses a redirect chain past the hop limit and a later hop to a private host', async () => {
+    stubFetch([redirectTo('https://a.example.net/1'), redirectTo('https://b.example.net/2'), redirectTo('https://c.example.net/3'), redirectTo('https://d.example.net/4'), redirectTo('https://e.example.net/5')]);
+    await expect(new Api(cfg()).download('1', path.join(tmp, 'x'))).rejects.toThrow(/not following past 3 hops/);
+    stubFetch([redirectTo('https://a.example.net/1'), redirectTo('https://10.0.0.5/secret')]);
+    await expect(new Api(cfg()).download('1', path.join(tmp, 'y'))).rejects.toThrow(/private host/);
+  });
+
   it('downloads through the one redirect, without auth on the second hop, with timeouts on both', async () => {
     const { calls } = stubFetch([redirectTo('https://inst-fs.example.net/files/1?token=x'), body('pdf bytes')]);
     const dest = path.join(tmp, 'c', '1-v0', 'a.pdf');
@@ -67,9 +88,11 @@ describe('Api', () => {
     await expect(new Api(cfg()).download('1', path.join(tmp, 'x'))).rejects.toThrow(/Cloudflare Access/);
   });
 
-  it('does not follow a second redirect', async () => {
+  it('checks every later hop like the first and leaves no partial file behind', async () => {
     stubFetch([redirectTo('https://cdn.example.net/a'), redirectTo('https://10.0.0.1/b')]);
-    await expect(new Api(cfg()).download('1', path.join(tmp, 'x'))).rejects.toThrow(/redirected again/);
+    await expect(new Api(cfg()).download('1', path.join(tmp, 'x'))).rejects.toThrow(/private host/);
+    stubFetch([redirectTo('https://cdn.example.net/a'), redirectTo('http://cdn.example.net/plain')]);
+    await expect(new Api(cfg()).download('1', path.join(tmp, 'x'))).rejects.toThrow(/not https/);
     expect(existsSync(path.join(tmp, 'x.part'))).toBe(false);
   });
 
