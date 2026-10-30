@@ -7,6 +7,7 @@ import { DemoBoard } from '@/demo/DemoBoard';
 import { isSignedIn, useMe } from '@/lib/queries';
 import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
+import { AgentPrompt } from './landing/AgentPrompt';
 import { Bento } from './landing/Bento';
 import { DotField } from './landing/DotField';
 import { Hub } from './landing/Hub';
@@ -79,6 +80,9 @@ function Hero() {
             </Button>
           </div>
           <p className="mt-5 text-[13px] text-ter">Free and open source · AGPL-3.0 · No ads, no tracking</p>
+        </Reveal>
+        <Reveal delay={210}>
+          <AgentPrompt />
         </Reveal>
         <Reveal delay={240}>
           <ul className="mx-auto mt-14 flex max-w-4xl flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[14px] font-medium text-sub">

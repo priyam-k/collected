@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- Landing page and README: a "Set up with your agent" prompt to paste into Claude Code, Cursor, Codex or any agent with a shell. It reads the skill, the CLI README and the self-host guide, asks laptop or server, and walks the setup, asking before anything that opens the browser, creates accounts or costs money. The landing card has a Copy button (clipboard, falling back to selecting the text).
+
 ## 1.2.4 — 2026-10-30 · recommended
 
 - Settings → Sources: clicking Save on an incomplete form marks the empty or invalid fields red with the reason under each and moves focus there, instead of a button that silently does nothing.

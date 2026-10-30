@@ -23,6 +23,14 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/collected-cli?style=flat" alt="Node 22.12 or newer"></a>
 </p>
 
+### Set up with your AI agent
+
+Paste this into Claude Code, Cursor, Codex or any agent that can run a shell:
+
+```text
+Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, and it is readable by agents like you. Start by reading https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md. Then ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then `collected connect canvas` (I must be signed in to Canvas in Chrome, Brave, Edge, Arc or Firefox; on Windows use Firefox or paste the cookie under Settings → Sources), ask before `collected connect google calendar` and `collected connect google tasks` since they open my browser, tell me how to paste a Todoist token in Settings → Sources, run `collected daemon install`, then `collected ui` and show me `collected agenda`. Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step and ask before anything that creates accounts or costs money. Never ask me to paste secrets into this chat; the CLI prompts for them itself.
+```
+
 One dashboard for everything a student juggles. collected copies your Canvas assignments, Gradescope submissions, Google Calendar, Todoist tasks and a public internship feed into one copy that is yours, and shows them as a grid of widgets you can rearrange: a week calendar, a to-do list that knows what you have already submitted, one row per class, a job feed with an applications tracker. It never owns the data (Canvas stays the truth about assignments, Google about events) and never writes back except where you ask it to. Run it on your laptop with nothing but Node (`collected init --local`: no server, no Docker, no Google Cloud project), on a small server of your own, or on the hosted beta. The `collected` CLI reads the same data from the terminal, keeps your course files sorted into folders on your laptop, and comes with an agent skill so Claude Code or any other agent can answer "what's due this week".
 
 <p align="center">
