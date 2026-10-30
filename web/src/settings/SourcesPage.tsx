@@ -426,7 +426,7 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
                 spellCheck={false}
                 placeholder="value"
                 {...cookieInput}
-                className={cn('rounded-l-none font-mono', cookieInput.className)}
+                className={cn('relative rounded-l-none font-mono focus-visible:z-10 [&.invalid]:z-10', cookieInput.className)}
               />
             </div>
           </Field>
