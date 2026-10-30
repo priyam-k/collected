@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+## 1.2.4 — 2026-10-30 · recommended
+
 - Settings → Sources, Canvas card: the Canvas URL field is prefilled from the saved address (the server now publishes it as `meta.baseUrl`; the cookie stays encrypted and never comes back), accepts a bare host or any page address (`umd.instructure.com`, `umd.instructure.com/courses/1`, `http://…`) and saves it as `https://<host>`, and the Save/Replace cookie button says why it is off (address first, then the cookie) instead of looking like a rejected cookie. Pasted text with no `name=value` in it is flagged inline.
 - CLI: `collected connect canvas` reads Firefox on Windows (`%APPDATA%\Mozilla\Firefox\Profiles`) and Linux (`~/.mozilla/firefox`, the snap and flatpak sandboxes), Chrome/Edge/Brave on Windows (the `Local State` key unwrapped through DPAPI in PowerShell; `v20` app-bound cookies are reported as such with the paste fallback) and Chromium browsers on Linux (the basic `peanuts` store, or the keyring password through `secret-tool`; a locked keyring is named). Before this, every browser read as "not installed" off macOS and the error said the cookie was missing. The "no cookie" error now lists each browser's outcome: not installed, N profiles without the cookie, or why the store could not be read. macOS is unchanged.
 
