@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils';
 import { reducedMotion } from './motion';
 
 /**
- * The logo mark and "collected." drawn in light characters across the full width of the page's closing band. The art
- * is rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to
- * a sparse ramp) and drawn to one canvas that covers the band. It is placed in the band's open space, on whichever
- * side of the `clear` element (the headline card) has more room: below it on a wide screen, the mark beside the word
- * and the word about two thirds of the width; above it on a phone, the mark over the word, filling the width.
+ * The logo mark and "collected." drawn in light characters across the page's closing band, edge to edge. The art is
+ * rasterised once per size (mark and wordmark on an offscreen canvas, coverage sampled per cell, coverage mapped to a
+ * sparse ramp) and drawn to one canvas that covers the band. It is centred vertically on the `center` element (the
+ * headline card), which floats over it: on a wide screen the mark at the left edge and the word across the rest, about
+ * four fifths of the width; on a phone the mark over the word, the word filling the width.
  * As the band scrolls in, glyphs drop a few rows into place, the columns filling in from both sides toward the middle
  * and each column stacking bottom first, each glyph a little early or late. Progress runs 0 when the band's top
  * enters the viewport to 1 at the very bottom of the page, so the art is whole only there; the assembly starts once
@@ -36,15 +36,14 @@ function hash(x: number, y: number, k = 0): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
-/** A band of the canvas, in CSS pixels from its top, that the art is centred in. */
-type Region = { y0: number; y1: number };
-
 /**
- * The mark (on its 32 grid, as in Logo.tsx) and the wordmark, in the proportions of <Logo>: the word at m / 1.3, a
- * 0.35m gap. Side by side on a wide screen, the word about two thirds of the width; stacked, mark over word, on a
- * phone, since a single row would leave the letters too few cells to read. `region` is in raster pixels.
+ * The mark (on its 32 grid, as in Logo.tsx) and the wordmark, edge to edge. On a wide screen they sit in one row
+ * across the whole width: the word's ink about four fifths of it, its final "." a small margin from the right edge,
+ * the mark hugging the left margin and taking what is left (a fifth of its size as the gap), centred on the word's ink.
+ * On a phone, mark over word: the word across the full width, the mark centred above it at about five sixths of the
+ * width. `cy` is the art's vertical centre in raster pixels.
  */
-function rasterise(cols: number, rows: number, stacked: boolean, region: Region): Float32Array {
+function rasterise(cols: number, rows: number, stacked: boolean, cy: number): Float32Array {
   const W = cols * S;
   const H = rows * SY;
   const cov = new Float32Array(cols * rows);
@@ -54,40 +53,38 @@ function rasterise(cols: number, rows: number, stacked: boolean, region: Region)
   const ctx = c.getContext('2d', { willReadFrequently: true });
   if (!ctx) return cov;
   const word = 'collected.';
-  const font = (px: number) => `640 ${px}px ${SANS}`;
   const setFont = (px: number) => {
-    ctx.font = font(px);
+    ctx.font = `640 ${px}px ${SANS}`;
     if ('letterSpacing' in ctx) ctx.letterSpacing = `${-0.035 * px}px`;
     return ctx.measureText(word);
   };
   const t100 = setFont(100);
-  const wordW = t100.width / 100;
-  const wordH = (t100.actualBoundingBoxAscent + t100.actualBoundingBoxDescent) / 100;
-  const RH = Math.max(SY, region.y1 - region.y0);
-  const fs = stacked
-    ? Math.min((W * 0.88) / wordW, (RH * 0.92) / (1.3 * 1.2 + wordH))
-    : Math.min((W * 0.66) / wordW, (W * 0.94) / (1.3 * 1.35 + wordW), (RH * 0.94) / 1.3);
-  const m = fs * 1.3;
+  // The word's ink, not its advance: the trailing letter spacing would otherwise pull the "." off the edge.
+  const inkW = (t100.actualBoundingBoxLeft + t100.actualBoundingBoxRight) / 100;
+  const margin = Math.max(S * 2, W * 0.022);
+  const fs = ((stacked ? W - 2 * margin : W * 0.8) / inkW);
   const tm = setFont(fs);
   const asc = tm.actualBoundingBoxAscent;
   const desc = tm.actualBoundingBoxDescent;
-  const cy = (region.y0 + region.y1) / 2;
+  // The word's ink box ends at W - margin; wx is its pen position.
+  const wx = W - margin - tm.actualBoundingBoxRight;
+  const inkLeft = wx - tm.actualBoundingBoxLeft;
+  let m: number;
   let mx: number;
   let my: number;
-  let wx: number;
   let wy: number;
   if (stacked) {
-    const total = m * 1.2 + asc + desc;
+    m = W * 0.84;
+    const gap = m * 0.16;
+    const total = m + gap + asc + desc;
     mx = (W - m) / 2;
     my = cy - total / 2;
-    wx = (W - tm.width) / 2;
-    wy = my + m * 1.2 + asc;
+    wy = my + m + gap + asc;
   } else {
-    // The word's ink box centred on the mark, as the flex row in <Logo> does.
-    mx = (W - (m * 1.35 + tm.width)) / 2;
+    m = Math.max(0, (inkLeft - margin) / 1.2);
+    mx = margin;
     my = cy - m / 2;
-    wx = mx + m * 1.35;
-    wy = my + m / 2 + (asc - desc) / 2;
+    wy = cy + (asc - desc) / 2;
   }
   const k = m / 32;
   ctx.fillStyle = '#000';
@@ -153,7 +150,7 @@ function glyphs(cov: Float32Array, cols: number, rows: number, share: number): G
 }
 
 
-export function AsciiLogo({ className, clear }: { className?: string; clear?: RefObject<HTMLElement | null> }) {
+export function AsciiLogo({ className, center }: { className?: string; center?: RefObject<HTMLElement | null> }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -183,18 +180,11 @@ export function AsciiLogo({ className, clear }: { className?: string; clear?: Re
       cw = Math.max(3.8, Math.min(10, W / 190));
       cols = Math.floor(W / cw);
       rows = Math.floor(H / (cw * R));
-      // The open side of the band: below the card when it sits high, above it when it sits low. Offsets, not the
-      // card's client rect, so its reveal translate does not move the art.
-      const card = clear?.current;
-      const pad = cw * R * 1.5;
-      let region: Region = { y0: pad, y1: H - pad };
-      if (card) {
-        const top = card.offsetTop;
-        const bottom = top + card.offsetHeight;
-        region = H - bottom >= top ? { y0: bottom + pad, y1: H - pad } : { y0: pad, y1: top - pad };
-      }
-      const scale = S / cw;
-      const cov = rasterise(cols, rows, window.innerWidth < 640, { y0: region.y0 * scale, y1: region.y1 * scale });
+      // Centred on the `center` element (the headline card), which floats over the middle of the art. Offsets, not
+      // the card's client rect, so its reveal translate does not move the art.
+      const card = center?.current;
+      const mid = card ? card.offsetTop + card.offsetHeight / 2 : H / 2;
+      const cov = rasterise(cols, rows, window.innerWidth < 640, mid * (S / cw));
       const box = canvas.getBoundingClientRect();
       const below = Math.max(0, document.documentElement.scrollHeight - (window.scrollY + box.bottom));
       art = glyphs(cov, cols, rows, H / (H + below));
@@ -288,6 +278,6 @@ export function AsciiLogo({ className, clear }: { className?: string; clear?: Re
       mo.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [clear]);
+  }, [center]);
   return <canvas ref={ref} aria-hidden className={cn('pointer-events-none block', className)} />;
 }

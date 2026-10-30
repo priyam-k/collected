@@ -290,18 +290,17 @@ function RunIt() {
 }
 
 /**
- * The foot of the page: a tall band with the logo, in characters, across its full width, assembling as the page runs
- * out. The headline card floats over it, at the top on a wide screen with the art below, under the art on a phone.
+ * The foot of the page: a tall band with the logo, in characters, edge to edge across the full width, assembling as
+ * the page runs out. The headline card floats over the middle of the art, which shows faintly through its edges.
  */
 function Closing() {
   const signedIn = isSignedIn(useMe().data);
   const card = useRef<HTMLDivElement>(null);
   return (
-    <section className="relative isolate flex flex-col items-center px-4 pb-8 pt-[72px] sm:min-h-[max(560px,calc(100svh-7.5rem))] sm:px-6 sm:pb-4 sm:pt-[84px]">
-      <AsciiLogo clear={card} className="absolute inset-0 -z-10 size-full text-ink opacity-30 dark:text-ink-muted dark:opacity-55" />
-      <div aria-hidden className="order-1 h-[64vw] w-full shrink-0 sm:order-2 sm:h-auto sm:min-h-[220px] sm:flex-1" />
-      <div ref={card} className="relative order-2 w-full max-w-[540px] sm:order-1">
-        <Reveal className="surface rounded-[28px] px-7 py-8 text-center sm:px-10">
+    <section className="relative isolate flex min-h-[max(500px,140vw)] flex-col items-center justify-center px-4 py-16 sm:min-h-[max(560px,calc(100svh-7.5rem),26vw)] sm:px-6 sm:py-20">
+      <AsciiLogo center={card} className="absolute inset-0 -z-10 size-full text-ink opacity-30 dark:text-ink-muted dark:opacity-55" />
+      <div ref={card} className="relative w-full max-w-[540px]">
+        <Reveal className="surface closing-card rounded-[28px] px-7 py-8 text-center sm:px-10">
           <h2 className="text-[clamp(28px,3.2vw,42px)] font-[650] leading-[1.04] tracking-[-0.04em]">
             Put the whole semester
             <br />
