@@ -8,6 +8,8 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+## 1.2.2 — 2026-10-30 · optional
+
 - CLI: `collected pull` and the file sync follow Canvas's extra redirect to its file CDN. Canvas answers the verifier link with one more 302 before the bytes, and the downloader stopped there with "CDN redirected again". Up to three further hops are followed, each held to the same rule as the first: https, a public host, never a sign-in page, no credentials sent.
 ## 1.2.1 — 2026-10-30 · optional
 
