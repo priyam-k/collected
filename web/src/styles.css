@@ -557,6 +557,17 @@
   .scroll-fade[data-scroll-right] { --fade-r: var(--fade-size); }
 }
 
+/* A field a form's early submit marked (useFormMarks): a critical rim, kept while the field has focus. Unlayered so it
+   wins over the inputs' brand focus utilities. */
+.invalid {
+  border-color: var(--critical);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--critical) 18%, transparent);
+}
+.invalid:focus-visible {
+  border-color: var(--critical);
+  box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--critical);
+}
+
 /* The widget card's rim, drawn over its content: the edit-mode ring is never painted under a card or list row that
    reaches the edge. */
 .widget-frame::after {

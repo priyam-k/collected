@@ -10,12 +10,19 @@ export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactN
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+/** A labelled input. `error` (from `useFormMarks`) takes the hint's place in critical, under `errorId` for aria-describedby. */
+export function Field({ label, hint, error, errorId, children }: { label: string; hint?: ReactNode; error?: ReactNode; errorId?: string; children: ReactNode }) {
   return (
     <label className="block min-w-0 space-y-1.5">
       <span className="text-[13px] font-medium text-sub">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
+      {error ? (
+        <span id={errorId} className="block text-xs font-medium text-critical">
+          {error}
+        </span>
+      ) : (
+        hint && <span className="block text-xs text-muted-foreground">{hint}</span>
+      )}
     </label>
   );
 }

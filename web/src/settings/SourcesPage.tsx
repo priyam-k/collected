@@ -16,6 +16,7 @@ import { safeColor } from '@/lib/color';
 import { friendlyDate, relative } from '@/lib/time';
 import { safeHref } from '@/lib/url';
 import { Field, PageTitle, StatusTag, type StatusTone } from './ui';
+import { useFormMarks } from './useFormMarks';
 
 /** Source status as a dot and a word; the raw ids ("needs_auth") are not for people. */
 const STATUS: Record<Source['status'], { tone: StatusTone; word: string }> = {
@@ -281,22 +282,28 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   const cookieNotCookie = cookie.trim() !== '' && !cookie.includes('=');
   const blocker = canvasCookieBlocker(normalized, cookie);
   const [icalUrl, setIcalUrl] = useState('');
+  const marks = useFormMarks({
+    baseUrl: normalized ? null : baseUrl.trim() ? 'That is not a Canvas address yet: a host like canvas.yourschool.edu or umd.instructure.com' : 'Enter your Canvas address',
+    cookie: !cookie.trim() ? 'Paste the cookie: canvas_session=…' : cookieNotCookie ? 'That is not a cookie yet: paste it as canvas_session=…, or the whole Cookie header' : null,
+  });
+  const icalMarks = useFormMarks({ url: icalUrl.trim() ? null : 'Paste the calendar feed URL' });
   const submitCookie = (e: FormEvent) => {
     e.preventDefault();
-    if (!normalized || blocker) return;
+    if (canvas.pending || !marks.attempt() || !normalized || blocker) return;
     canvas.save({ baseUrl: normalized, cookieHeader: cookie.trim() }, () => setCookie(''));
   };
   const submitIcal = (e: FormEvent) => {
     e.preventDefault();
+    if (icalSave.pending || !icalMarks.attempt()) return;
     icalSave.save({ url: icalUrl.trim() }, () => setIcalUrl(''));
   };
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <form onSubmit={submitCookie} className="space-y-3">
-        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas. A bare host or a page address both work; it is saved as https://<host>.">
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="canvas.yourschool.edu" aria-invalid={baseUrl.trim() !== '' && !normalized ? true : undefined} />
+        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas. A bare host or a page address both work; it is saved as https://<host>." {...marks.field('baseUrl')}>
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="canvas.yourschool.edu" {...marks.input('baseUrl')} aria-invalid={marks.isMarked('baseUrl') || (baseUrl.trim() !== '' && !normalized) ? true : undefined} />
         </Field>
-        {baseUrl.trim() !== '' && !normalized && <p className="-mt-2 text-xs text-critical">That does not look like a Canvas address: a host like canvas.yourschool.edu or umd.instructure.com.</p>}
+        {baseUrl.trim() !== '' && !normalized && !marks.isMarked('baseUrl') && <p className="-mt-2 text-xs text-critical">That does not look like a Canvas address: a host like canvas.yourschool.edu or umd.instructure.com.</p>}
         <Field
           label="Session cookie"
           hint={
@@ -305,30 +312,31 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
               the whole cookie header or at least <Cmd>canvas_session=…</Cmd> (older instances call it <Cmd>_normandy_session</Cmd>).
             </>
           }
+          {...marks.field('cookie')}
         >
-          <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" aria-invalid={cookieNotCookie ? true : undefined} />
+          <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" {...marks.input('cookie')} aria-invalid={marks.isMarked('cookie') || cookieNotCookie ? true : undefined} />
         </Field>
-        {cookieNotCookie && (
+        {cookieNotCookie && !marks.isMarked('cookie') && (
           <p className="-mt-2 text-xs text-critical">
             That does not look like a cookie: there is no <Cmd>name=value</Cmd> in it. Copy the value column next to <Cmd>canvas_session</Cmd> as <Cmd>canvas_session=…</Cmd>, or the whole Cookie header.
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" disabled={!!blocker || canvas.pending}>
+          <Button type="submit" variant={blocker ? 'secondary' : 'default'} disabled={canvas.pending}>
             {source.hasConfig ? 'Replace cookie' : 'Save cookie'}
           </Button>
           {source.hasConfig && (
             <RemoveCredential source="canvas" what="The saved cookie is removed." onConfirm={canvas.clear} pending={canvas.pending} />
           )}
-          {blocker && <span className="text-xs text-muted-foreground">{blocker}</span>}
+          {blocker && !marks.isMarked('baseUrl') && !marks.isMarked('cookie') && <span className="text-xs text-muted-foreground">{blocker}</span>}
         </div>
       </form>
       <form onSubmit={submitIcal} className="space-y-3">
-        <Field label="iCal feed URL (fallback)" hint="Canvas → Calendar → Calendar Feed. Used only while the cookie is dead.">
-          <Input value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://umd.instructure.com/feeds/calendars/user_….ics" />
+        <Field label="iCal feed URL (fallback)" hint="Canvas → Calendar → Calendar Feed. Used only while the cookie is dead." {...icalMarks.field('url')}>
+          <Input value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://umd.instructure.com/feeds/calendars/user_….ics" {...icalMarks.input('url')} />
         </Field>
         <div className="flex items-center gap-2">
-          <Button type="submit" variant="secondary" disabled={!icalUrl.trim() || icalSave.pending}>
+          <Button type="submit" variant="secondary" disabled={icalSave.pending}>
             {ical.hasConfig ? 'Replace feed URL' : 'Save feed URL'}
           </Button>
           {ical.hasConfig && <span className="text-xs text-muted-foreground">feed saved</span>}
@@ -341,22 +349,25 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
 function GcalIcalForm({ source }: { source: Source }) {
   const s = useSave('gcal_ical');
   const [url, setUrl] = useState('');
+  const marks = useFormMarks({ url: url.trim() ? null : 'Paste the secret iCal address' });
   return (
     <form
       className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
+        if (s.pending || !marks.attempt()) return;
         s.save({ url: url.trim() }, () => setUrl(''));
       }}
     >
       <Field
         label="Secret address in iCal format"
         hint="Google Calendar on the web → Settings (gear) → the calendar under Settings for my calendars → Integrate calendar → Secret address in iCal format. Anyone with this URL can read the calendar; it is stored encrypted. Events show up as read-only."
+        {...marks.field('url')}
       >
-        <Input type="password" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" placeholder="https://calendar.google.com/calendar/ical/…/private-…/basic.ics" />
+        <Input type="password" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" placeholder="https://calendar.google.com/calendar/ical/…/private-…/basic.ics" {...marks.input('url')} />
       </Field>
       <div className="flex gap-2">
-        <Button type="submit" disabled={!url.trim() || s.pending}>
+        <Button type="submit" variant={marks.complete ? 'default' : 'secondary'} disabled={s.pending}>
           {source.hasConfig ? 'Replace address' : 'Save address'}
         </Button>
         {source.hasConfig && (
@@ -371,22 +382,24 @@ function GradescopeForm({ source }: { source: Source }) {
   const s = useSave('gradescope');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const marks = useFormMarks({ email: email.trim() ? null : 'Enter your Gradescope email', password: password ? null : 'Enter the password' });
   return (
     <form
       className="grid gap-3 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
+        if (s.pending || !marks.attempt()) return;
         s.save({ email: email.trim(), password }, () => setPassword(''));
       }}
     >
-      <Field label="Email">
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
+      <Field label="Email" {...marks.field('email')}>
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" {...marks.input('email')} />
       </Field>
-      <Field label="Password">
-        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+      <Field label="Password" {...marks.field('password')}>
+        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" {...marks.input('password')} />
       </Field>
       <div className="flex gap-2 sm:col-span-2">
-        <Button type="submit" disabled={!email || !password || s.pending}>
+        <Button type="submit" variant={marks.complete ? 'default' : 'secondary'} disabled={s.pending}>
           {source.hasConfig ? 'Replace credentials' : 'Save credentials'}
         </Button>
         {source.hasConfig && (
@@ -400,25 +413,30 @@ function GradescopeForm({ source }: { source: Source }) {
 function TokenForm({ source, field, label }: { source: Source; field: string; label: string }) {
   const s = useSave(source.id);
   const [value, setValue] = useState('');
+  const marks = useFormMarks({ value: value.trim() ? null : 'Paste the token' });
   return (
     <form
-      className="flex flex-wrap items-end gap-3"
+      className="flex flex-wrap items-start gap-3"
       onSubmit={(e) => {
         e.preventDefault();
+        if (s.pending || !marks.attempt()) return;
         s.save({ [field]: value.trim() }, () => setValue(''));
       }}
     >
       <div className="min-w-64 flex-1">
-        <Field label={label}>
-          <Input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" />
+        <Field label={label} {...marks.field('value')}>
+          <Input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" {...marks.input('value')} />
         </Field>
       </div>
-      <Button type="submit" disabled={!value.trim() || s.pending}>
-        {source.hasConfig ? 'Replace' : 'Save'}
-      </Button>
-      {source.hasConfig && (
-        <RemoveCredential source={source.id} what="The saved token is removed." onConfirm={s.clear} pending={s.pending} />
-      )}
+      {/* Level with the input, not the bottom of the field: a marked field grows a line under it. */}
+      <div className="flex gap-3 sm:mt-6">
+        <Button type="submit" variant={marks.complete ? 'default' : 'secondary'} disabled={s.pending}>
+          {source.hasConfig ? 'Replace' : 'Save'}
+        </Button>
+        {source.hasConfig && (
+          <RemoveCredential source={source.id} what="The saved token is removed." onConfirm={s.clear} pending={s.pending} />
+        )}
+      </div>
     </form>
   );
 }

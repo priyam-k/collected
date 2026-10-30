@@ -17,6 +17,7 @@ import { ImportCoursesDialog } from './ImportCoursesDialog';
 import { ROLE_LABEL, SUBMITS_LABEL } from './labels';
 import { ScheduleEditor } from './ScheduleEditor';
 import { Field, PageTitle } from './ui';
+import { useFormMarks } from './useFormMarks';
 
 type Draft = Omit<CourseInput, 'links' | 'schedule'> & { id?: string; links: CourseLink[]; scheduleText: string };
 
@@ -101,9 +102,16 @@ export function CoursesPage() {
       onError: (e) => toast.error(`Could not delete ${c.code}: ${e.message}`),
     });
 
+  // Term and code are what a course is keyed by; Save marks them when they are empty.
+  const marks = useFormMarks({ term: draft && !draft.term ? 'Enter the term' : null, code: draft && !draft.code ? 'Enter the course code' : null });
+  const resetMarks = marks.reset;
+  useEffect(() => {
+    if (!draft) resetMarks();
+  }, [draft, resetMarks]);
+
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!draft || save.isPending || !draft.code || !draft.term) return;
+    if (!draft || save.isPending || !marks.attempt() || !draft.code || !draft.term) return;
     let schedule: unknown = {};
     try {
       schedule = JSON.parse(draft.scheduleText || '{}');
@@ -212,11 +220,11 @@ export function CoursesPage() {
           <form onSubmit={submit} className="grid gap-4">
           {draft && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Term">
-                <Input value={draft.term} onChange={(e) => setDraft({ ...draft, term: e.target.value })} disabled={!!draft.id} />
+              <Field label="Term" {...marks.field('term')}>
+                <Input value={draft.term} onChange={(e) => setDraft({ ...draft, term: e.target.value })} disabled={!!draft.id} {...marks.input('term')} />
               </Field>
-              <Field label="Code">
-                <Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="CMSC422" disabled={!!draft.id} />
+              <Field label="Code" {...marks.field('code')}>
+                <Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="CMSC422" disabled={!!draft.id} {...marks.input('code')} />
               </Field>
               <Field label="Section">
                 <Input value={draft.section ?? ''} onChange={(e) => setDraft({ ...draft, section: e.target.value })} placeholder="0101" disabled={!!draft.id} />
@@ -282,7 +290,7 @@ export function CoursesPage() {
           )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={requestClose}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending || !draft?.code || !draft?.term}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+            <Button type="submit" variant={marks.complete ? 'default' : 'secondary'} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save'}</Button>
           </DialogFooter>
           </form>
         </DialogContent>
