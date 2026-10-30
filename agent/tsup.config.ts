@@ -17,6 +17,12 @@ export default defineConfig({
   // database, Hono or the ingesters.
   splitting: true,
   banner: { js: '#!/usr/bin/env node' },
+  // The built-in Google desktop client (src/google-client.ts) is baked in at build time and never committed:
+  // release.yml provides both from repository secrets; a local build gets empty strings and Google connect is off.
+  env: {
+    COLLECTED_GOOGLE_DESKTOP_CLIENT_ID: process.env.COLLECTED_GOOGLE_DESKTOP_CLIENT_ID ?? '',
+    COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET: process.env.COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET ?? '',
+  },
   // The workspace packages are bundled in; their runtime packages are this package's dependencies and stay external.
   noExternal: ['@collected/shared', '@collected/core', '@collected/server'],
   // Everything local mode reads from disk travels next to the bundle (src/paths.ts resolves each by exact path):

@@ -1,6 +1,7 @@
 # Publishes the CLI (`agent/`, npm package `collected-cli`) when a tag `cli-v<version>` is pushed.
 #
 # Needs, on the repo:
+#   secrets COLLECTED_GOOGLE_DESKTOP_CLIENT_ID / _SECRET  the Desktop-app OAuth client the CLI's local mode ships (SETUP.md Google step 9)
 #   secret NPM_TOKEN   an npm granular access token, publish-only, limited to the package `collected-cli`
 #                      (npmjs.com → Access Tokens → Generate New Token → Granular; packages and scopes: only
 #                      collected-cli, permissions: read and write; no org or user permissions). Rotate it when it expires.
@@ -47,6 +48,13 @@ jobs:
       # The package carries the dashboard (agent/dist/web), so the web build comes first; the CLI build refuses to run without it.
       - run: pnpm --filter web build
       - run: pnpm --filter collected-cli build
+        env:
+          # The CLI's built-in Google desktop client (agent/src/google-client.ts); baked into the bundle, never committed.
+          COLLECTED_GOOGLE_DESKTOP_CLIENT_ID: ${{ secrets.COLLECTED_GOOGLE_DESKTOP_CLIENT_ID }}
+          COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET }}
+      - name: Check the bundle carries the Google desktop client
+        run: |
+          grep -q 'apps.googleusercontent.com' agent/dist/*.js || { echo 'no Google desktop client in the bundle; set the COLLECTED_GOOGLE_DESKTOP_CLIENT_* secrets' >&2; exit 1; }
 
       # The guard against an uninstallable package (1.1.0 shipped one): pack, install the tarball into an empty project
       # outside the repo with real dependency resolution, and run local mode end to end, the dashboard included.

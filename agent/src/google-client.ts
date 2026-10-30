@@ -13,8 +13,14 @@
  * in the process. An operator who wants their own project sets GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in
  * `~/.collected/.env`, which wins over this pair (agent/src/local.ts).
  *
- * The owner fills the two strings in before a release. While both are empty (this build), Google connect fails
- * softly: `/api/google/start` sends the browser back to Sources with the not-configured reason, the cards say the
- * build ships without a Google client, and `connect google` says so before it listens. Neither value is ever logged.
+ * The values are not in the repository: GitHub's push protection refuses them and a public repo should not carry
+ * them. They are injected when the package is built (tsup `env`, from the repository secrets
+ * COLLECTED_GOOGLE_DESKTOP_CLIENT_ID / COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET in release.yml; a local build without
+ * them gets empty strings). While both are empty, Google connect fails softly: `/api/google/start` sends the browser
+ * back to Sources with the not-configured reason, the cards say the build ships without a Google client, and
+ * `connect google` says so before it listens. Neither value is ever logged.
  */
-export const BUILTIN_GOOGLE_CLIENT = { id: '', secret: '' } as const;
+export const BUILTIN_GOOGLE_CLIENT = {
+  id: process.env.COLLECTED_GOOGLE_DESKTOP_CLIENT_ID ?? '',
+  secret: process.env.COLLECTED_GOOGLE_DESKTOP_CLIENT_SECRET ?? '',
+} as const;
