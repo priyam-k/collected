@@ -8,6 +8,7 @@ break); `optional` means it is nice to have.
 
 ## Unreleased
 
+- Dashboard: a small collected mark and "collected." wordmark above the date, linking to the home page. It sits in the room the date already left in the header row, so the header is no taller.
 - CLI: `collected daemon install` under a non-default `COLLECTED_AGENT_HOME` writes a timer of its own, `com.collected.sync.<hash>` / `collected-sync-<hash>` (the first 8 hex of sha256 over the home's path), instead of overwriting the default home's `com.collected.sync`; `status` and `uninstall` act on the same unit, and the messages name it. The default `~/.collected` keeps the bare names, and the old `com.collected.agent` migration applies to it only.
 - Landing page and README: a "Set up with your agent" prompt to paste into Claude Code, Cursor, Codex or any agent with a shell. It reads the skill, the CLI README and the self-host guide, asks laptop or server, and walks the setup, asking before anything that opens the browser, creates accounts or costs money. The landing card has a Copy button (clipboard, falling back to selecting the text).
 

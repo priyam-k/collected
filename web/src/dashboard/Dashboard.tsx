@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { SOURCE_LABELS, type Layouts, type Source } from '@collected/shared';
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { LogoMark, Wordmark } from '@/components/Logo';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
@@ -199,9 +200,17 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-[1600px] flex-col gap-3.5 pb-28 pl-3 pr-[max(0px,calc(0.75rem-var(--sbw,0px)))] pt-4 sm:pb-10 sm:pl-4 sm:pr-[max(0px,calc(1rem-var(--sbw,0px)))]">
-      {/* One row as tall as the toolbar pill beside it: the date, then the eyebrow over the summary. */}
-      <header className={cn('flex h-11 items-center gap-3.5 px-1', showPill ? 'sm:pr-[356px] lg:pr-[470px]' : 'sm:pr-[300px]')}>
-        <h1 className="shrink-0 text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
+      {/* One row as tall as the toolbar pill beside it: the small logo over the date, then the eyebrow over the
+          summary. The logo row (14px) plus its gap fill the room the 26px date left in the 44px row, so the header
+          is no taller for it. */}
+      <header className={cn('flex h-11 items-end gap-3.5 px-1', showPill ? 'sm:pr-[356px] lg:pr-[470px]' : 'sm:pr-[300px]')}>
+        <div className="flex shrink-0 flex-col items-start gap-1">
+          <Link to="/" aria-label="collected home" className="-mx-1 flex h-3.5 items-center gap-[5px] rounded-full px-1 text-sub transition-colors hover:text-ink">
+            <LogoMark className="size-3.5" />
+            <Wordmark className="text-[12.5px] leading-none" />
+          </Link>
+          <h1 className="text-[26px] font-[620] leading-none tracking-[-0.025em]"><span className="sr-only">Today, </span>{format(new Date(), 'MMMM d')}</h1>
+        </div>
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
           <p className="label !text-[10.5px] !leading-[13px]">{eyebrow}</p>
           <p className="truncate text-[13px] leading-[17px] text-sub">
