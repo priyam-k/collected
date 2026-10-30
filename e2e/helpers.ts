@@ -28,7 +28,8 @@ export function cli(args: string[], opts: { input?: string; home?: string } = {}
   const r = spawnSync(process.execPath, [AGENT_CLI, ...args], {
     encoding: 'utf8',
     input: opts.input,
-    env: { ...process.env, COLLECTED_AGENT_HOME: opts.home ?? agentHome(), TZ: 'America/New_York' },
+    // NO_UPDATE_NOTIFIER: the CLI's once-a-day npm version check stays off the network here (agent/src/skew.ts).
+    env: { ...process.env, COLLECTED_AGENT_HOME: opts.home ?? agentHome(), TZ: 'America/New_York', NO_UPDATE_NOTIFIER: '1' },
     timeout: 60_000,
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };

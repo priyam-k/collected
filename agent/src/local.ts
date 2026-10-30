@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
+import { mkdirSync } from 'node:fs';
 import type { Hono } from 'hono';
 import type { EffectiveItem, FileSyncManifest, FileSyncReport } from '@collected/shared';
 import { createContext, createLogger, type AppContext } from '@collected/core';
@@ -13,6 +12,7 @@ import { localDotenvPath, readLocalDotenv, type LocalDotenv } from './dotenv.js'
 import type { CourseContentRow } from './facts.js';
 import { BUILTIN_GOOGLE_CLIENT } from './google-client.js';
 import { shippedMigrations, shippedSeedConfig } from './paths.js';
+import { cliVersion } from './version.js';
 
 /*
  * Local mode: the whole backend inside this process. The same Hono app the server listens on is built here over a
@@ -21,15 +21,6 @@ import { shippedMigrations, shippedSeedConfig } from './paths.js';
  * machine's owner: the server's auth middleware answers it when the config object carries LOCAL_OWNER, which nothing
  * in process.env can set (server/src/env.ts).
  */
-
-/** The version this CLI reports as the app's; agent/package.json sits one level above both src/ and dist/. */
-function cliVersion(): string {
-  try {
-    return (JSON.parse(readFileSync(path.resolve(import.meta.dirname, '..', 'package.json'), 'utf8')) as { version?: string }).version ?? '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
 
 export interface LocalEnvOptions {
   /** The command's own choice (`--verbose`, a test's `silent`); unset, the dotenv's LOG_LEVEL, then `warn`. */

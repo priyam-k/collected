@@ -6,6 +6,8 @@ import type { EffectiveItem, FileSyncManifest, FileSyncReport } from '@collected
 import type { CourseContentRow } from './facts.js';
 import { isLocal, type AgentConfig } from './config.js';
 import { assertSecureUrl, isPrivateHost } from './guard.js';
+import { VersionWatch } from './skew.js';
+import { cliVersion } from './version.js';
 
 const JSON_TIMEOUT_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -121,9 +123,18 @@ export async function downloadFromCdn(fileId: string, target: URL, dest: string,
   renameSync(tmp, dest);
 }
 
+/**
+ * One watch for the process: every `Api` reports the headers of every answer to it, whichever command or module
+ * opened the client, and cli.ts reads it for the end-of-command notice (skew.ts).
+ */
+export const versionWatch = new VersionWatch(cliVersion());
+
 /** Talks to collected over HTTP. Auth is an Access service token (prod) or the helper key (local); see DECISIONS 038. */
 export class Api implements CollectedApi {
-  constructor(private readonly cfg: AgentConfig) {
+  constructor(
+    private readonly cfg: AgentConfig,
+    private readonly watch: VersionWatch = versionWatch,
+  ) {
     assertSecureUrl(cfg.server, 'the server URL in agent.json');
   }
 
@@ -145,6 +156,8 @@ export class Api implements CollectedApi {
 
   private async json<T>(p: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(this.url(p), { ...init, headers: { ...this.headers(), ...(init.headers as Record<string, string> | undefined) }, redirect: 'manual', signal: AbortSignal.timeout(JSON_TIMEOUT_MS) });
+    // Version skew is decided before the body is read: a server this CLI cannot talk to throws here, and no later request goes out.
+    this.watch.see(res.headers);
     return readJson<T>(p, res);
   }
 
@@ -185,6 +198,7 @@ export class Api implements CollectedApi {
   async download(fileId: string, dest: string): Promise<void> {
     if (!/^\d+$/.test(fileId)) throw new ApiError(`file id "${fileId.slice(0, 40)}" is not a Canvas file id`, 400);
     const first = await fetch(this.url(`/api/canvas/files/${encodeURIComponent(fileId)}/open?download=1`), { headers: this.headers(), redirect: 'manual', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+    this.watch.see(first.headers);
     const target = await downloadTarget(fileId, first, this.url('/'));
     await downloadFromCdn(fileId, target, dest, this.cfg.maxFileMb);
   }

@@ -29,16 +29,29 @@ export interface Placement {
 export interface AgentState {
   placements: Record<string, Placement>;
   lastRunAt: string | null;
+  /** The version check (skew.ts): when its once-a-day notice last ran, and what the server and npm reported then. */
+  lastSkewNoticeAt: string | null;
+  lastServerVersion: string | null;
+  npmLatest: string | null;
 }
+
+export type SkewState = Pick<AgentState, 'lastSkewNoticeAt' | 'lastServerVersion' | 'npmLatest'>;
 
 export const stateKey = (courseId: string, fileId: string): string => `${courseId}/${fileId}`;
 const statePath = (): string => path.join(agentHome(), 'state.json');
 
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
 export function loadState(): AgentState {
   const file = statePath();
-  if (!existsSync(file)) return { placements: {}, lastRunAt: null };
+  if (!existsSync(file)) return { placements: {}, lastRunAt: null, lastSkewNoticeAt: null, lastServerVersion: null, npmLatest: null };
   const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<AgentState>;
-  return { placements: raw.placements ?? {}, lastRunAt: raw.lastRunAt ?? null };
+  return { placements: raw.placements ?? {}, lastRunAt: raw.lastRunAt ?? null, lastSkewNoticeAt: str(raw.lastSkewNoticeAt), lastServerVersion: str(raw.lastServerVersion), npmLatest: str(raw.npmLatest) };
+}
+
+/** Read, merge, write: for the few fields a command sets on its way out without owning the whole state. */
+export function patchState(patch: Partial<AgentState>): void {
+  saveState({ ...loadState(), ...patch });
 }
 
 /** 0600 like agent.json: the placements are a map of the vault. */

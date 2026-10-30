@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { Api, openApi } from './api.js';
+import { Api, openApi, versionWatch } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas } from './connect.js';
 import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
@@ -14,8 +14,11 @@ import { READ_SOURCES, ensureFresh, takeFreshnessFlags } from './freshness.js';
 import { assertSecureUrl } from './guard.js';
 import { installLaunchd, uninstallLaunchd } from './launchd.js';
 import { pullFile } from './pull.js';
-import { loadState } from './state.js';
+import { SkewError, maybeNotice } from './skew.js';
+import { loadState, patchState } from './state.js';
 import { runSync } from './sync.js';
+import { fetchNpmLatest, runUpgrade } from './upgrade.js';
+import { cliVersion } from './version.js';
 
 // `--verbose` anywhere raises the in-process app's log level in local mode (the dotenv's LOG_LEVEL or warnings otherwise, on stderr).
 // `--fresh` / `--stale-ok` anywhere decide whether a local-mode read syncs first (freshness.ts); a server keeps itself fresh.
@@ -26,6 +29,10 @@ const DEMO_SOURCES = ['canvas', 'gradescope', 'gcal', 'todoist', 'gtasks'] as co
 const SYNC_SOURCES = ['canvas', 'canvas_ical', 'gradescope', 'gcal', 'gcal_ical', 'todoist', 'gtasks', 'jobs', 'all'];
 /** The in-process app's log level: `--verbose` says info; otherwise `~/.collected/.env`'s LOG_LEVEL, then warn (local.ts). */
 const localOpts = { logLevel: verbose ? 'info' : undefined, verbose };
+/** The once-a-day npm check at the end of a command waits this long at most; `collected upgrade` itself waits 10 s. */
+const NOTICE_REGISTRY_TIMEOUT_MS = 3_000;
+/** Commands that end without the version notice: nothing was asked of a server, or the command is the notice's own remedy. */
+const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon']);
 
 function usage(): never {
   console.log(`${HELP}
@@ -53,12 +60,47 @@ function usage(): never {
     connect canvas [--browser X] [--domain host] [--dry-run]
                                               read the Canvas session cookie from your browser and send it to the server
     connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
-                                              (overrides, if you have your own OAuth client: ${localDotenvPath()})`);
+                                              (overrides, if you have your own OAuth client: ${localDotenvPath()})
+
+  This program
+
+    --version                                 print the version (collected-cli ${cliVersion()})
+    upgrade [--dry-run]                       install the newest collected-cli from npm, with whatever installed this one
+                                              (a once-a-day stderr line says when the server or npm is ahead of this CLI)`);
   // Asked for (`help`, `--help`, no command) is success; reached from an unknown command is not.
   process.exit(cmd && cmd !== 'help' && cmd !== '--help' ? 1 : 0);
 }
 
 const say = (s: string) => console.log(s);
+
+/**
+ * The version notice on the way out (skew.ts): in client mode what the command's requests learned from the server's
+ * headers, in both modes what npm has, once a day, on stderr. Never the reason a command fails; NO_UPDATE_NOTIFIER
+ * in the environment keeps it off the network (the e2e suite sets it).
+ */
+async function notice(): Promise<void> {
+  try {
+    const cfg = loadConfig();
+    const local = isLocal(cfg);
+    await maybeNotice({
+      client: versionWatch.client,
+      server: local ? null : versionWatch.server,
+      minClient: local ? null : versionWatch.minClient,
+      verbose,
+      warn: (line) => console.error(line),
+      state: { load: loadState, save: (patch) => patchState(patch) },
+      npmLatest: process.env.NO_UPDATE_NOTIFIER ? undefined : () => fetchNpmLatest({ timeoutMs: NOTICE_REGISTRY_TIMEOUT_MS }),
+    });
+  } catch (e) {
+    if (verbose) console.error(`version notice skipped: ${(e as Error).message}`);
+  }
+}
+
+/** Every successful command leaves through here: the notice (unless the command is exempt), then the exit code. */
+async function finish(command: string | undefined, code = 0): Promise<never> {
+  if (!NO_NOTICE.has(command)) await notice();
+  process.exit(code);
+}
 
 /** A secret typed at a prompt with echo off, or the whole of stdin when piped. Never an argv word. */
 async function readSecret(prompt: string): Promise<string> {
@@ -96,20 +138,44 @@ try {
     const cfg = cfgOf();
     if (!isLocal(cfg)) throw new Error(`\`collected sync ${rest[0]}\` runs a source sync in local mode only; against a server use \`collected resync ${rest[0]}\` (the file sync is \`collected sync\` with no source)`);
     say(await runCollected(await apiFor(cfg), 'resync', rest));
-    process.exit(0);
+    await finish('sync');
   }
   if (command === cmd && isCollectedCommand(cmd)) {
     const cfg = cfgOf();
     const api = await apiFor(cfg);
     if (isLocal(cfg) && cmd in READ_SOURCES) await ensureFresh(api, cmd, { maxAgeMinutes: maxAgeMinutes(cfg), flags: freshness, warn: (line) => console.error(line) });
     say(await runCollected(api, cmd, rest));
-    process.exit(0);
+    await finish(cmd);
   }
   switch (command) {
     case undefined:
     case 'help':
     case '--help':
       usage();
+    // eslint-disable-next-line no-fallthrough
+    case '--version':
+    case '-v':
+    case 'version':
+      say(cliVersion());
+      break;
+    case 'upgrade': {
+      const { values } = parseArgs({ args: rest, options: { 'dry-run': { type: 'boolean' } } });
+      const code = await runUpgrade({
+        argv1: process.argv[1] ?? '',
+        current: cliVersion(),
+        dryRun: !!values['dry-run'],
+        verbose,
+        say,
+        warn: (line) => console.error(line),
+        // The same registry answer the once-a-day notice caches, so the two never disagree.
+        latest: async () => {
+          const r = await fetchNpmLatest();
+          if (r.version) patchState({ npmLatest: r.version });
+          return r;
+        },
+      });
+      process.exit(code);
+    }
     // eslint-disable-next-line no-fallthrough
     case 'init': {
       const { values, positionals } = parseArgs({ args: rest, options: { force: { type: 'boolean' }, device: { type: 'string' }, local: { type: 'boolean' }, 'data-dir': { type: 'string' } }, allowPositionals: true });
@@ -281,7 +347,8 @@ try {
       if (s.pending) parts.push(`${s.pending} waiting for the model`);
       if (s.classified) parts.push(`${s.classified} classified`);
       say(`${values['dry-run'] ? 'dry run: ' : ''}${s.courses} course${s.courses === 1 ? '' : 's'}: ${parts.join(', ')}${s.errors.length ? `, ${s.errors.length} error${s.errors.length === 1 ? '' : 's'}` : ''} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
-      process.exit(s.errors.length ? 1 : 0);
+      await finish(command, s.errors.length ? 1 : 0);
+      break;
     }
     // eslint-disable-next-line no-fallthrough
     case 'pull': {
@@ -314,7 +381,8 @@ try {
     default:
       usage();
   }
+  await finish(command);
 } catch (e) {
   console.error((e as Error).message);
-  process.exit(1);
+  process.exit(e instanceof SkewError ? e.exitCode : 1);
 }
