@@ -2,7 +2,7 @@ import pino from 'pino';
 import { CookieJar } from 'tough-cookie';
 import { describe, expect, it } from 'vitest';
 import { NeedsAuthError } from '../types.js';
-import { CanvasClient, buildUrl, jarFromCookieHeader, parseLinkHeader, stripCanvasPrefix } from './client.js';
+import { CanvasClient, buildUrl, jarFromCookieHeader, needsAuthMessage, parseLinkHeader, stripCanvasPrefix } from './client.js';
 
 const log = pino({ level: 'silent' });
 const withUrl = (res: Response, url = 'https://x/api/v1/things') => {
@@ -58,5 +58,54 @@ describe('canvas client', () => {
     await c.get('/api/v1/a');
     const cookies = await jar.getCookies('https://x.test/');
     expect(cookies.find((k) => k.key === '_normandy_session')?.value).toBe('new');
+  });
+});
+
+describe('canvas client with an access token', () => {
+  const TOKEN = '7~tokentokentokentokentokentoken';
+  const capture = () => {
+    const calls: { url: string; auth: string | null; cookie: string | null }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({ url: String(input), auth: headers.get('authorization'), cookie: headers.get('cookie') });
+      return json({ ok: true }, { headers: { 'set-cookie': 'canvas_session=rotated; Path=/; Secure; HttpOnly' } });
+    };
+    return { calls, fetchImpl };
+  };
+
+  it('fromConfig picks the token over a stored cookie, sends Bearer on every request and keeps no jar', async () => {
+    const { calls, fetchImpl } = capture();
+    const c = await CanvasClient.fromConfig({ baseUrl: 'https://x', accessToken: TOKEN, cookieHeader: 'canvas_session=old' }, log, fetchImpl);
+    expect(c.authMode).toBe('token');
+    expect(c.jar).toBeNull();
+    await c.get('/api/v1/users/self');
+    await c.get('/api/v1/files/1/public_url');
+    expect(calls.map((k) => k.auth)).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`]);
+    // No cookie goes out, and the one Canvas set back was not kept for the second request.
+    expect(calls.map((k) => k.cookie)).toEqual([null, null]);
+    expect(await c.serializeJar()).toBeNull();
+  });
+
+  it('without a token the cookie path is unchanged: a jar, no Authorization header', async () => {
+    const { calls, fetchImpl } = capture();
+    const c = await CanvasClient.fromConfig({ baseUrl: 'https://x', cookieHeader: 'canvas_session=abc' }, log, fetchImpl);
+    expect(c.authMode).toBe('cookie');
+    expect(c.jar).not.toBeNull();
+    await c.get('/api/v1/users/self');
+    expect(calls[0]!.auth).toBeNull();
+    expect(calls[0]!.cookie).toBe('canvas_session=abc');
+  });
+
+  it('a 401 with a token is "rejected the access token", never a session message', async () => {
+    const mk = (res: Response) => new CanvasClient('https://x', null, log, async () => res, { accessToken: TOKEN });
+    const denied = mk(withUrl(new Response('{"errors":[{"message":"Invalid access token."}]}', { status: 401, headers: { 'content-type': 'application/json' } })));
+    const err = await denied.get('/api/v1/users/self').catch((e: Error) => e);
+    expect(err).toBeInstanceOf(NeedsAuthError);
+    expect((err as Error).message).toMatch(/Canvas rejected the access token/);
+    expect((err as Error).message).not.toMatch(/session/);
+    expect(needsAuthMessage(denied)).toBe('Canvas rejected the access token; replace it in Settings → Sources');
+    expect(needsAuthMessage(new CanvasClient('https://x', new CookieJar(), log))).toBe('Canvas session expired; reconnect it in Settings → Sources');
+    // A resource-level denial still resolves to null with a token, as it does with a cookie.
+    expect(await mk(withUrl(new Response('{}', { status: 403, headers: { 'content-type': 'application/json' } }))).getResource('/api/v1/files/9')).toBeNull();
   });
 });

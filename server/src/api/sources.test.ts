@@ -63,3 +63,46 @@ describe('POST /api/sources/sync', () => {
     expect(after.meta.baseUrl).toBe('https://canvas.school.edu');
   });
 });
+
+describe('PUT /api/sources/canvas/config: token or cookie, one at a time', () => {
+  const TOKEN = '7~configtokenconfigtokenconfigtoken';
+  const put = (app: Hono, body: unknown) => app.request('/api/sources/canvas/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('stores a token (clearing a cookie), a cookie (clearing the token), reports only the kind, and the cookie route clears a token', async () => {
+    const ctx = await testContext();
+    const app = new Hono().route('/api/sources', sourcesRoutes(ctx, { ingesters: [], run: async () => ({ ok: true, result: { counts: {} }, ms: 1 }) }));
+    const { getSourceConfig } = await import('@collected/core/lib/sources');
+    const stored = () => getSourceConfig<Record<string, unknown>>(ctx, 'canvas');
+
+    const cookie = await put(app, { baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=SECRETVALUE' });
+    expect(cookie.status).toBe(200);
+    expect(((await cookie.json()) as { meta: Record<string, unknown> }).meta.auth).toBe('cookie');
+
+    const token = await put(app, { baseUrl: 'https://canvas.school.edu', accessToken: TOKEN });
+    expect(token.status).toBe(200);
+    const tokenBody = (await token.json()) as { hasConfig: boolean; meta: Record<string, unknown> };
+    expect(tokenBody.meta.auth).toBe('token');
+    expect(JSON.stringify(tokenBody)).not.toContain(TOKEN);
+    expect(await stored()).toEqual({ baseUrl: 'https://canvas.school.edu', accessToken: TOKEN });
+
+    const back = await put(app, { baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=NEWCOOKIE' });
+    expect(((await back.json()) as { meta: Record<string, unknown> }).meta.auth).toBe('cookie');
+    expect(await stored()).toEqual({ baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=NEWCOOKIE' });
+
+    // Neither credential, or a token too short to be one: refused, nothing changes.
+    expect((await put(app, { baseUrl: 'https://canvas.school.edu' })).status).toBe(422);
+    expect((await put(app, { baseUrl: 'https://canvas.school.edu', accessToken: 'short' })).status).toBe(422);
+    expect(await stored()).toEqual({ baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=NEWCOOKIE' });
+
+    await put(app, { baseUrl: 'https://canvas.school.edu', accessToken: TOKEN });
+    const viaCookieRoute = await app.request('/api/sources/canvas/cookie', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cookieHeader: 'canvas_session=FROMCLI' }) });
+    expect(viaCookieRoute.status).toBe(200);
+    expect(await stored()).toEqual({ baseUrl: 'https://canvas.school.edu', cookieHeader: 'canvas_session=FROMCLI', cookieJar: undefined });
+
+    await app.request('/api/sources/canvas/config', { method: 'DELETE' });
+    const after = (await (await app.request('/api/sources/canvas')).json()) as { hasConfig: boolean; meta: Record<string, unknown> };
+    expect(after.hasConfig).toBe(false);
+    expect(after.meta.auth).toBeNull();
+    expect(after.meta.baseUrl).toBe('https://canvas.school.edu');
+  });
+});

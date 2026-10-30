@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { sourceConfigSchemas } from '@collected/shared';
 import type { AppContext } from '../context.js';
-import { CanvasClient, type CanvasConfig } from '@collected/core/ingest/canvas/client';
+import { CanvasClient, needsAuthMessage, type CanvasConfig } from '@collected/core/ingest/canvas/client';
 import { NeedsAuthError } from '@collected/core/ingest/types';
 import { getSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
 
@@ -55,7 +55,7 @@ export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (
     } catch (err) {
       if (err instanceof NeedsAuthError) {
         await setSourceStatus(ctx, 'canvas', 'needs_auth', { lastError: err.message });
-        return c.json({ error: 'Canvas session expired; reconnect it in Settings → Sources' }, 502);
+        return c.json({ error: needsAuthMessage(client) }, 502);
       }
       const message = err instanceof Error ? err.message : String(err);
       ctx.log.warn({ err, file: id }, 'canvas file open failed');
@@ -97,7 +97,7 @@ export function canvasRoutes(ctx: AppContext, clientFor: CanvasClientFactory = (
     } catch (err) {
       if (err instanceof NeedsAuthError) {
         await setSourceStatus(ctx, 'canvas', 'needs_auth', { lastError: err.message });
-        return c.json({ error: 'Canvas session expired; reconnect it in Settings → Sources' }, 502);
+        return c.json({ error: needsAuthMessage(client) }, 502);
       }
       const message = err instanceof Error ? err.message : String(err);
       return c.json({ error: message }, 502);

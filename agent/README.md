@@ -38,17 +38,17 @@ collected auth service-token <client-id>          # prompts for the secret; keep
 collected courses                                 # proves the connection
 ```
 
-`init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas` reads the Canvas session from your browser and hands it to the server; the fallback is pasting the cookie in Settings → Sources.
+`init` writes the config file and prints the next steps. For a server you run locally with `AUTH_DISABLED=true`, use `collected auth helper-key` with the server's `LOCAL_HELPER_KEY` instead of a service token. `collected connect canvas --token` connects Canvas with a personal access token: make one in Canvas under Account → Settings → Approved Integrations → "+ New Access Token" (leave the expiry blank and it never expires), run the command, paste the token at the prompt (or pipe it on stdin; it is never a flag), and it is checked against your Canvas before the server stores it. No browser, no Keychain, no DevTools. Plain `collected connect canvas` is the second way: it reads the Canvas session cookie from your browser and hands it to the server; the fallback to that is pasting the cookie in Settings → Sources.
 
 ### Which browsers `connect canvas` can read
 
-Firefox keeps its cookies in the clear, so it works everywhere. Chromium browsers encrypt theirs with a key the operating system guards, and whether a program running as you can get that key depends on the platform. `--browser <name>` picks one (`chrome`, `brave`, `edge`, `arc`, `chromium`, `firefox`); without it they are tried in that order. When nothing is found, the error lists every browser: not installed, how many profiles had no cookie for the host, or why the store could not be read.
+This is the cookie path; `connect canvas --token` needs none of it. Firefox and its forks (Zen, LibreWolf, Floorp, Waterfox) keep their cookies in the clear, so they work everywhere and never prompt. Chromium browsers encrypt theirs with a key the operating system guards, and whether a program running as you can get that key depends on the platform. `--browser <name>` picks one (`chrome`, `brave`, `edge`, `arc`, `chromium`, `firefox`, `zen`, `librewolf`, `floorp`, `waterfox`); without it they are tried in that order. The Keychain line is printed only when a Chromium store is about to be opened. When nothing is found, the error lists every browser: not installed, how many profiles had no cookie for the host, or why the store could not be read.
 
-| | Firefox | Chrome, Edge, Brave, Chromium | Arc |
+| | Firefox, Zen, LibreWolf, Floorp, Waterfox | Chrome, Edge, Brave, Chromium | Arc |
 |---|---|---|---|
-| macOS | yes | yes: the Keychain asks once for the "Safe Storage" password; click Allow | yes |
-| Windows | yes (`%APPDATA%\Mozilla\Firefox\Profiles`) | usually no: since Chrome 127 and the matching Edge, cookies are app-bound, which only the browser itself can decrypt. The command says so; paste the cookie in Settings → Sources instead | no |
-| Linux | yes (`~/.mozilla/firefox`, the snap and flatpak sandboxes too) | only with the basic password store (`--password-store=basic`, or no desktop keyring); with GNOME Keyring or KWallet the key is read through `secret-tool` when that works, otherwise the command says the store is locked | no |
+| macOS | yes (`~/Library/Application Support/<Firefox, zen, LibreWolf, Floorp, Waterfox>/Profiles`) | yes: the Keychain asks once for the "Safe Storage" password; click Allow | yes |
+| Windows | yes (`%APPDATA%\<Mozilla\Firefox, zen, librewolf, Floorp, Waterfox>\Profiles`) | usually no: since Chrome 127 and the matching Edge, cookies are app-bound, which only the browser itself can decrypt. The command says so; use `--token`, or paste the cookie in Settings → Sources | no |
+| Linux | yes (`~/.mozilla/firefox` with the snap and flatpak sandboxes, `~/.zen` and its flatpak, `~/.librewolf`, `~/.floorp`, `~/.waterfox`) | only with the basic password store (`--password-store=basic`, or no desktop keyring); with GNOME Keyring or KWallet the key is read through `secret-tool` when that works, otherwise the command says the store is locked | no |
 
 Pasting always works: DevTools → Application → Cookies → your Canvas domain, copy `canvas_session=…` (older instances: `_normandy_session`) into the Canvas card. The Canvas address field accepts a bare host or any page address from that Canvas.
 
@@ -65,7 +65,7 @@ collected courses
 collected status                       # "local · <data dir>"
 ```
 
-The data directory (created `0700`) holds `collected.db`, the encryption key (`.secret_key`, created on first use), the pre-migration snapshots under `backups/`, the daemon's log and the per-source lock files (`sync.lock/`). It is yours to back up or delete. `collected sync <source|all>` runs a source's sync right there and waits for it; `collected connect canvas` stores the Canvas session in the local database and syncs it. `login` and `auth service-token` have nothing to do in local mode and say so.
+The data directory (created `0700`) holds `collected.db`, the encryption key (`.secret_key`, created on first use), the pre-migration snapshots under `backups/`, the daemon's log and the per-source lock files (`sync.lock/`). It is yours to back up or delete. `collected sync <source|all>` runs a source's sync right there and waits for it; `collected connect canvas --token` (or plain `connect canvas` for the browser cookie) stores the Canvas credential in the local database and syncs it. `login` and `auth service-token` have nothing to do in local mode and say so.
 
 ### The dashboard: `collected ui`
 
@@ -153,6 +153,8 @@ event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD]   all day; <when> is "2
 event calendars                             the connected Google calendars, with the default marked
 jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
 resync [canvas|gradescope|gcal|todoist|jobs|all]
+connect canvas --token [--domain host] [--dry-run]   paste a Canvas access token at the prompt (or pipe it on stdin); checked against Canvas, then saved
+connect canvas [--browser X] [--domain host] [--dry-run]   or read the Canvas session cookie from a browser and send it
 ```
 
 Local mode only (`collected init --local`):

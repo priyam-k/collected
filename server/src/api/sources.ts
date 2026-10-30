@@ -10,7 +10,7 @@ import { sources } from '@collected/core/db/schema';
 import { ingesters as registryIngesters } from '@collected/core/ingest/registry';
 import { isRunning, runIngester as runReal, type RunOutcome } from '@collected/core/ingest/runner';
 import type { Ingester } from '@collected/core/ingest/types';
-import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
+import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus, type CanvasAuthKind } from '@collected/core/lib/sources';
 import { bad, parseBody } from './util.js';
 import { eq } from 'drizzle-orm';
 
@@ -19,6 +19,12 @@ function stripPrivateMeta(meta: unknown): Record<string, unknown> {
   if (!meta || typeof meta !== 'object') return {};
   const { syncTokens: _s, ...rest } = meta as Record<string, unknown>;
   return rest;
+}
+
+function canvasAuthKind(row: typeof sources.$inferSelect): CanvasAuthKind {
+  if (!row.configEnc) return null;
+  const auth = (row.meta as { auth?: unknown } | null)?.auth;
+  return auth === 'token' || auth === 'cookie' ? auth : 'cookie'; // a config saved before meta.auth existed is a cookie
 }
 
 export function toPublic(row: typeof sources.$inferSelect, env: Env): Source {
@@ -31,7 +37,8 @@ export function toPublic(row: typeof sources.$inferSelect, env: Env): Source {
     lastError: row.lastError,
     hasConfig: !!row.configEnc,
     running: isRunning(row.id as IngestedSourceId, { dataDir: env.DATA_DIR, timeoutMs: registryIngesters.find((i) => i.id === row.id)?.timeoutMs }),
-    meta: stripPrivateMeta(row.meta),
+    // Canvas says which kind of credential it holds (`auth: 'token' | 'cookie' | null`), never the value.
+    meta: row.id === 'canvas' ? { ...stripPrivateMeta(row.meta), auth: canvasAuthKind(row) } : stripPrivateMeta(row.meta),
     updatedAt: row.updatedAt,
     ...(row.id === 'todoist' ? { oauthAvailable: todoistOAuthConfigured(env) } : {}),
     // Calendar and Tasks share one client; the cards say when a build or an instance has none.
@@ -97,7 +104,12 @@ export function sourcesRoutes(ctx: AppContext, deps: SourcesDeps = { ingesters: 
     const id = sourceIdSchema.safeParse(c.req.param('id'));
     if (!id.success) bad('unknown source', 404);
     const schema = sourceConfigSchemas[id.data];
-    const body = await parseBody(c, schema);
+    let body: unknown = await parseBody(c, schema);
+    // Canvas holds one credential at a time: a token replaces any stored cookie and jar, a cookie replaces a token.
+    if (id.data === 'canvas') {
+      const v = body as { baseUrl: string; accessToken?: string; cookieHeader?: string };
+      body = v.accessToken ? { baseUrl: v.baseUrl, accessToken: v.accessToken } : { baseUrl: v.baseUrl, cookieHeader: v.cookieHeader };
+    }
     await setSourceConfig(ctx, id.data, body);
     await setSourceStatus(ctx, id.data, 'disconnected', { lastError: null });
     await ctx.db.update(sources).set({ enabled: true }).where(eq(sources.id, id.data));

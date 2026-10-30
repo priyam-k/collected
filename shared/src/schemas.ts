@@ -287,11 +287,15 @@ export type ManualEventInput = z.infer<typeof manualEventInputSchema>;
 
 // Per-source config bodies (secrets). Stored encrypted; never returned by the API.
 export const sourceConfigSchemas = {
-  canvas: z.object({
-    baseUrl: outboundUrlSchema, // the school's Canvas host, e.g. https://canvas.example.edu; no default
-    cookieHeader: z.string().optional(), // raw "name=value; name2=value2" pasted from the browser
-    cookieJar: z.unknown().optional(), // serialized tough-cookie jar, maintained by the ingester
-  }),
+  /** One credential at a time: an access token (Canvas → Account → Settings → New Access Token) or a browser session. */
+  canvas: z
+    .object({
+      baseUrl: outboundUrlSchema, // the school's Canvas host, e.g. https://canvas.example.edu; no default
+      accessToken: z.string().trim().min(20).max(200).optional(), // a personal access token; sent as `Authorization: Bearer`
+      cookieHeader: z.string().optional(), // raw "name=value; name2=value2" pasted from the browser
+      cookieJar: z.unknown().optional(), // serialized tough-cookie jar, maintained by the ingester
+    })
+    .refine((v) => !!v.accessToken || !!v.cookieHeader || !!v.cookieJar, { message: 'an access token or a session cookie is required', path: ['accessToken'] }),
   canvas_ical: z.object({ url: outboundUrlSchema }),
   gradescope: z.object({ email: z.string().email(), password: z.string().min(1) }),
   gcal: z.object({ refreshToken: z.string().min(1) }),

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deriveChromiumKey, hostKeyHash } from './browser-cookies.js';
-import { connectCanvas, type CanvasConnectApi } from './connect.js';
+import { connectCanvas, connectCanvasToken, type CanvasConnectApi } from './connect.js';
 import type { AgentConfig } from './config.js';
 
 const PASSWORD = 'test-safe-storage-password';
@@ -35,13 +35,31 @@ const cfg = (over: Partial<AgentConfig> = {}): AgentConfig => ({ server: 'https:
 
 function fakeApi(outcome: unknown = { ok: true, result: { counts: { assignments: 7 } } }) {
   const posts: { cookieHeader: string; baseUrl?: string }[] = [];
+  const sent: { method: string; path: string; body?: unknown }[] = [];
   const api: CanvasConnectApi = {
     postCanvasCookie: async (body) => {
       posts.push(body);
       return { ok: true, outcome };
     },
+    send: async <T>(method: string, path: string, body?: unknown) => {
+      sent.push({ method, path, body });
+      return (path.endsWith('/sync') ? { outcome } : {}) as T;
+    },
   };
-  return { api, posts };
+  return { api, posts, sent };
+}
+
+/** A Canvas that knows one token; records the Authorization header of every call and never sees a cookie. */
+function fakeCanvas(goodToken: string) {
+  const calls: { url: string; auth: string | null; cookie: string | null }[] = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    const headers = new Headers(init?.headers);
+    calls.push({ url, auth: headers.get('authorization'), cookie: headers.get('cookie') });
+    if (headers.get('authorization') !== `Bearer ${goodToken}`) return new Response('{"errors":[{"message":"Invalid access token."}]}', { status: 401, headers: { 'content-type': 'application/json' } });
+    return new Response('while(1);{"id":42,"name":"Test Student","login_id":"ts"}', { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' } });
+  };
+  return { fetchImpl, calls };
 }
 
 let home: string;
@@ -124,8 +142,44 @@ describe('connectCanvas', () => {
     const err = await connectCanvas(cfg(), { log, api, keychainPassword: reader, home, platform: 'darwin' }).catch((e: Error) => e);
     expect(err).toBeInstanceOf(Error);
     const lines = (err as Error).message.split('\n');
-    expect(lines[0]).toMatch(/no Canvas session cookie.*chrome\/brave\/edge\/arc\/chromium\/firefox.*Settings → Sources/);
-    expect(lines.slice(1)).toEqual(['  chrome: 1 profile, no session cookie for umd.instructure.com', '  brave: not installed', '  edge: not installed', '  arc: not installed', '  chromium: not installed', '  firefox: not installed']);
+    expect(lines[0]).toMatch(/no Canvas session cookie.*chrome\/brave\/edge\/arc\/chromium\/firefox\/zen\/librewolf\/floorp\/waterfox.*connect canvas --token.*Settings → Sources/);
+    expect(lines.slice(1)).toEqual([
+      '  chrome: 1 profile, no session cookie for umd.instructure.com',
+      '  brave: not installed',
+      '  edge: not installed',
+      '  arc: not installed',
+      '  chromium: not installed',
+      '  firefox: not installed',
+      '  zen: not installed',
+      '  librewolf: not installed',
+      '  floorp: not installed',
+      '  waterfox: not installed',
+    ]);
+    // Chrome exists on this machine, so the Keychain line was said once, before it was opened.
+    expect(logs.filter((l) => /Keychain/.test(l))).toHaveLength(1);
+  });
+
+  it('says nothing about the Keychain when the cookie comes from a Firefox-family browser, or when no Chromium store exists', async () => {
+    const zen = path.join(home, 'Library', 'Application Support', 'zen', 'Profiles', 'ab12.Default (release)');
+    mkdirSync(zen, { recursive: true });
+    const db = new DatabaseSync(path.join(zen, 'cookies.sqlite'));
+    db.exec('CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, expiry INTEGER)');
+    db.prepare('INSERT INTO moz_cookies(name,value,host,expiry) VALUES(?,?,?,?)').run('canvas_session', 'ZENTOKEN', HOST, Math.round(Date.now() / 1000) + 86_400);
+    db.close();
+    const deny = () => {
+      throw new Error('should not be asked');
+    };
+    const { api, posts } = fakeApi();
+    // No Chromium browser is installed: the whole order is walked without a Keychain word.
+    const res = await connectCanvas(cfg(), { log, api, keychainPassword: deny, home, platform: 'darwin' });
+    expect(res.browser).toBe('zen');
+    expect(posts[0]!.cookieHeader).toBe('canvas_session=ZENTOKEN');
+    expect(logs.some((l) => /Keychain/.test(l))).toBe(false);
+    // Named outright, a Firefox-family browser never triggers the line even with Chrome present.
+    writeChrome(home, [{ host: HOST, name: 'canvas_session', value: 'CHROMETOKEN' }]);
+    logs = [];
+    await connectCanvas(cfg(), { browser: 'zen', log, api, keychainPassword: deny, home, platform: 'darwin' });
+    expect(logs.some((l) => /Keychain/.test(l))).toBe(false);
   });
 
   it('on Windows, reads Firefox with no Keychain talk and names app-bound Chrome in the error', async () => {
@@ -169,8 +223,44 @@ describe('connectCanvas', () => {
     cdb.close();
     const { api } = fakeApi();
     const err = await connectCanvas(cfg(), { log, api, home, platform: 'linux', env: {}, linuxKeyringPassword: () => undefined }).catch((e: Error) => e);
-    expect((err as Error).message).toMatch(/On Linux, Firefox always works/);
+    expect((err as Error).message).toMatch(/On Linux, Firefox and its forks always work/);
     expect((err as Error).message).toMatch(/chrome: cookies are locked by the desktop keyring/);
     expect((err as Error).message).toMatch(/firefox: not installed/);
+  });
+});
+
+describe('connectCanvasToken', () => {
+  const TOKEN = '7~abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG';
+
+  it('verifies the token against Canvas with a Bearer header, then PUTs the config and syncs; the token is never printed', async () => {
+    const canvas = fakeCanvas(TOKEN);
+    const { api, posts, sent } = fakeApi();
+    const res = await connectCanvasToken(cfg({ canvasHost: 'canvas.school.edu' }), { log, api, fetchImpl: canvas.fetchImpl, readSecret: async () => `${TOKEN}\n` });
+    expect(res).toEqual({ host: 'canvas.school.edu', user: 'Test Student', saved: true });
+    // One check against Canvas itself: /users/self with the token and no cookie.
+    expect(canvas.calls).toEqual([{ url: 'https://canvas.school.edu/api/v1/users/self', auth: `Bearer ${TOKEN}`, cookie: null }]);
+    // Then the config, then the first sync; the cookie route is never used.
+    expect(sent).toEqual([
+      { method: 'PUT', path: '/api/sources/canvas/config', body: { baseUrl: 'https://canvas.school.edu', accessToken: TOKEN } },
+      { method: 'POST', path: '/api/sources/canvas/sync', body: undefined },
+    ]);
+    expect(posts).toHaveLength(0);
+    expect(logs.join('\n')).not.toContain(TOKEN);
+    expect(logs.some((l) => /token works: canvas\.school\.edu knows it as Test Student/.test(l))).toBe(true);
+    expect(logs.some((l) => /Canvas synced: .*assignments/.test(l))).toBe(true);
+  });
+
+  it('saves nothing when Canvas rejects the token, when it is not token-shaped, or on a dry run', async () => {
+    const canvas = fakeCanvas(TOKEN);
+    const { api, sent } = fakeApi();
+    const opts = { log, api, fetchImpl: canvas.fetchImpl, domain: 'https://canvas.school.edu/courses/1' };
+    await expect(connectCanvasToken(cfg(), { ...opts, readSecret: async () => '7~wrongwrongwrongwrongwrongwrong' })).rejects.toThrow(/canvas\.school\.edu rejected that token \(401\); nothing saved/);
+    await expect(connectCanvasToken(cfg(), { ...opts, readSecret: async () => 'canvas_session=notatoken' })).rejects.toThrow(/does not look like a Canvas access token/);
+    const dry = await connectCanvasToken(cfg(), { ...opts, dryRun: true, readSecret: async () => TOKEN });
+    expect(dry.saved).toBe(false);
+    expect(sent).toHaveLength(0);
+    // The shape check ran before any network: only the two real attempts reached Canvas.
+    expect(canvas.calls.map((c) => c.auth)).toEqual(['Bearer 7~wrongwrongwrongwrongwrongwrong', `Bearer ${TOKEN}`]);
+    expect(logs.join('\n')).not.toContain(TOKEN);
   });
 });

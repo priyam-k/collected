@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { decryptChromiumValue, decryptChromiumValueWindows, deriveChromiumKey, deriveLinuxChromiumKey, describeScan, firefoxDefaultProfiles, hostKeyHash, scanBrowser, type ScanOptions } from './browser-cookies.js';
+import { BROWSER_ORDER, decryptChromiumValue, decryptChromiumValueWindows, deriveChromiumKey, deriveLinuxChromiumKey, describeScan, firefoxDefaultProfiles, firefoxRoots, hostKeyHash, isFirefoxFamily, scanBrowser, type ScanOptions } from './browser-cookies.js';
 
 /* Fixtures are built the way the browsers write their stores, so decryption and enumeration are exercised end to end. */
 
@@ -348,5 +348,64 @@ describe('describeScan', () => {
     expect(describeScan({ browser: 'firefox', installed: true, profiles: [], scanned: 2 }, HOST)).toBe('firefox: 2 profiles, no session cookie for umd.instructure.com');
     expect(describeScan({ browser: 'chrome', installed: true, profiles: [], scanned: 1 }, HOST)).toBe('chrome: 1 profile, no session cookie for umd.instructure.com');
     expect(describeScan({ browser: 'chrome', installed: true, profiles: [], scanned: 1, error: 'boom' }, HOST)).toBe('chrome: boom');
+  });
+});
+
+describe('Firefox forks (zen, librewolf, floorp, waterfox)', () => {
+  function writeStoreAt(dir: string, value: string): void {
+    mkdirSync(dir, { recursive: true });
+    const db = new DatabaseSync(path.join(dir, 'cookies.sqlite'));
+    db.exec('CREATE TABLE moz_cookies(name TEXT, value TEXT, host TEXT, expiry INTEGER)');
+    db.prepare('INSERT INTO moz_cookies(name,value,host,expiry) VALUES(?,?,?,?)').run('canvas_session', value, HOST, Math.round(Date.now() / 1000) + 86_400 * 365);
+    db.close();
+  }
+
+  it('resolves each fork\'s roots per platform from its own definition, and firefox keeps its three Linux roots', () => {
+    const win = { home: '/h', platform: 'win32' as const, env: { APPDATA: 'C:/Users/me/AppData/Roaming' } };
+    expect(firefoxRoots({ home: '/h', platform: 'darwin' }, 'zen')).toEqual([{ ini: '/h/Library/Application Support/zen/profiles.ini', profilesDir: '/h/Library/Application Support/zen/Profiles' }]);
+    expect(firefoxRoots(win, 'zen')).toEqual([{ ini: 'C:/Users/me/AppData/Roaming/zen/profiles.ini', profilesDir: 'C:/Users/me/AppData/Roaming/zen/Profiles' }]);
+    expect(firefoxRoots({ home: '/h', platform: 'linux' }, 'zen')).toEqual([
+      { ini: '/h/.zen/profiles.ini', profilesDir: '/h/.zen' },
+      { ini: '/h/.var/app/app.zen_browser.zen/.zen/profiles.ini', profilesDir: '/h/.var/app/app.zen_browser.zen/.zen' },
+    ]);
+    expect(firefoxRoots({ home: '/h', platform: 'linux' }, 'firefox').map((r) => r.profilesDir)).toEqual(['/h/.mozilla/firefox', '/h/snap/firefox/common/.mozilla/firefox', '/h/.var/app/org.mozilla.firefox/.mozilla/firefox']);
+    expect(firefoxRoots({ home: '/h', platform: 'darwin' }, 'librewolf')[0]!.profilesDir).toBe('/h/Library/Application Support/LibreWolf/Profiles');
+    expect(firefoxRoots(win, 'librewolf')[0]!.profilesDir).toBe('C:/Users/me/AppData/Roaming/librewolf/Profiles');
+    expect(firefoxRoots({ home: '/h', platform: 'linux' }, 'librewolf')[0]!.profilesDir).toBe('/h/.librewolf');
+    expect(firefoxRoots({ home: '/h', platform: 'darwin' }, 'floorp')[0]!.profilesDir).toBe('/h/Library/Application Support/Floorp/Profiles');
+    expect(firefoxRoots(win, 'floorp')[0]!.profilesDir).toBe('C:/Users/me/AppData/Roaming/Floorp/Profiles');
+    expect(firefoxRoots({ home: '/h', platform: 'linux' }, 'floorp')[0]!.profilesDir).toBe('/h/.floorp');
+    expect(firefoxRoots({ home: '/h', platform: 'darwin' }, 'waterfox')[0]!.profilesDir).toBe('/h/Library/Application Support/Waterfox/Profiles');
+    expect(firefoxRoots(win, 'waterfox')[0]!.profilesDir).toBe('C:/Users/me/AppData/Roaming/Waterfox/Profiles');
+    expect(firefoxRoots({ home: '/h', platform: 'linux' }, 'waterfox')[0]!.profilesDir).toBe('/h/.waterfox');
+    // A Chromium browser has no Firefox roots.
+    expect(firefoxRoots({ home: '/h', platform: 'darwin' }, 'chrome')).toEqual([]);
+  });
+
+  it('reads Zen on macOS under Application Support/zen/Profiles, on Windows under %APPDATA%\\zen\\Profiles, and on Linux from ~/.zen and the flatpak, in the clear', () => {
+    writeStoreAt(path.join(home, 'Library', 'Application Support', 'zen', 'Profiles', 'ab12.Default (release)'), 'MACZEN');
+    const mac = scanBrowser('zen', HOST, ['canvas_session'], { home, platform: 'darwin' });
+    expect(mac.installed).toBe(true);
+    expect(mac.profiles[0]).toEqual({ profile: 'ab12.Default (release)', cookies: [{ name: 'canvas_session', value: 'MACZEN' }] });
+    // Zen's tree is not Firefox's: firefox on the same machine is "not installed".
+    expect(scanBrowser('firefox', HOST, ['canvas_session'], { home, platform: 'darwin' }).installed).toBe(false);
+
+    const roaming = path.join(home, 'Roaming');
+    writeStoreAt(path.join(roaming, 'zen', 'Profiles', 'q1w2.Default (release)'), 'WINZEN');
+    const win = scanBrowser('zen', HOST, ['canvas_session'], { home, platform: 'win32', env: { APPDATA: roaming, LOCALAPPDATA: path.join(home, 'Local') } });
+    expect(win.scanned).toBe(1);
+    expect(win.profiles[0]!.cookies[0]!.value).toBe('WINZEN');
+
+    writeStoreAt(path.join(home, '.zen', 'abcd.Default (release)'), 'DEBZEN');
+    writeStoreAt(path.join(home, '.var', 'app', 'app.zen_browser.zen', '.zen', 'efgh.flat'), 'FLATZEN');
+    const linux = scanBrowser('zen', HOST, ['canvas_session'], { home, platform: 'linux', env: {} });
+    expect(linux.scanned).toBe(2);
+    expect(linux.profiles.map((p) => p.cookies[0]!.value)).toEqual(['DEBZEN', 'FLATZEN']);
+  });
+
+  it('tries the forks after firefox, and all of them count as the Firefox family', () => {
+    expect(BROWSER_ORDER).toEqual(['chrome', 'brave', 'edge', 'arc', 'chromium', 'firefox', 'zen', 'librewolf', 'floorp', 'waterfox']);
+    expect(BROWSER_ORDER.filter(isFirefoxFamily)).toEqual(['firefox', 'zen', 'librewolf', 'floorp', 'waterfox']);
+    expect(describeScan(scanBrowser('librewolf', HOST, ['canvas_session'], { home, platform: 'darwin' }), HOST)).toBe('librewolf: not installed');
   });
 });

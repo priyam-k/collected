@@ -56,6 +56,10 @@ export function identityAllows(user: string, method: string, pathWithQuery: stri
     if (p === '/api/todoist/config' || p === '/api/gtasks/config') return false;
     if (p.startsWith('/api/system')) return false;
     if (p.startsWith('/api/settings')) return false;
+    // The one credential write a token identity may make: `collected connect canvas --token` stores the Canvas access
+    // token it just verified. Replacing a Canvas credential is what the cookie route already let the helper key do;
+    // clearing it (DELETE) and every other source's config stay the owner's.
+    if (method === 'PUT' && p === '/api/sources/canvas/config') return true;
     if (/^\/api\/sources\/[^/]+\/(config|enabled|meta)$/.test(p)) return false;
     if (method === 'DELETE') return false;
   }

@@ -30,12 +30,15 @@ function DatabaseSyncClass(): DatabaseSyncCtor {
  * never leave this module except through the returned structure; nothing here prints or logs a value.
  */
 
-export type BrowserId = 'chrome' | 'chromium' | 'brave' | 'edge' | 'arc' | 'firefox';
+export type BrowserId = 'chrome' | 'chromium' | 'brave' | 'edge' | 'arc' | 'firefox' | 'zen' | 'librewolf' | 'floorp' | 'waterfox';
 
-/** Order the connect flow tries browsers in when none is named. */
-export const BROWSER_ORDER: BrowserId[] = ['chrome', 'brave', 'edge', 'arc', 'chromium', 'firefox'];
+/** Order the connect flow tries browsers in when none is named: the Chromium family, then Firefox and its forks. */
+export const BROWSER_ORDER: BrowserId[] = ['chrome', 'brave', 'edge', 'arc', 'chromium', 'firefox', 'zen', 'librewolf', 'floorp', 'waterfox'];
 
 export const isBrowserId = (s: string): s is BrowserId => (BROWSER_ORDER as string[]).includes(s);
+
+/** Firefox and its forks keep cookies in the clear: no Keychain, DPAPI or keyring is ever consulted for them. */
+export const isFirefoxFamily = (browser: BrowserId): boolean => BROWSERS[browser].kind === 'firefox';
 
 /** Reads the Chromium "Safe Storage" password for a Keychain service (macOS). Injected in tests. */
 export type KeychainReader = (service: string) => string;
@@ -120,8 +123,18 @@ interface ChromiumDef {
   /** The `application` attribute Chromium gives its keyring entry on Linux. */
   keyringApp?: string;
 }
+/**
+ * A Firefox-family browser: the same `profiles.ini` + `cookies.sqlite` layout under a vendor root. On macOS and
+ * Windows the profiles sit in a `Profiles` folder under the root; on Linux they sit in the root itself.
+ */
 interface FirefoxDef {
   kind: 'firefox';
+  /** Root under ~/Library/Application Support. */
+  darwin: string;
+  /** Root under %APPDATA%, as path segments. */
+  win32: string[];
+  /** Roots under the home directory, as path segments (the native one first, then sandboxed installs). */
+  linux: string[][];
 }
 
 const BROWSERS: Record<BrowserId, ChromiumDef | FirefoxDef> = {
@@ -131,7 +144,16 @@ const BROWSERS: Record<BrowserId, ChromiumDef | FirefoxDef> = {
   edge: { kind: 'chromium', darwin: 'Microsoft Edge', win32: 'Microsoft/Edge/User Data', linux: 'microsoft-edge', keychainService: 'Microsoft Edge Safe Storage', keyringApp: 'microsoft-edge' },
   // Arc ships for macOS and (as a packaged app) Windows; only the macOS layout is known here.
   arc: { kind: 'chromium', darwin: 'Arc/User Data', keychainService: 'Arc Safe Storage' },
-  firefox: { kind: 'firefox' },
+  firefox: {
+    kind: 'firefox',
+    darwin: 'Firefox',
+    win32: ['Mozilla', 'Firefox'],
+    linux: [['.mozilla', 'firefox'], ['snap', 'firefox', 'common', '.mozilla', 'firefox'], ['.var', 'app', 'org.mozilla.firefox', '.mozilla', 'firefox']],
+  },
+  zen: { kind: 'firefox', darwin: 'zen', win32: ['zen'], linux: [['.zen'], ['.var', 'app', 'app.zen_browser.zen', '.zen']] },
+  librewolf: { kind: 'firefox', darwin: 'LibreWolf', win32: ['librewolf'], linux: [['.librewolf']] },
+  floorp: { kind: 'firefox', darwin: 'Floorp', win32: ['Floorp'], linux: [['.floorp']] },
+  waterfox: { kind: 'firefox', darwin: 'Waterfox', win32: ['Waterfox'], linux: [['.waterfox']] },
 };
 
 const supportRoot = (home: string): string => path.join(home, 'Library', 'Application Support');
@@ -162,22 +184,27 @@ export interface FirefoxRoot {
   profilesDir: string;
 }
 
-/** Every place Firefox profiles can live on this platform (the snap and flatpak sandboxes have their own on Linux). */
-export function firefoxRoots(opts: ScanOptions = {}): FirefoxRoot[] {
+/**
+ * Every place a Firefox-family browser's profiles can live on this platform (on Linux the snap and flatpak sandboxes
+ * have their own). Empty for a Chromium browser.
+ */
+export function firefoxRoots(opts: ScanOptions = {}, browser: BrowserId = 'firefox'): FirefoxRoot[] {
+  const def = BROWSERS[browser];
+  if (def.kind !== 'firefox') return [];
   const home = opts.home ?? homedir();
   const platform = opts.platform ?? process.platform;
   if (platform === 'darwin') {
-    const root = path.join(supportRoot(home), 'Firefox');
+    const root = path.join(supportRoot(home), def.darwin);
     return [{ ini: path.join(root, 'profiles.ini'), profilesDir: path.join(root, 'Profiles') }];
   }
   if (platform === 'win32') {
-    const root = path.join(windowsRoots(home, opts.env ?? process.env).roaming, 'Mozilla', 'Firefox');
+    const root = path.join(windowsRoots(home, opts.env ?? process.env).roaming, ...def.win32);
     return [{ ini: path.join(root, 'profiles.ini'), profilesDir: path.join(root, 'Profiles') }];
   }
-  return [path.join(home, '.mozilla', 'firefox'), path.join(home, 'snap', 'firefox', 'common', '.mozilla', 'firefox'), path.join(home, '.var', 'app', 'org.mozilla.firefox', '.mozilla', 'firefox')].map((root) => ({
-    ini: path.join(root, 'profiles.ini'),
-    profilesDir: root,
-  }));
+  return def.linux.map((segments) => {
+    const root = path.join(home, ...segments);
+    return { ini: path.join(root, 'profiles.ini'), profilesDir: root };
+  });
 }
 
 /** Convert a Chromium `expires_utc` (microseconds since 1601) to whether the cookie is still valid at `nowMs`. */
@@ -274,7 +301,7 @@ export function decryptChromiumValueWindows(encrypted: Buffer, key: Buffer): str
 /** The SHA-256 of a host key, as Chrome 130+ prepends it. Exported so tests can build fixtures the same way. */
 export const hostKeyHash = (hostKey: string): Buffer => createHash('sha256').update(hostKey).digest();
 
-const DISPLAY: Record<BrowserId, string> = { chrome: 'Chrome', chromium: 'Chromium', brave: 'Brave', edge: 'Edge', arc: 'Arc', firefox: 'Firefox' };
+const DISPLAY: Record<BrowserId, string> = { chrome: 'Chrome', chromium: 'Chromium', brave: 'Brave', edge: 'Edge', arc: 'Arc', firefox: 'Firefox', zen: 'Zen', librewolf: 'LibreWolf', floorp: 'Floorp', waterfox: 'Waterfox' };
 
 export const PASTE_INSTEAD = 'use Firefox, or paste the cookie from DevTools (Settings → Sources)';
 /** Chrome 127+ (and Edge) on Windows: the cookie key is held by a service that answers only the browser itself. */
@@ -548,7 +575,7 @@ function firefoxProfiles(root: FirefoxRoot): { profile: string; file: string }[]
 }
 
 function scanFirefox(browser: BrowserId, host: string, names: Set<string>, opts: ScanOptions): BrowserScan {
-  const profiles = firefoxRoots(opts).flatMap(firefoxProfiles);
+  const profiles = firefoxRoots(opts, browser).flatMap(firefoxProfiles);
   if (!profiles.length) return { browser, installed: false, profiles: [], scanned: 0 };
   const result: ProfileScan[] = [];
   const now = Date.now();

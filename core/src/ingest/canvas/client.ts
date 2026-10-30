@@ -13,8 +13,20 @@ export const isAbort = (err: unknown, signal?: AbortSignal): boolean => !!signal
 
 export interface CanvasConfig {
   baseUrl: string;
+  /** A personal access token (Canvas → Account → Settings → New Access Token). When set, the cookie fields are ignored. */
+  accessToken?: string;
   cookieHeader?: string;
   cookieJar?: unknown; // tough-cookie serialized jar, maintained by us
+}
+
+export type CanvasAuthMode = 'token' | 'cookie';
+
+/** Which credential a config would use: the token wins when both are present. */
+export const canvasAuthMode = (config: Pick<CanvasConfig, 'accessToken'>): CanvasAuthMode => (config.accessToken?.trim() ? 'token' : 'cookie');
+
+/** What the dashboard says when this client's credential stops working; the token wording never says "session". */
+export function needsAuthMessage(client: Pick<CanvasClient, 'authMode'>): string {
+  return client.authMode === 'token' ? 'Canvas rejected the access token; replace it in Settings → Sources' : 'Canvas session expired; reconnect it in Settings → Sources';
 }
 
 export type Params = Record<string, string | number | boolean | Array<string | number> | undefined>;
@@ -80,37 +92,51 @@ export async function jarFromConfig(config: CanvasConfig): Promise<CookieJar> {
     }
   }
   if (config.cookieHeader?.trim()) return jarFromCookieHeader(config.cookieHeader, config.baseUrl);
-  throw new NotConfiguredError('Canvas has no session cookie yet');
+  throw new NotConfiguredError('Canvas has no access token or session cookie yet');
 }
 
 export class CanvasClient {
-  private readonly fetchWithCookies: typeof fetch;
+  private readonly doFetch: typeof fetch;
+  /** `token`: `Authorization: Bearer` on every request, no jar. `cookie`: the browser session in a jar that Canvas rotates. */
+  readonly authMode: CanvasAuthMode;
+  private readonly accessToken?: string;
   requestCount = 0;
 
+  /**
+   * With a jar the client is a browser session; with `opts.accessToken` it is an API client and `jar` may be null.
+   * Everything the ingester calls is `/api/v1/*`, which accepts either; nothing here needs a cookie once a token is set.
+   */
   constructor(
     readonly baseUrl: string,
-    readonly jar: CookieJar,
+    readonly jar: CookieJar | null,
     private readonly log: Logger,
     fetchImpl: typeof fetch = fetch,
+    opts: { accessToken?: string } = {},
   ) {
-    this.fetchWithCookies = makeFetchCookie(fetchImpl, jar) as unknown as typeof fetch;
+    this.authMode = canvasAuthMode(opts);
+    this.accessToken = this.authMode === 'token' ? opts.accessToken!.trim() : undefined;
+    // A token travels on its own: a plain fetch, so no cookie Canvas sets back is kept or sent, and a second
+    // credential never rides along with the first.
+    this.doFetch = this.authMode === 'cookie' && jar ? (makeFetchCookie(fetchImpl, jar) as unknown as typeof fetch) : fetchImpl;
   }
 
   static async fromConfig(config: CanvasConfig, log: Logger, fetchImpl?: typeof fetch): Promise<CanvasClient> {
+    if (canvasAuthMode(config) === 'token') return new CanvasClient(config.baseUrl, null, log, fetchImpl, { accessToken: config.accessToken });
     return new CanvasClient(config.baseUrl, await jarFromConfig(config), log, fetchImpl);
   }
 
-  /** One GET. Throws NeedsAuthError on anything that looks like a dead session. */
+  /** One GET. Throws NeedsAuthError on anything that looks like a dead session or a rejected token. */
   async getRaw(path: string, params: Params = {}, signal?: AbortSignal, opts: { deniedIsNull?: boolean } = {}): Promise<{ data: unknown; link: Record<string, string> }> {
     const url = buildUrl(this.baseUrl, path, params);
     // Absolute URLs come from Link headers; a hostile upstream must not steer the session elsewhere.
     if (new URL(url).origin !== new URL(this.baseUrl).origin) throw new Error(`refusing to fetch ${safeUrlForLog(url)}: not on the Canvas host`);
     this.requestCount++;
-    const res = await this.fetchWithCookies(url, {
+    const res = await this.doFetch(url, {
       signal: withTimeout(signal, REQUEST_TIMEOUT_MS),
       headers: {
         Accept: 'application/json+canvas-string-ids, application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 collected/0.1',
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
       },
       redirect: 'follow',
     });
@@ -118,9 +144,11 @@ export class CanvasClient {
     const finalUrl = res.url || url;
     if (opts.deniedIsNull && [401, 403, 404].includes(res.status) && !/\/login(\/|\?|$)/.test(finalUrl)) return { data: null, link: {} };
     if (res.status === 401 || res.status === 403 || /\/login(\/|\?|$)/.test(finalUrl)) {
+      if (this.authMode === 'token') throw new NeedsAuthError(`Canvas rejected the access token (${res.status} at ${safePath(finalUrl)})`);
       throw new NeedsAuthError(`Canvas responded ${res.status} at ${safePath(finalUrl)}`);
     }
     if (!ct.includes('json')) {
+      if (this.authMode === 'token') throw new NeedsAuthError(`Canvas returned ${ct || 'non-JSON'} for ${path}; the access token was not accepted`);
       throw new NeedsAuthError(`Canvas returned ${ct || 'non-JSON'} for ${path}; the session is probably gone`);
     }
     if (!res.ok) {
@@ -195,7 +223,8 @@ export class CanvasClient {
     }
   }
 
-  serializeJar(): Promise<unknown> {
-    return this.jar.serialize();
+  /** The rotated session, for the ingester to store back; null for a token client, which has nothing that rotates. */
+  async serializeJar(): Promise<unknown | null> {
+    return this.jar ? this.jar.serialize() : null;
   }
 }

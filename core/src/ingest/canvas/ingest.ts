@@ -206,17 +206,19 @@ export const canvasIngester: Ingester = {
   timeoutMs: 240_000,
   async run(ctx, signal) {
     const config = await getSourceConfig<CanvasConfig>(ctx, 'canvas');
-    if (!config) throw new NotConfiguredError('Canvas is not set up: paste a session cookie in Settings → Sources');
+    if (!config) throw new NotConfiguredError('Canvas is not set up: add an access token in Settings → Sources');
     const parsed = sourceConfigSchemas.canvas.parse(config);
     const client = await CanvasClient.fromConfig(parsed, ctx.log);
     try {
       const counts = await syncCanvas(ctx, client, signal);
       return { counts };
     } finally {
-      // Always persist the jar: Canvas rotates the session cookie on responses, and the sliding expiry
-      // only slides if we keep the newest value.
-      const jar = await client.serializeJar();
-      await setSourceConfig(ctx, 'canvas', { baseUrl: parsed.baseUrl, cookieJar: jar });
+      // A cookie session is always persisted back: Canvas rotates the session cookie on responses, and the sliding
+      // expiry only slides if we keep the newest value. A token does not rotate, so the stored config stays as is.
+      if (client.authMode === 'cookie') {
+        const jar = await client.serializeJar();
+        await setSourceConfig(ctx, 'canvas', { baseUrl: parsed.baseUrl, cookieJar: jar });
+      }
     }
   },
 };

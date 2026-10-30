@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { Api, openApi, versionWatch } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
-import { connectCanvas } from './connect.js';
+import { connectCanvas, connectCanvasToken } from './connect.js';
 import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
 import { localDotenvPath } from './dotenv.js';
 import { daemonLine, daemonStatus, describeStatus, installDaemon, uninstallDaemon } from './daemon.js';
@@ -58,8 +58,10 @@ function usage(): never {
     daemon install [--interval N] | uninstall | status
                                               a user timer running \`collected sync\` every N minutes (15 in local mode, 30 against a server;
                                               daemon.intervalMinutes in agent.json wins); install-launchd / uninstall-launchd still mean the same
+    connect canvas --token [--domain host] [--dry-run]
+                                              paste a Canvas access token (Canvas → Account → Settings → New Access Token): checked, then saved. The simplest way
     connect canvas [--browser X] [--domain host] [--dry-run]
-                                              read the Canvas session cookie from your browser and send it to the server
+                                              or read the Canvas session cookie from your browser and send it to the server
     connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
                                               (overrides, if you have your own OAuth client: ${localDotenvPath()})
 
@@ -302,7 +304,13 @@ try {
         break;
       }
       if (rest[0] !== 'canvas') usage();
-      const { values } = parseArgs({ args: rest.slice(1), options: { browser: { type: 'string' }, domain: { type: 'string' }, 'dry-run': { type: 'boolean' } } });
+      const { values } = parseArgs({ args: rest.slice(1), options: { token: { type: 'boolean' }, browser: { type: 'string' }, domain: { type: 'string' }, 'dry-run': { type: 'boolean' } } });
+      if (values.token) {
+        if (values.browser) usage();
+        // The token is typed at the prompt or piped on stdin, never a flag value: argv lands in shell history and `ps`.
+        await connectCanvasToken(loadConfig(), { domain: values.domain, dryRun: values['dry-run'], log: say, readSecret: () => readSecret('Canvas access token: ') });
+        break;
+      }
       await connectCanvas(loadConfig(), { browser: values.browser, domain: values.domain, dryRun: values['dry-run'], log: say });
       break;
     }

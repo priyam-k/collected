@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { COURSE_ROLES, sourceConfigSchemas } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { courses } from '@collected/core/db/schema';
-import { CanvasClient, type CanvasConfig } from '@collected/core/ingest/canvas/client';
+import { CanvasClient, needsAuthMessage, type CanvasConfig } from '@collected/core/ingest/canvas/client';
 import { canvasIngester } from '@collected/core/ingest/canvas/ingest';
 import type { CanvasCourse } from '@collected/core/ingest/canvas/map';
 import { activeEnrollments, importCanvasCourses, splitCourseCode, termSlug, toEnrollment } from '@collected/core/ingest/canvas/onboarding';
@@ -54,7 +54,7 @@ export function onboardingRoutes(ctx: AppContext, clientFor: CanvasClientFactory
     } catch (err) {
       if (err instanceof NeedsAuthError) {
         await setSourceStatus(ctx, 'canvas', 'needs_auth', { lastError: err.message });
-        return c.json({ error: 'Canvas session expired; reconnect it', connected: false, courses: [] }, 502);
+        return c.json({ error: needsAuthMessage(client), connected: false, courses: [] }, 502);
       }
       throw err;
     }

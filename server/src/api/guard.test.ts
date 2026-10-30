@@ -32,8 +32,11 @@ describe('identityAllows', () => {
       ['GET', '/api/todo/status'],
       ['POST', '/api/sources/canvas/sync'],
       ['PATCH', '/api/jobs/x/state'],
+      // `connect canvas --token` stores the token it verified; the one credential write a machine may make.
+      ['PUT', '/api/sources/canvas/config'],
     ] as const)
       expect(identityAllows(svc, m, p), `${m} ${p}`).toBe(true);
+    expect(identityAllows('token:laptop', 'PUT', '/api/sources/canvas/config')).toBe(true);
     for (const [m, p] of [
       ['GET', '/api/export'],
       ['POST', '/api/import'],
@@ -41,6 +44,9 @@ describe('identityAllows', () => {
       ['DELETE', '/api/courses/x'],
       ['PUT', '/api/sources/gradescope/config'],
       ['DELETE', '/api/sources/gradescope/config'],
+      ['DELETE', '/api/sources/canvas/config'],
+      ['PUT', '/api/sources/canvas/enabled'],
+      ['PATCH', '/api/sources/canvas/meta'],
       ['PATCH', '/api/sources/jobs/meta'],
       ['PUT', '/api/settings/jobs.filter'],
       ['PUT', '/api/layout'],

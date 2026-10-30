@@ -37,11 +37,16 @@ export async function setSourceConfig(ctx: AppContext, id: SourceId, config: unk
     .update(sources)
     .set({ configEnc: config == null ? null : ctx.crypto.encryptJson(config) })
     .where(eq(sources.id, id));
-  if (id === 'canvas' && config && typeof config === 'object') {
-    const baseUrl = (config as { baseUrl?: unknown }).baseUrl;
-    if (typeof baseUrl === 'string' && baseUrl) await mergeSourceMeta(ctx, 'canvas', { baseUrl });
+  if (id === 'canvas') {
+    const c = (config && typeof config === 'object' ? config : {}) as { baseUrl?: unknown; accessToken?: unknown; cookieHeader?: unknown; cookieJar?: unknown };
+    // Which kind of credential is stored, never its value: the card says "access token" or "browser session".
+    const auth: CanvasAuthKind = typeof c.accessToken === 'string' && c.accessToken.trim() ? 'token' : c.cookieHeader || c.cookieJar ? 'cookie' : null;
+    await mergeSourceMeta(ctx, 'canvas', { auth, ...(typeof c.baseUrl === 'string' && c.baseUrl ? { baseUrl: c.baseUrl } : {}) });
   }
 }
+
+/** What `meta.auth` on the Canvas source says about the stored credential; null when there is none. */
+export type CanvasAuthKind = 'token' | 'cookie' | null;
 
 export async function mergeSourceMeta(ctx: AppContext, id: SourceId, patch: Record<string, unknown>): Promise<void> {
   const row = await getSourceRow(ctx, id);

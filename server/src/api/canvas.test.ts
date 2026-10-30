@@ -93,3 +93,34 @@ describe('GET /api/canvas/raw', () => {
     expect(row?.status).not.toBe('needs_auth');
   });
 });
+
+describe('Canvas with an access token', () => {
+  const TOKEN = '7~servertokenservertokenservertoken';
+
+  it('opens a file with Authorization: Bearer and no cookie jar, and names the token when Canvas rejects it', async () => {
+    const ctx = await testContext();
+    await setSourceConfig(ctx, 'canvas', { baseUrl: BASE, accessToken: TOKEN });
+    const seen: { url: string; auth: string | null; cookie: string | null }[] = [];
+    let status = 200;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      seen.push({ url: input instanceof Request ? input.url : String(input), auth: headers.get('authorization'), cookie: headers.get('cookie') });
+      if (status !== 200) return new Response('{"errors":[{"message":"Invalid access token."}]}', { status, headers: { 'content-type': 'application/json' } });
+      return new Response('{"public_url":"https://inst-fs.test/files/uuid/notes.pdf?token=t1"}', { headers: { 'content-type': 'application/json' } });
+    };
+    // The real factory: the stored config decides the auth mode.
+    const a = new Hono().route('/api/canvas', canvasRoutes(ctx, (config) => CanvasClient.fromConfig(config, pino({ level: 'silent' }), fetchImpl)));
+    const res = await a.request('/api/canvas/files/123/open');
+    expect(res.status).toBe(302);
+    expect(seen).toEqual([{ url: `${BASE}/api/v1/files/123/public_url`, auth: `Bearer ${TOKEN}`, cookie: null }]);
+
+    status = 401;
+    const bad = await a.request('/api/canvas/files/123/open');
+    expect(bad.status).toBe(502);
+    expect(await bad.json()).toEqual({ error: 'Canvas rejected the access token; replace it in Settings → Sources' });
+    const src = await ctx.db.query.sources.findFirst({ where: (t, { eq }) => eq(t.id, 'canvas') });
+    expect(src?.status).toBe('needs_auth');
+    expect(src?.lastError).not.toMatch(/session/);
+    expect(src?.lastError).not.toContain(TOKEN);
+  });
+});
