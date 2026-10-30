@@ -12,11 +12,14 @@ export const PACKAGE = 'collected-cli';
 export const REGISTRY_LATEST_URL = `https://registry.npmjs.org/${PACKAGE}/latest`;
 export const REGISTRY_TIMEOUT_MS = 10_000;
 
-export type InstallMethod = 'npm' | 'pnpm' | 'bun' | 'npx' | 'checkout' | 'unknown';
+export type InstallMethod = 'brew' | 'npm' | 'pnpm' | 'bun' | 'npx' | 'checkout' | 'unknown';
 
 /**
- * How the running CLI was installed, from the path of its entry script (resolved). Order matters: an npx cache and a
- * pnpm global store both contain `node_modules/collected-cli`, so they are recognised before the plain npm layout.
+ * How the running CLI was installed, from the path of its entry script (resolved). Order matters: a Homebrew keg, an
+ * npx cache and a pnpm global store all contain `node_modules/collected-cli`, so they are recognised before the plain
+ * npm layout.
+ *   brew      <prefix>/Cellar/collected-cli/<version>/libexec/lib/node_modules/collected-cli/dist/cli.js, the prefix
+ *             being /opt/homebrew, /usr/local or /home/linuxbrew/.linuxbrew (the tap priyam-k/collected)
  *   npx       ~/.npm/_npx/<hash>/node_modules/collected-cli/dist/cli.js
  *   pnpm      <pnpm home>/global/5/.pnpm/collected-cli@1.2.0/node_modules/collected-cli/dist/cli.js
  *   bun       ~/.bun/install/global/node_modules/collected-cli/dist/cli.js
@@ -28,6 +31,7 @@ export type InstallMethod = 'npm' | 'pnpm' | 'bun' | 'npx' | 'checkout' | 'unkno
 export function detectInstallMethod(argv1: string): InstallMethod {
   const p = argv1.replace(/\\/g, '/');
   const ours = `/node_modules/${PACKAGE}/`;
+  if (p.includes(`/Cellar/${PACKAGE}/`)) return 'brew';
   if (p.includes('/_npx/')) return 'npx';
   if (/\/pnpm\/global\//.test(p) && p.includes(ours)) return 'pnpm';
   if (/\/(\.bun|bun)\/install\/global\//.test(p) && p.includes(ours)) return 'bun';
@@ -39,6 +43,8 @@ export function detectInstallMethod(argv1: string): InstallMethod {
 /** The install command for a method, or null when there is no in-place upgrade to run. */
 export function upgradeCommand(method: InstallMethod): { cmd: string; args: string[] } | null {
   switch (method) {
+    case 'brew':
+      return { cmd: 'brew', args: ['upgrade', PACKAGE] };
     case 'npm':
       return { cmd: 'npm', args: ['install', '-g', `${PACKAGE}@latest`] };
     case 'pnpm':

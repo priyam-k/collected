@@ -5,6 +5,11 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('detectInstallMethod', () => {
   const cases: [string, InstallMethod][] = [
+    ['/opt/homebrew/Cellar/collected-cli/1.3.0/libexec/lib/node_modules/collected-cli/dist/cli.js', 'brew'],
+    ['/usr/local/Cellar/collected-cli/1.3.0/libexec/lib/node_modules/collected-cli/dist/cli.js', 'brew'],
+    ['/home/linuxbrew/.linuxbrew/Cellar/collected-cli/1.3.0/libexec/lib/node_modules/collected-cli/dist/cli.js', 'brew'],
+    ['/Users/p/brew/Cellar/collected-cli/1.3.0_1/libexec/lib/node_modules/collected-cli/dist/cli.js', 'brew'], // a prefix of one's own; the keg layout is what counts
+    ['/opt/homebrew/Cellar/node/26.10.0/lib/node_modules/collected-cli/dist/cli.js', 'npm'], // Homebrew's node, npm's global install
     ['/usr/local/lib/node_modules/collected-cli/dist/cli.js', 'npm'],
     ['/opt/homebrew/lib/node_modules/collected-cli/dist/cli.js', 'npm'],
     ['/Users/p/.nvm/versions/node/v22.12.0/lib/node_modules/collected-cli/dist/cli.js', 'npm'],
@@ -29,6 +34,7 @@ describe('detectInstallMethod', () => {
 
 describe('upgradeCommand', () => {
   it('names one install command per installer and none for the rest', () => {
+    expect(commandLine(upgradeCommand('brew')!)).toBe('brew upgrade collected-cli');
     expect(commandLine(upgradeCommand('npm')!)).toBe('npm install -g collected-cli@latest');
     expect(commandLine(upgradeCommand('pnpm')!)).toBe('pnpm add -g collected-cli@latest');
     expect(commandLine(upgradeCommand('bun')!)).toBe('bun add -g collected-cli@latest');
@@ -108,7 +114,18 @@ describe('runUpgrade', () => {
     expect(h.err).toEqual([]);
   });
 
-  it('--dry-run prints and runs nothing; pnpm and bun get their own commands', async () => {
+  it('runs brew upgrade for a Homebrew keg', async () => {
+    const h = harness('/usr/local/Cellar/collected-cli/1.2.0/libexec/lib/node_modules/collected-cli/dist/cli.js', { version: '1.3.0' });
+    expect(await h.code).toBe(0);
+    expect(h.ran).toEqual(['brew upgrade collected-cli']);
+    expect(h.out).toEqual(['collected-cli 1.2.0 → 1.3.0 (the newest on npm)', 'running: brew upgrade collected-cli', 'collected-cli 1.3.0']);
+  });
+
+  it('--dry-run prints and runs nothing; brew, pnpm and bun get their own commands', async () => {
+    const brew = harness('/opt/homebrew/Cellar/collected-cli/1.2.0/libexec/lib/node_modules/collected-cli/dist/cli.js', { version: '1.3.0' }, { dryRun: true });
+    expect(await brew.code).toBe(0);
+    expect(brew.ran).toEqual([]);
+    expect(brew.out.at(-1)).toBe('would run: brew upgrade collected-cli');
     const pnpm = harness('/Users/p/Library/pnpm/global/5/.pnpm/collected-cli@1.2.0/node_modules/collected-cli/dist/cli.js', { version: '1.3.0' }, { dryRun: true });
     expect(await pnpm.code).toBe(0);
     expect(pnpm.ran).toEqual([]);
