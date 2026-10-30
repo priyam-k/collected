@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowDown, ArrowRight, Bot, Briefcase, CalendarDays, ClipboardCheck, Database, GraduationCap, ListChecks, ListTodo, MousePointerClick, Server, ShieldCheck } from 'lucide-react';
+import { ArrowDown, ArrowRight, Bot, Briefcase, CalendarDays, ClipboardCheck, Database, GraduationCap, Laptop, ListChecks, ListTodo, MousePointerClick, Server, ShieldCheck } from 'lucide-react';
 import { AsciiOrb } from '@/components/AsciiOrb';
 import { Button } from '@/components/ui/button';
 import { DemoBoard } from '@/demo/DemoBoard';
@@ -12,10 +12,10 @@ import { DotField } from './landing/DotField';
 import { Hub } from './landing/Hub';
 import { Reveal, useScrollProgress } from './landing/motion';
 import { Terminal } from './landing/Terminal';
-import { GITHUB_URL, LICENSE_URL, OPERATOR_EMAIL, PublicLayout, SELF_HOST_DOC_URL } from './PublicLayout';
+import { GITHUB_URL, LICENSE_URL, LOCAL_MODE_DOC_URL, OPERATOR_EMAIL, PublicLayout, SELF_HOST_DOC_URL } from './PublicLayout';
 
 const PITCH = 'Canvas, Gradescope, Google Calendar, Todoist, Google Tasks and an internship feed, pulled into one dashboard you arrange yourself.';
-const PITCH_2 = 'Open source, self-hosted, and readable by your AI agents.';
+const PITCH_2 = 'Open source, on your laptop or server, readable by your AI agents.';
 
 const WORKS_WITH: [string, typeof GraduationCap][] = [
   ['Canvas', GraduationCap],
@@ -48,9 +48,9 @@ function Hero() {
       <DotField className="absolute inset-x-0 -top-24 -z-10 h-[820px] w-full opacity-80 [mask-image:radial-gradient(ellipse_62%_58%_at_50%_34%,#000_10%,transparent_72%)]" />
       <div className="mx-auto max-w-6xl px-5 pt-14 text-center sm:pt-20">
         <Reveal>
-          <a href="#how" className="glass inline-flex h-9 items-center gap-2 px-3.5 text-[13px] font-medium text-ink transition-transform hover:scale-[1.02]">
+          <a href="#self-host" className="glass inline-flex h-9 items-center gap-2 px-3.5 text-[13px] font-medium text-ink transition-transform hover:scale-[1.02]">
             <span className="size-1.5 rounded-full bg-brand" />
-            Now with Google Tasks
+            Now runs on your laptop
             <ArrowRight className="size-3.5 text-sub" />
           </a>
         </Reveal>
@@ -75,7 +75,7 @@ function Hero() {
               </a>
             </Button>
             <Button asChild size="lg" variant="outline" className="h-12 px-6 text-[15px]">
-              <a href="#self-host">Self-host it</a>
+              <a href="#self-host">Run it yourself</a>
             </Button>
           </div>
           <p className="mt-5 text-[13px] text-ter">Free and open source · AGPL-3.0 · No ads, no tracking</p>
@@ -186,59 +186,94 @@ function Agents() {
   );
 }
 
-function SelfHost() {
+/** A run of shell commands in a well, one per line, each behind a muted prompt. Grows to fill its card. */
+function Commands({ lines }: { lines: string[] }) {
+  return (
+    <pre className="mt-5 flex-1 overflow-x-auto rounded-[16px] bg-well px-4 py-4 font-mono text-[12px] leading-7 text-ink sm:px-5 sm:text-[13px]">
+      <code>
+        {lines.map((line, i) => (
+          <span key={line}>
+            <span className="text-ter">$ </span>
+            {line}
+            {i < lines.length - 1 ? '\n' : null}
+          </span>
+        ))}
+      </code>
+    </pre>
+  );
+}
+
+function CardHead({ icon, title, tone = 'well', badge }: { icon: ReactNode; title: string; tone?: 'well' | 'positive'; badge?: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className={cn('grid size-9 place-items-center rounded-full', tone === 'positive' ? 'bg-[color-mix(in_srgb,var(--positive)_14%,var(--surface))] text-positive' : 'bg-well')}>{icon}</span>
+      <h3 className="text-[19px] font-semibold tracking-[-0.015em]">{title}</h3>
+      {badge && <span className="ml-auto rounded-full bg-brand-soft px-2.5 py-1 text-[11.5px] font-semibold text-brand-ink">{badge}</span>}
+    </div>
+  );
+}
+
+const docLink = 'mt-5 inline-flex items-center gap-1.5 self-start text-[14px] font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-brand';
+
+/** The three ways to run it: the laptop (local mode), a server of your own, the hosted beta. `#self-host` is linked from the nav and the sign-in page. */
+function RunIt() {
   return (
     <section className="px-5 py-24 sm:py-28">
-      <SectionHead id="self-host" eyebrow="Yours to run" title="One container. One SQLite file. Your domain." sub="Run it on a small server you control, or ask for an invite to the hosted instance." />
-      <div className="mx-auto mt-14 grid max-w-6xl gap-4 lg:grid-cols-3">
-        <Reveal className="surface flex min-w-0 flex-col rounded-[26px] p-7 lg:col-span-2">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-full bg-well">
-              <Server className="size-[18px]" strokeWidth={1.7} />
-            </span>
-            <h3 className="text-[19px] font-semibold tracking-[-0.015em]">Self-host</h3>
-          </div>
-          <p className="mt-3 max-w-xl text-[14.5px] leading-relaxed text-sub">A Linux box with Docker and a domain. The guide covers TLS, the Google OAuth client, backups and updates, and the app tells you when a new version is out.</p>
-          <pre className="mt-5 overflow-x-auto rounded-[16px] bg-well px-5 py-4 font-mono text-[13px] leading-7 text-ink">
-            <code>
-              <span className="text-ter">$ </span>git clone {GITHUB_URL}.git{'\n'}
-              <span className="text-ter">$ </span>cd collected && cp .env.example .env{'\n'}
-              <span className="text-ter">$ </span>docker compose up -d
-            </code>
-          </pre>
-          <a href={SELF_HOST_DOC_URL} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-ink underline decoration-line-strong underline-offset-4 hover:decoration-brand">
+      <SectionHead
+        id="self-host"
+        eyebrow="Yours to run"
+        title={
+          <>
+            Your laptop, your server,{' '}
+            <br className="hidden sm:block" />
+            <span className="text-sub">or ours.</span>
+          </>
+        }
+        sub="Run the whole thing on one machine with nothing but Node, put it on a small server you control, or ask for an invite to the hosted instance."
+      />
+      <div className="mx-auto mt-14 grid max-w-6xl gap-4 lg:grid-cols-2">
+        <Reveal className="surface flex min-w-0 flex-col rounded-[26px] p-6 sm:p-7">
+          <CardHead icon={<Laptop className="size-[18px]" strokeWidth={1.7} />} title="On your laptop" badge="New" />
+          <p className="mt-3 max-w-xl text-[14.5px] leading-relaxed text-sub">
+            The whole backend runs inside the CLI, over a SQLite database on this machine, and{' '}
+            <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected ui</code> opens the same dashboard. Sources keep syncing while it is open.
+          </p>
+          <Commands lines={['npm i -g collected-cli', 'collected init --local', 'collected connect canvas', 'collected connect google calendar', 'collected ui']} />
+          <p className="mt-4 text-[13.5px] text-ter">
+            No server. No Google Cloud project. Data stays in <span className="font-mono text-[12.5px] text-sub">~/.collected</span>.
+          </p>
+          <a href={LOCAL_MODE_DOC_URL} target="_blank" rel="noreferrer" className={docLink}>
+            Read the CLI guide <ArrowRight className="size-3.5" />
+          </a>
+        </Reveal>
+        <Reveal delay={80} className="surface flex min-w-0 flex-col rounded-[26px] p-6 sm:p-7">
+          <CardHead icon={<Server className="size-[18px]" strokeWidth={1.7} />} title="Self-host" />
+          <p className="mt-3 max-w-xl text-[14.5px] leading-relaxed text-sub">A Linux box with Docker and a domain, so every device you own sees the board. The guide covers TLS, the Google OAuth client, backups and updates, and the app tells you when a new version is out.</p>
+          <Commands lines={[`git clone ${GITHUB_URL}.git`, 'cd collected && cp .env.example .env', 'mkdir -p data && sudo chown 1000:1000 data', 'docker compose pull', 'docker compose up -d']} />
+          <p className="mt-4 text-[13.5px] text-ter">
+            One container, one SQLite file, the prebuilt image from <span className="font-mono text-[12.5px] text-sub">ghcr.io</span>.
+          </p>
+          <a href={SELF_HOST_DOC_URL} target="_blank" rel="noreferrer" className={docLink}>
             Read the self-host guide <ArrowRight className="size-3.5" />
           </a>
         </Reveal>
-        <div className="grid min-w-0 gap-4">
-          <Reveal delay={80} className="surface rounded-[26px] p-7">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-9 place-items-center rounded-full bg-well">
-                <Database className="size-[18px]" strokeWidth={1.7} />
-              </span>
-              <h3 className="text-[19px] font-semibold tracking-[-0.015em]">Hosted</h3>
-            </div>
-            <p className="mt-3 text-[14.5px] leading-relaxed text-sub">An invite-only beta. Say which school you are at; what it can connect to depends on it.</p>
-            <Button asChild variant="outline" className="mt-5">
-              <a href={`mailto:${OPERATOR_EMAIL}?subject=collected%20invite`}>Request an invite</a>
-            </Button>
-          </Reveal>
-          <Reveal delay={140} className="surface rounded-[26px] p-7">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-9 place-items-center rounded-full bg-[color-mix(in_srgb,var(--positive)_14%,var(--surface))] text-positive">
-                <ShieldCheck className="size-[18px]" strokeWidth={1.7} />
-              </span>
-              <h3 className="text-[19px] font-semibold tracking-[-0.015em]">Your data stays yours</h3>
-            </div>
-            <p className="mt-3 text-[14.5px] leading-relaxed text-sub">
-              Never sold, never used for ads or to train models, no tracking cookies. Open source under the{' '}
-              <a href={LICENSE_URL} target="_blank" rel="noreferrer" className="text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">
-                AGPL-3.0
-              </a>
-              .
-            </p>
-          </Reveal>
-        </div>
+        <Reveal delay={140} className="surface flex min-w-0 flex-col rounded-[26px] p-6 sm:p-7">
+          <CardHead icon={<Database className="size-[18px]" strokeWidth={1.7} />} title="Hosted" />
+          <p className="mt-3 text-[14.5px] leading-relaxed text-sub">An invite-only beta, for when you would rather not run anything. Say which school you are at; what it can connect to depends on it.</p>
+          <Button asChild variant="outline" className="mt-5 self-start">
+            <a href={`mailto:${OPERATOR_EMAIL}?subject=collected%20invite`}>Request an invite</a>
+          </Button>
+        </Reveal>
+        <Reveal delay={200} className="surface flex min-w-0 flex-col rounded-[26px] p-6 sm:p-7">
+          <CardHead icon={<ShieldCheck className="size-[18px]" strokeWidth={1.7} />} title="Your data stays yours" tone="positive" />
+          <p className="mt-3 text-[14.5px] leading-relaxed text-sub">
+            Never sold, never used for ads or to train models, no tracking cookies. Open source under the{' '}
+            <a href={LICENSE_URL} target="_blank" rel="noreferrer" className="text-ink underline decoration-line-strong underline-offset-[3px] hover:decoration-brand">
+              AGPL-3.0
+            </a>
+            .
+          </p>
+        </Reveal>
       </div>
     </section>
   );
@@ -293,7 +328,7 @@ export function Landing() {
             <Bento />
           </div>
         </section>
-        <SelfHost />
+        <RunIt />
         <Closing />
       </div>
     </PublicLayout>

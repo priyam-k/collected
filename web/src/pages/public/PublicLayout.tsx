@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 
 export const GITHUB_URL = 'https://github.com/priyam-k/collected';
 export const SELF_HOST_DOC_URL = `${GITHUB_URL}/blob/main/docs/self-host.md`;
+export const LOCAL_MODE_DOC_URL = `${GITHUB_URL}/blob/main/agent/README.md#local-mode`;
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 /** Replaced by the operator of a hosted instance; also used verbatim in the privacy policy text. */
 /** Operators of a self-hosted copy: change these two lines (see README.md in this folder). */
@@ -48,7 +49,7 @@ const SECTIONS: [string, string][] = [
   ['How it works', '/#how'],
   ['Agents', '/#agents'],
   ['Features', '/#features'],
-  ['Self-host', '/#self-host'],
+  ['Run it', '/#self-host'],
 ];
 
 /**
