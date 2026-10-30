@@ -44,7 +44,7 @@ The ones that trip people up:
 
 ## Changelog
 
-Every user-visible change adds a bullet to `CHANGELOG.md` under the `## Unreleased` heading, in the same pull request. The file is machine-read by the update check that self-hosters see, so the format is strict: a release heading is `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>` and each change is one `-` bullet under it. Cutting a release means renaming `## Unreleased` to that heading, bumping `version` in the root `package.json`, and adding a fresh `## Unreleased` above it. `core/src/lib/changelog.test.ts` parses the real file, so a malformed heading fails CI.
+Every user-visible change adds one short bullet to `CHANGELOG.md` under `## Unreleased`, in the same pull request. Write it for a person skimming release notes: what changed, in a line ("CLI: `collected event add` creates calendar events"), not the flags, the route or the reasoning; those belong in the README and DECISIONS. The file is machine-read by the update check that self-hosters see, so the format is strict: a release heading is `## <major.minor.patch> — <YYYY-MM-DD> · <recommended|optional>` and each change is one `-` bullet under it. Cutting a release means renaming `## Unreleased` to that heading, bumping `version` in the root `package.json`, and adding a fresh `## Unreleased` above it. `core/src/lib/changelog.test.ts` parses the real file, so a malformed heading fails CI.
 
 ## Commits and pull requests
 
