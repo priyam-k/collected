@@ -53,7 +53,7 @@ export function ImportCoursesDialog({ open, onOpenChange }: { open: boolean; onO
         {q.isPending && <p className="text-[13px] text-sub">Asking Canvas…</p>}
         {q.isError && (
           <p className="text-[13px] text-sub">
-            {/not connected|expired/i.test(q.error.message) ? 'Canvas is not connected. Connect it under Sources first (collected connect canvas on your laptop).' : q.error.message}
+            {/not connected|expired/i.test(q.error.message) ? 'Canvas is not connected. Connect it under Sources first, with a Canvas access token.' : q.error.message}
           </p>
         )}
         {q.data && rows.length === 0 && <p className="text-[13px] text-sub">Canvas returned no active enrollments.</p>}

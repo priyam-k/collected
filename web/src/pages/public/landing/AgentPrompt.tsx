@@ -7,7 +7,7 @@ export const AGENT_PROMPT =
   'Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, and it is readable by agents like you. ' +
   'Start by reading https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md. ' +
   'Then ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? ' +
-  'Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then `collected connect canvas` (I must be signed in to Canvas in Chrome, Brave, Edge, Arc or Firefox; on Windows use Firefox or paste the cookie under Settings → Sources), ' +
+  'Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then connect Canvas with a personal access token (Canvas → Account → Settings → + New Access Token; run `collected connect canvas --token`, which prompts for it; if your school disabled tokens, `collected connect canvas` reads the browser cookie instead), ' +
   'ask before `collected connect google calendar` and `collected connect google tasks` since they open my browser, tell me how to paste a Todoist token in Settings → Sources, run `collected daemon install`, then `collected ui` and show me `collected agenda`. ' +
   'Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step and ask before anything that creates accounts or costs money. ' +
   'Never ask me to paste secrets into this chat; the CLI prompts for them itself.';

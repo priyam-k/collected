@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { SOURCE_LABELS, type Source, type SourceId } from '@collected/shared';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardPaste } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { canvasCookieBlocker, normalizeCanvasBaseUrl } from '@/lib/canvas';
 import { safeColor } from '@/lib/color';
 import { friendlyDate, relative } from '@/lib/time';
 import { safeHref } from '@/lib/url';
+import { cn } from '@/lib/utils';
 import { Field, PageTitle, StatusTag, type StatusTone } from './ui';
 import { useFormMarks } from './useFormMarks';
 
@@ -55,7 +56,7 @@ export function SourcesPage() {
   return (
     <div className="space-y-4">
       <PageTitle sub="Credentials are encrypted at rest and never shown again after saving.">Sources</PageTitle>
-      <SourceCard source={by.canvas} description="Signs in with your Canvas session cookie. The calendar feed keeps due dates coming while the cookie has expired.">
+      <SourceCard source={by.canvas} sub={canvasAuthLine(by.canvas)} description="Signs in with a Canvas access token, or a session cookie where your school turned tokens off. The calendar feed keeps due dates coming while the sign-in is not working.">
         <CanvasForm source={by.canvas} ical={by.canvas_ical} />
       </SourceCard>
       <SourceCard source={by.gradescope} description="Your Gradescope email and password. Use a Gradescope password, not the school sign-in button.">
@@ -97,7 +98,8 @@ export function SourcesPage() {
   );
 }
 
-function SourceCard({ source, description, children }: { source: Source; description: string; children: React.ReactNode }) {
+/** `sub`: a short line under the title row, e.g. which credential the source signs in with. */
+function SourceCard({ source, description, sub, children }: { source: Source; description: string; sub?: string | null; children: React.ReactNode }) {
   const setEnabled = useSetSourceEnabled();
   const sync = useSyncSource();
   const status = STATUS[source.status];
@@ -133,6 +135,7 @@ function SourceCard({ source, description, children }: { source: Source; descrip
             Enabled
           </label>
         </div>
+        {sub && <p className="text-[13px] font-medium text-sub">{sub}</p>}
         <CardDescription>{description}</CardDescription>
         {source.lastError && (
           <p className="text-xs text-critical">
@@ -269,12 +272,64 @@ function RemoveCredential({ source, label = 'Clear', what, onConfirm, pending, s
   );
 }
 
+type CanvasAuth = 'token' | 'cookie';
+
+/**
+ * How the saved Canvas credential signs in. `meta.auth` from the server; a server that predates tokens only ever
+ * saved cookies, so a saved config without it is a cookie.
+ */
+function canvasAuth(source: Source): CanvasAuth | null {
+  const auth = (source.meta as { auth?: string | null }).auth;
+  if (auth === 'token' || auth === 'cookie') return auth;
+  return auth === undefined && source.hasConfig ? 'cookie' : null;
+}
+
+/** The line under the Canvas title: which credential it signs in with, nothing when none is saved. */
+function canvasAuthLine(source: Source): string | null {
+  const auth = canvasAuth(source);
+  if (!auth) return null;
+  const what = auth === 'token' ? 'an access token' : 'a session cookie';
+  return source.status === 'connected' ? `Connected with ${what}` : `Saved: ${what}`;
+}
+
+/** A Paste button inside a secret field: reads the clipboard into it. Hidden where the browser offers no clipboard read. */
+function PasteButton({ onPaste }: { onPaste: (text: string) => void }) {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.readText) return null;
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="ghost"
+      className="absolute right-1 top-1/2 -translate-y-1/2"
+      onClick={async () => {
+        try {
+          const text = (await navigator.clipboard.readText()).trim();
+          if (text) onPaste(text);
+          else toast.error('The clipboard is empty');
+        } catch {
+          toast.error('The browser did not allow reading the clipboard; paste into the field instead');
+        }
+      }}
+    >
+      <ClipboardPaste aria-hidden />
+      Paste
+    </Button>
+  );
+}
+
 function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   const canvas = useSave('canvas');
   const icalSave = useSave('canvas_ical');
+  const auth = canvasAuth(source);
+  const [token, setToken] = useState('');
   const [cookie, setCookie] = useState('');
+  // The cookie is the fallback for schools that turned tokens off: folded away unless it is what is saved.
+  const [showCookie, setShowCookie] = useState(auth === 'cookie');
+  useEffect(() => {
+    if (auth === 'cookie') setShowCookie(true);
+  }, [auth]);
   // No default host: every school has its own Canvas address. The server mirrors the saved one into meta (it is
-  // not a secret), so a replaced cookie starts from it; the field stays editable.
+  // not a secret), so a replaced credential starts from it; the field stays editable.
   const saved = typeof source.meta.baseUrl === 'string' ? source.meta.baseUrl : '';
   const [baseUrl, setBaseUrl] = useState(saved);
   useEffect(() => setBaseUrl((v) => (v.trim() ? v : saved)), [saved]);
@@ -282,14 +337,29 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
   const cookieNotCookie = cookie.trim() !== '' && !cookie.includes('=');
   const blocker = canvasCookieBlocker(normalized, cookie);
   const [icalUrl, setIcalUrl] = useState('');
+  const baseUrlCheck = normalized ? null : baseUrl.trim() ? 'That is not a Canvas address yet: a host like canvas.yourschool.edu or umd.instructure.com' : 'Enter your Canvas address';
+  const tokenMarks = useFormMarks({ baseUrl: baseUrlCheck, token: token.trim() ? null : 'Paste the access token' });
   const marks = useFormMarks({
-    baseUrl: normalized ? null : baseUrl.trim() ? 'That is not a Canvas address yet: a host like canvas.yourschool.edu or umd.instructure.com' : 'Enter your Canvas address',
+    baseUrl: baseUrlCheck,
     cookie: !cookie.trim() ? 'Paste the cookie: canvas_session=…' : cookieNotCookie ? 'That is not a cookie yet: paste it as canvas_session=…, or the whole Cookie header' : null,
   });
+  // The address belongs to both forms: whichever submit marked it owns the mark, and either can focus it.
+  const urlMarks = tokenMarks.isMarked('baseUrl') ? tokenMarks : marks;
+  const urlMarked = tokenMarks.isMarked('baseUrl') || marks.isMarked('baseUrl');
+  const urlInput = urlMarks.input('baseUrl');
+  const otherUrlRef = (urlMarks === marks ? tokenMarks : marks).input('baseUrl').ref;
+  const tokenInput = tokenMarks.input('token');
   const icalMarks = useFormMarks({ url: icalUrl.trim() ? null : 'Paste the calendar feed URL' });
+  const submitToken = (e: FormEvent) => {
+    e.preventDefault();
+    if (canvas.pending || !tokenMarks.attempt() || !normalized) return;
+    marks.reset();
+    canvas.save({ baseUrl: normalized, accessToken: token.trim() }, () => setToken(''));
+  };
   const submitCookie = (e: FormEvent) => {
     e.preventDefault();
     if (canvas.pending || !marks.attempt() || !normalized || blocker) return;
+    tokenMarks.reset();
     canvas.save({ baseUrl: normalized, cookieHeader: cookie.trim() }, () => setCookie(''));
   };
   const submitIcal = (e: FormEvent) => {
@@ -297,42 +367,79 @@ function CanvasForm({ source, ical }: { source: Source; ical: Source }) {
     if (icalSave.pending || !icalMarks.attempt()) return;
     icalSave.save({ url: icalUrl.trim() }, () => setIcalUrl(''));
   };
+  const remove = (what: string) => <RemoveCredential source="canvas" what={what} onConfirm={canvas.clear} pending={canvas.pending} />;
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <form onSubmit={submitCookie} className="space-y-3">
-        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas. A bare host or a page address both work; it is saved as https://<host>." {...marks.field('baseUrl')}>
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="canvas.yourschool.edu" {...marks.input('baseUrl')} aria-invalid={marks.isMarked('baseUrl') || (baseUrl.trim() !== '' && !normalized) ? true : undefined} />
+      <div className="space-y-3">
+        <Field label="Canvas URL" hint="Your school's Canvas address: what the browser shows when you open Canvas. A bare host or a page address both work; it is saved as https://<host>." {...urlMarks.field('baseUrl')}>
+          <Input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="canvas.yourschool.edu"
+            {...urlInput}
+            ref={(el) => {
+              urlInput.ref(el);
+              otherUrlRef(el);
+            }}
+            aria-invalid={urlMarked || (baseUrl.trim() !== '' && !normalized) ? true : undefined}
+          />
         </Field>
-        {baseUrl.trim() !== '' && !normalized && !marks.isMarked('baseUrl') && <p className="-mt-2 text-xs text-critical">That does not look like a Canvas address: a host like canvas.yourschool.edu or umd.instructure.com.</p>}
-        <Field
-          label="Session cookie"
-          hint={
-            <>
-              Easiest: run <Cmd>collected connect canvas</Cmd> on your laptop, which reads it from your browser. By hand: DevTools → Application → Cookies → your Canvas domain, and paste
-              the whole cookie header or at least <Cmd>canvas_session=…</Cmd> (older instances call it <Cmd>_normandy_session</Cmd>).
-            </>
-          }
-          {...marks.field('cookie')}
-        >
-          <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" {...marks.input('cookie')} aria-invalid={marks.isMarked('cookie') || cookieNotCookie ? true : undefined} />
-        </Field>
-        {cookieNotCookie && !marks.isMarked('cookie') && (
-          <p className="-mt-2 text-xs text-critical">
-            That does not look like a cookie: there is no <Cmd>name=value</Cmd> in it. Copy the value column next to <Cmd>canvas_session</Cmd> as <Cmd>canvas_session=…</Cmd>, or the whole Cookie header.
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" variant={blocker ? 'secondary' : 'default'} disabled={canvas.pending}>
-            {source.hasConfig ? 'Replace cookie' : 'Save cookie'}
-          </Button>
-          {source.hasConfig && (
-            <RemoveCredential source="canvas" what="The saved cookie is removed." onConfirm={canvas.clear} pending={canvas.pending} />
+        {baseUrl.trim() !== '' && !normalized && !urlMarked && <p className="-mt-2 text-xs text-critical">That does not look like a Canvas address: a host like canvas.yourschool.edu or umd.instructure.com.</p>}
+        <form onSubmit={submitToken} className="space-y-3">
+          <Field
+            label="Access token"
+            hint="In Canvas: Account → Settings → Approved Integrations → + New Access Token. Give it a purpose like collected, leave the expiry blank, Generate, copy it once."
+            {...tokenMarks.field('token')}
+          >
+            <div className="relative">
+              <Input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} placeholder="1234~…" {...tokenInput} className={cn('pr-20', tokenInput.className)} />
+              <PasteButton onPaste={setToken} />
+            </div>
+          </Field>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" variant={tokenMarks.complete ? 'default' : 'secondary'} disabled={canvas.pending}>
+              {auth === 'token' ? 'Replace token' : 'Save token'}
+            </Button>
+            {auth === 'token' && remove('The saved access token is removed. It stays valid in Canvas until you delete it under Approved Integrations.')}
+          </div>
+        </form>
+        <div>
+          <button type="button" aria-expanded={showCookie} className="flex items-center gap-1 text-xs text-muted-foreground hover:underline" onClick={() => setShowCookie((v) => !v)}>
+            {showCookie ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            Use a session cookie instead
+          </button>
+          {showCookie && (
+            <form onSubmit={submitCookie} className="mt-3 space-y-3">
+              <Field
+                label="Session cookie"
+                hint={
+                  <>
+                    For schools that turned access tokens off. Easiest: run <Cmd>collected connect canvas</Cmd> on your laptop, which reads it from your browser. By hand: DevTools → Application →
+                    Cookies → your Canvas domain, and paste the whole cookie header or at least <Cmd>canvas_session=…</Cmd> (older instances call it <Cmd>_normandy_session</Cmd>).
+                  </>
+                }
+                {...marks.field('cookie')}
+              >
+                <Textarea rows={3} value={cookie} onChange={(e) => setCookie(e.target.value)} placeholder="_normandy_session=…; canvas_session=…" {...marks.input('cookie')} aria-invalid={marks.isMarked('cookie') || cookieNotCookie ? true : undefined} />
+              </Field>
+              {cookieNotCookie && !marks.isMarked('cookie') && (
+                <p className="-mt-2 text-xs text-critical">
+                  That does not look like a cookie: there is no <Cmd>name=value</Cmd> in it. Copy the value column next to <Cmd>canvas_session</Cmd> as <Cmd>canvas_session=…</Cmd>, or the whole Cookie header.
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="submit" variant={blocker ? 'secondary' : 'default'} disabled={canvas.pending}>
+                  {auth === 'cookie' ? 'Replace cookie' : 'Save cookie'}
+                </Button>
+                {auth === 'cookie' && remove('The saved cookie is removed.')}
+                {blocker && !marks.isMarked('baseUrl') && !marks.isMarked('cookie') && <span className="text-xs text-muted-foreground">{blocker}</span>}
+              </div>
+            </form>
           )}
-          {blocker && !marks.isMarked('baseUrl') && !marks.isMarked('cookie') && <span className="text-xs text-muted-foreground">{blocker}</span>}
         </div>
-      </form>
+      </div>
       <form onSubmit={submitIcal} className="space-y-3">
-        <Field label="iCal feed URL (fallback)" hint="Canvas → Calendar → Calendar Feed. Used only while the cookie is dead." {...icalMarks.field('url')}>
+        <Field label="iCal feed URL (fallback)" hint="Canvas → Calendar → Calendar Feed. Used only while the Canvas sign-in is not working." {...icalMarks.field('url')}>
           <Input value={icalUrl} onChange={(e) => setIcalUrl(e.target.value)} placeholder="https://umd.instructure.com/feeds/calendars/user_….ics" {...icalMarks.input('url')} />
         </Field>
         <div className="flex items-center gap-2">

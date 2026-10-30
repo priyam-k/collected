@@ -28,7 +28,7 @@
 Paste this into Claude Code, Cursor, Codex or any agent that can run a shell:
 
 ```text
-Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, and it is readable by agents like you. Start by reading https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md. Then ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then `collected connect canvas` (I must be signed in to Canvas in Chrome, Brave, Edge, Arc or Firefox; on Windows use Firefox or paste the cookie under Settings → Sources), ask before `collected connect google calendar` and `collected connect google tasks` since they open my browser, tell me how to paste a Todoist token in Settings → Sources, run `collected daemon install`, then `collected ui` and show me `collected agenda`. Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step and ask before anything that creates accounts or costs money. Never ask me to paste secrets into this chat; the CLI prompts for them itself.
+Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, and it is readable by agents like you. Start by reading https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md. Then ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`, then connect Canvas with a personal access token (Canvas → Account → Settings → + New Access Token; run `collected connect canvas --token`, which prompts for it; if your school disabled tokens, `collected connect canvas` reads the browser cookie instead), ask before `collected connect google calendar` and `collected connect google tasks` since they open my browser, tell me how to paste a Todoist token in Settings → Sources, run `collected daemon install`, then `collected ui` and show me `collected agenda`. Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step and ask before anything that creates accounts or costs money. Never ask me to paste secrets into this chat; the CLI prompts for them itself.
 ```
 
 One dashboard for everything a student juggles. collected copies your Canvas assignments, Gradescope submissions, Google Calendar, Todoist tasks and a public internship feed into one copy that is yours, and shows them as a grid of widgets you can rearrange: a week calendar, a to-do list that knows what you have already submitted, one row per class, a job feed with an applications tracker. It never owns the data (Canvas stays the truth about assignments, Google about events) and never writes back except where you ask it to. Run it on your laptop with nothing but Node (`collected init --local`: no server, no Docker, no Google Cloud project), on a small server of your own, or on the hosted beta. The `collected` CLI reads the same data from the terminal, keeps your course files sorted into folders on your laptop, and comes with an agent skill so Claude Code or any other agent can answer "what's due this week".
@@ -47,7 +47,7 @@ One dashboard for everything a student juggles. collected copies your Canvas ass
 
 ## Features
 
-**Sources.** Canvas (assignments, planner, announcements, modules, files, grades, with the iCal feed as a fallback), Gradescope (student submissions and, if you TA, the grading queue), Google Calendar (incremental sync, quick-add events), Todoist (tasks, labels, and an optional one-way push of assignments into a project), and an internship feed (the public Simplify listings, filtered by your own rules). Each source syncs on its own timer, fails on its own, and reports its status; a dead scraper degrades one panel, never the app.
+**Sources.** Canvas (assignments, planner, announcements, modules, files, grades; connected with a personal access token from Account → Settings, or a session cookie where tokens are off, with the iCal feed as a fallback), Gradescope (student submissions and, if you TA, the grading queue), Google Calendar (incremental sync, quick-add events), Todoist (tasks, labels, and an optional one-way push of assignments into a project), and an internship feed (the public Simplify listings, filtered by your own rules). Each source syncs on its own timer, fails on its own, and reports its status; a dead scraper degrades one panel, never the app.
 
 **Widgets.** Calendar (agenda, day, week, month), to-do (open tasks and assignments, grouped, with "done here only"), classes overview, sources, job feed, applications tracker, and smaller ones. Every widget renders at every size; drag and resize them in edit mode; layouts are saved per breakpoint, and the mobile view stacks them.
 
@@ -68,12 +68,12 @@ Needs Node 22.12 or newer and nothing else.
 ```sh
 npm i -g collected-cli
 collected init --local                # no server: a SQLite database in ~/.collected/data
-collected connect canvas              # reads your Canvas session from the browser and syncs
+collected connect canvas --token      # prompts for a Canvas access token (Account → Settings → + New Access Token) and syncs
 collected connect google calendar     # Google's consent screen in your browser; no Google Cloud project
 collected ui                          # the dashboard at http://127.0.0.1:4848
 ```
 
-Local mode runs the same backend a server runs, inside the CLI, so every command and the whole dashboard work on one machine with no server, Docker, domain or OAuth client, and the data stays in `~/.collected`. The dashboard keeps sources syncing while it is open, a read such as `collected agenda` syncs a stale source before it answers, and `collected daemon install` adds a user timer that runs `collected sync` (every source, then the course files) every 15 minutes in the background. `collected demo canvas` loads fixture data if you want to look around first. Every command, `~/.collected/.env` and the freshness rules: [`agent/README.md`](agent/README.md#local-mode).
+Local mode runs the same backend a server runs, inside the CLI, so every command and the whole dashboard work on one machine with no server, Docker, domain or OAuth client, and the data stays in `~/.collected`. The dashboard keeps sources syncing while it is open, a read such as `collected agenda` syncs a stale source before it answers, and `collected daemon install` adds a user timer that runs `collected sync` (every source, then the course files) every 15 minutes in the background. If your school turned access tokens off, `collected connect canvas` reads the Canvas session cookie from your browser instead. `collected demo canvas` loads fixture data if you want to look around first. Every command, `~/.collected/.env` and the freshness rules: [`agent/README.md`](agent/README.md#local-mode).
 
 ### Self-host
 
@@ -87,7 +87,7 @@ docker compose pull             # ghcr.io/priyam-k/collected:latest
 docker compose up -d            # listens on 127.0.0.1:3000; put Caddy or a Cloudflare Tunnel in front
 ```
 
-The app has its own Google sign-in (the first person to sign in owns the instance); Cloudflare Access in front of it is optional. The full walk-through, covering TLS with Caddy or a tunnel, the Google OAuth client, connecting each source, backups and updates (the app tells you when a new version is out), is in [`docs/self-host.md`](docs/self-host.md). Then open the site, go to Settings → Sources and connect each account.
+The app has its own Google sign-in (the first person to sign in owns the instance); Cloudflare Access in front of it is optional. The full walk-through, covering TLS with Caddy or a tunnel, the Google OAuth client, connecting each source, backups and updates (the app tells you when a new version is out), is in [`docs/self-host.md`](docs/self-host.md). Then open the site, go to Settings → Sources and connect each account: Canvas takes a personal access token (in Canvas: Account → Settings → Approved Integrations → + New Access Token), with a session cookie as the fallback for schools that turned tokens off.
 
 ### Hosted
 
@@ -122,7 +122,7 @@ The backend lives in `core/` (database, ingesters, syncs, scheduler); `server/` 
 ```sh
 npm i -g collected-cli
 collected init --local                          # the whole app on this machine; or: collected init https://collected.example.com && collected login
-collected connect canvas                        # reads the Canvas session from your browser (into the local database, or posted to your server)
+collected connect canvas --token                # prompts for a Canvas access token (into the local database, or posted to your server); without --token it reads the browser cookie
 collected files link cs101 ~/School/CS101       # where this course's files should land
 collected sync                                  # everything this machine keeps current: sources (local mode), then course files; `collected daemon install` runs it on a timer
 collected agenda                                # what is due this week (`--fresh` to sync first, `--stale-ok` to never wait)
@@ -139,7 +139,7 @@ The same commands work in local mode and against a server; in local mode `collec
 
 See [SECURITY.md](SECURITY.md) for how to report a vulnerability. The trust model in four lines:
 
-- Credentials (Canvas cookie, Gradescope password, Google and Todoist tokens) are AES-256-GCM encrypted at rest and never returned by the API or written to logs.
+- Credentials (Canvas token or cookie, Gradescope password, Google and Todoist tokens) are AES-256-GCM encrypted at rest and never returned by the API or written to logs.
 - The laptop never trusts the server for a filesystem path: targets are validated against the names you configured, every write is checked to be inside the linked folder, and downloads follow only `https` redirects to public hosts.
 - Every outbound URL the server fetches is validated (`https`, public host), bounded in time and size, and pinned to its origin across redirects and pagination.
 - CLI tokens are scoped: a service token can do what the CLI needs and nothing destructive; the helper key opens a single route.
