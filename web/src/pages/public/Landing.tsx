@@ -6,11 +6,11 @@ import { DemoBoard } from '@/demo/DemoBoard';
 import { isSignedIn, useMe } from '@/lib/queries';
 import { DASHBOARD } from '@/lib/routes';
 import { cn } from '@/lib/utils';
-import { AgentPrompt } from './landing/AgentPrompt';
 import { AsciiLogo } from './landing/AsciiLogo';
 import { Bento } from './landing/Bento';
 import { DotField } from './landing/DotField';
 import { Hub } from './landing/Hub';
+import { GetStarted, InstallCommands } from './landing/Install';
 import { Reveal, useScrollProgress } from './landing/motion';
 import { Terminal } from './landing/Terminal';
 import { GITHUB_URL, LICENSE_URL, LOCAL_MODE_DOC_URL, OPERATOR_EMAIL, PublicLayout, SELF_HOST_DOC_URL } from './PublicLayout';
@@ -69,20 +69,20 @@ function Hero() {
           </p>
         </Reveal>
         <Reveal delay={180}>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="h-12 px-6 text-[15px]">
+          <GetStarted />
+        </Reveal>
+        <Reveal delay={210}>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+            <Button asChild size="lg" variant="outline" className="h-11 px-5 text-[14.5px]">
               <a href="#demo">
                 Try the live demo <ArrowDown className="size-4" />
               </a>
             </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 px-6 text-[15px]">
-              <a href="#self-host">Run it yourself</a>
+            <Button asChild size="lg" variant="ghost" className="h-11 px-5 text-[14.5px]">
+              <a href="#self-host">Other ways to run it</a>
             </Button>
           </div>
           <p className="mt-5 text-[13px] text-ter">Free and open source · AGPL-3.0 · No ads, no tracking</p>
-        </Reveal>
-        <Reveal delay={210}>
-          <AgentPrompt />
         </Reveal>
         <Reveal delay={240}>
           <ul className="mx-auto mt-14 flex max-w-4xl flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[14px] font-medium text-sub">
@@ -245,10 +245,11 @@ function RunIt() {
         <Reveal className="surface flex min-w-0 flex-col rounded-[26px] p-6 sm:p-7">
           <CardHead icon={<Laptop className="size-[18px]" strokeWidth={1.7} />} title="On your laptop" badge="New" />
           <p className="mt-3 max-w-xl text-[14.5px] leading-relaxed text-sub">
-            The whole backend runs inside the CLI, over a SQLite database on this machine, and{' '}
-            <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected ui</code> opens the same dashboard. Sources keep syncing while it is open.
+            The whole backend runs inside the CLI, over a SQLite database on this machine.{' '}
+            <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected quickstart</code> walks you through connecting your accounts, and{' '}
+            <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected ui</code> opens the same dashboard.
           </p>
-          <Commands lines={['npm i -g collected-cli', 'collected init --local', 'collected connect canvas', 'collected connect google calendar', 'collected ui']} />
+          <InstallCommands className="mt-5 flex-1" shellClassName="flex-1 rounded-[16px] px-4 py-4 sm:px-5" />
           <p className="mt-4 text-[13.5px] text-ter">
             No server. No Google Cloud project. Data stays in <span className="font-mono text-[12.5px] text-sub">~/.collected</span>.
           </p>

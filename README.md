@@ -28,7 +28,7 @@
 Paste this into Claude Code, Cursor, Codex or any agent that can run a shell:
 
 ```text
-Set up collected for me. It is an open-source student dashboard and CLI that pulls Canvas, Gradescope, Google Calendar, Todoist and Google Tasks into one board, readable by agents like you. First read https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md and https://raw.githubusercontent.com/priyam-k/collected/main/agent/README.md, and save the skill file where you keep skills (Claude Code: ~/.claude/skills/collected/SKILL.md) so you can use collected in later sessions; if you cannot write there, ask me to. Ask me one question: run it on this computer (nothing to host, data stays in ~/.collected) or self-host it on my own server (Docker, a domain, a Google Cloud project)? Before each step, say in one line what it does and why, and let me skip it. Laptop path: check Node 22 or newer, run `npm i -g collected-cli` and `collected init --local`. Canvas: run `collected connect canvas`; it reads my Canvas session cookie from the browser I am signed in with (Chrome, Brave, Edge, Arc, Firefox or Zen; on macOS one Keychain prompt appears, click Allow). If that fails or I would rather do it myself: in Canvas, DevTools → Application → Cookies → my Canvas domain, copy the value of canvas_session (older schools: _normandy_session) and paste it in Settings → Sources → Canvas, which has a field for just the value; on Windows use Firefox or that paste. If my school allows personal access tokens, `collected connect canvas --token` is the simpler route. Google: ask whether I want Calendar and Tasks connected now; `collected connect google calendar` and `collected connect google tasks` open my browser for consent, and I can do them later from Settings → Sources. Todoist: tell me where to paste a token (Settings → Sources). Then `collected daemon install` so it stays current, `collected ui` for the dashboard, and show me `collected agenda`. Self-host path: walk me through https://raw.githubusercontent.com/priyam-k/collected/main/docs/self-host.md step by step, asking before anything that creates accounts or costs money. Never ask me to paste secrets into this chat; the CLI prompts for them itself.
+Install collected (`brew install priyam-k/collected/collected-cli`, or `npm i -g collected-cli` if you have Node 22+), then run `collected quickstart --agent` and follow what it prints. Ask me before anything that opens my browser or creates accounts; never ask me to paste secrets into this chat.
 ```
 
 One dashboard for everything a student juggles. collected copies your Canvas assignments, Gradescope submissions, Google Calendar, Todoist tasks and a public internship feed into one copy that is yours, and shows them as a grid of widgets you can rearrange: a week calendar, a to-do list that knows what you have already submitted, one row per class, a job feed with an applications tracker. It never owns the data (Canvas stays the truth about assignments, Google about events) and never writes back except where you ask it to. Run it on your laptop with nothing but Node (`collected init --local`: no server, no Docker, no Google Cloud project), on a small server of your own, or on the hosted beta. The `collected` CLI reads the same data from the terminal, keeps your course files sorted into folders on your laptop, and comes with an agent skill so Claude Code or any other agent can answer "what's due this week".
@@ -63,15 +63,21 @@ Three ways, from least to most setup.
 
 ### On your laptop
 
-Needs Node 22.12 or newer and nothing else. With Homebrew on macOS or Linux, `brew install priyam-k/collected/collected-cli` brings its own Node; otherwise `npm i -g collected-cli`.
+Install, then run the setup wizard. With Homebrew on macOS or Linux (it brings its own Node):
 
 ```sh
-brew install priyam-k/collected/collected-cli   # or: npm i -g collected-cli
-collected init --local                # no server: a SQLite database in ~/.collected/data
-collected connect canvas              # reads your Canvas session cookie from the browser you are signed in with, and syncs
-collected connect google calendar     # Google's consent screen in your browser; no Google Cloud project
-collected ui                          # the dashboard at http://127.0.0.1:4848
+brew install priyam-k/collected/collected-cli
+collected quickstart
 ```
+
+Or with npm, on Node 22.12 or newer:
+
+```sh
+npm i -g collected-cli
+collected quickstart
+```
+
+`collected quickstart` sets up a local database in `~/.collected` and walks you through connecting Canvas, Google and the rest, one step at a time; `collected ui` then opens the dashboard at http://127.0.0.1:4848. `collected quickstart --agent` prints the same plan for an AI agent to follow instead.
 
 Local mode runs the same backend a server runs, inside the CLI, so every command and the whole dashboard work on one machine with no server, Docker, domain or OAuth client, and the data stays in `~/.collected`. The dashboard keeps sources syncing while it is open, a read such as `collected agenda` syncs a stale source before it answers, and `collected daemon install` adds a user timer that runs `collected sync` (every source, then the course files) every 15 minutes in the background. If your school allows personal access tokens, `collected connect canvas --token` prompts for one instead (Canvas → Account → Settings → + New Access Token). `collected demo canvas` loads fixture data if you want to look around first. Every command, `~/.collected/.env` and the freshness rules: [`agent/README.md`](agent/README.md#local-mode).
 
