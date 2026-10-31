@@ -7,6 +7,9 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.4.1 — 2026-10-31 · recommended
+
+- Dependencies: newer Google client libraries; the three audit advisories in their old dependency tree are gone.
 ## 1.4.0 — 2026-10-31 · recommended
 
 - CLI: `collected quickstart` sets everything up as a conversation (where it runs, Canvas, courses, Google, Todoist, the timer, then your agenda), and `collected quickstart --agent` prints the same plan for an AI agent; also `collected courses import` and `collected connect todoist`.

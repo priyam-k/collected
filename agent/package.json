@@ -1,6 +1,6 @@
 {
   "name": "collected-cli",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": false,
   "type": "module",
   "description": "Command-line client for collected, the self-hosted student dashboard, and the whole app on one machine in local mode: `collected init --local` keeps Canvas, Gradescope, calendar and to-do data in a SQLite file here, `collected ui` serves the dashboard on the loopback. Read your agenda, courses, grades and announcements, make small edits, browse Canvas read-only, and sync course files into local folders; against your own server or with no server at all.",
@@ -45,14 +45,14 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@googleapis/calendar": "^16.0.0",
+    "@googleapis/calendar": "^20.1.0",
     "@hono/node-server": "^2.1.5",
     "@libsql/client": "^0.18.0",
     "cheerio": "^1.2.0",
     "croner": "^11.0.0",
     "drizzle-orm": "^0.45.4",
     "fetch-cookie": "^3.2.0",
-    "google-auth-library": "^11.3.1",
+    "google-auth-library": "^11.3.2",
     "hono": "^4.13.14",
     "jose": "^6.2.13",
     "node-ical": "^0.27.3",
