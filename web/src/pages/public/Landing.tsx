@@ -249,7 +249,7 @@ function RunIt() {
             <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected quickstart</code> walks you through connecting your accounts, and{' '}
             <code className="rounded-md bg-well px-1.5 py-0.5 font-mono text-[13px] text-ink">collected ui</code> opens the same dashboard.
           </p>
-          <InstallCommands className="mt-5 flex-1" shellClassName="flex-1 rounded-[16px] px-4 py-4 sm:px-5" />
+          <InstallCommands className="mt-5" shellClassName="rounded-[16px] px-4 py-4 sm:px-5" />
           <p className="mt-4 text-[13.5px] text-ter">
             No server. No Google Cloud project. Data stays in <span className="font-mono text-[12.5px] text-sub">~/.collected</span>.
           </p>
