@@ -116,7 +116,8 @@ export async function runQuickstart(opts: QuickstartOptions): Promise<number> {
     return 1;
   }
   const local = isLocal(cfg);
-  const api: CollectedApi = await openApi(cfg, { logLevel: opts.logLevel, verbose: opts.verbose });
+  // The wizard narrates each step itself; the ingesters' own warnings would land mid-sentence, so they stay at error unless --verbose.
+  const api: CollectedApi = await openApi(cfg, { logLevel: opts.logLevel ?? (opts.verbose ? 'info' : 'error'), verbose: opts.verbose });
   const sources = async (): Promise<Map<string, Source>> => new Map((await api.get<Source[]>('/api/sources')).map((s) => [s.id, s]));
   const connected = async (id: string): Promise<Source | null> => {
     const s = (await sources()).get(id);
