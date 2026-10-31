@@ -32,7 +32,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = [
     why: 'collected runs whole inside this command, over a database in ~/.collected with nothing to host, or talks to a collected server you already run.',
     command: 'collected init --local',
     note: 'a server instead: `collected init https://your.server`, then `collected login`',
-    ask: 'Run everything on this computer, or connect to a collected server you already have? Local unless they name a server.',
+    ask: 'Three choices: (1) this computer, (2) a collected server they already run (ask for its URL), (3) they want to set up a server: point them at https://github.com/priyam-k/collected/blob/main/docs/self-host.md and stop; the rest of this plan is for after the server exists. Default is 1.',
     fallback: 'A config that already exists is kept; `collected init --force ...` replaces it.',
   },
   {

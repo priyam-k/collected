@@ -65,6 +65,24 @@ export function terminalIo(readSecret: QuickstartIo['readSecret'], say: (s: stri
 
 const step = (id: QuickstartStepId): QuickstartStep => QUICKSTART_STEPS.find((s) => s.id === id)!;
 
+/** Printed by step 1's third choice: enough to get a server up, then come back and pick 2. */
+export const SERVER_SETUP_STEPS = `
+  Setting up a collected server (full guide: https://github.com/priyam-k/collected/blob/main/docs/self-host.md)
+
+  You need: a Linux box that stays on (1 GB RAM is plenty) with Docker Compose v2, a domain pointed at it,
+  and a Google Cloud project for sign-in (the guide has the clicks).
+
+    git clone https://github.com/priyam-k/collected.git /srv/collected && cd /srv/collected
+    cp .env.example .env            # set PUBLIC_URL, SECRET_KEY, GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
+    docker compose pull             # ghcr.io/priyam-k/collected:latest
+    docker compose up -d
+    docker compose logs -f app      # wait for "listening"
+
+  Put TLS in front (Caddy, or a Cloudflare Tunnel; both in the guide), open https://your.domain and sign in
+  with Google: the first account to sign in owns the instance. Then run collected quickstart again here and
+  choose 2 with that URL.
+`.replace(/^\n/, '');
+
 export async function runQuickstart(opts: QuickstartOptions): Promise<number> {
   const { io } = opts;
   const say = io.say;
@@ -98,13 +116,21 @@ export async function runQuickstart(opts: QuickstartOptions): Promise<number> {
       if (await confirm('  Keep it?', true)) cfg = existing;
     }
     if (!cfg) {
-      const a = await ask('  Run everything on this computer, or connect to a collected server you already have? [Enter = this computer, or a server URL]', 'local');
+      say('    1  this computer: everything runs here, data in ~/.collected, nothing to host');
+      say('    2  a collected server you already run: this machine becomes a client of it');
+      say('    3  help me set up a server: prints the steps and stops here');
+      const a = (await ask('  Which one? [Enter = 1, or a server URL]', '1')).trim();
       if (SKIP.has(a.toLowerCase())) throw new Error('nothing to set up without a config');
-      if (a === 'local') {
+      if (a === '1' || a.toLowerCase() === 'local') {
         cfg = initConfig('local', { local: true });
         say(`  wrote ${configPath()}; data in ${localDataDir(cfg)}`);
+      } else if (a === '3' || /^help/i.test(a)) {
+        say(SERVER_SETUP_STEPS);
+        return 0;
       } else {
-        const server = /^https?:\/\//.test(a) ? a : `https://${a}`;
+        const raw = a === '2' ? (await ask('  Server URL?', '')).trim() : a;
+        if (!raw) throw new Error('no server URL given');
+        const server = /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
         assertSecureUrl(server, 'the server URL');
         cfg = initConfig(server);
         say(`  wrote ${configPath()} for ${server}`);
