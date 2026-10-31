@@ -1,18 +1,18 @@
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
-import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { Api, openApi, versionWatch } from './api.js';
+import { openApi, versionWatch } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas, connectCanvasToken } from './connect.js';
-import { LOCAL, configPath, defaultConfig, defaultLocalDataDir, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
+import { connectTodoist } from './connect-todoist.js';
+import { LOCAL, configPath, defaultLocalDataDir, existingConfig, initConfig, isLocal, loadConfig, localDataDir, maxAgeMinutes, saveConfig, targetDir } from './config.js';
 import { localDotenvPath } from './dotenv.js';
 import { daemonLine, daemonStatus, describeStatus, installDaemon, uninstallDaemon } from './daemon.js';
 import { READ_SOURCES, ensureFresh, takeFreshnessFlags } from './freshness.js';
 import { assertSecureUrl } from './guard.js';
+import { login } from './login.js';
 import { machineSync } from './machine-sync.js';
+import { agentPlan, agentPlanJson } from './quickstart-plan.js';
 import { pullFile } from './pull.js';
 import { SkewError, maybeNotice } from './skew.js';
 import { loadState, patchState } from './state.js';
@@ -31,13 +31,16 @@ const localOpts = { logLevel: verbose ? 'info' : undefined, verbose };
 /** The once-a-day npm check at the end of a command waits this long at most; `collected upgrade` itself waits 10 s. */
 const NOTICE_REGISTRY_TIMEOUT_MS = 3_000;
 /** Commands that end without the version notice: nothing was asked of a server, or the command is the notice's own remedy. */
-const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon', 'install-launchd', 'uninstall-launchd']);
+const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon', 'install-launchd', 'uninstall-launchd', 'quickstart']);
 
 function usage(): never {
   console.log(`${HELP}
 
-  File sync (course files → folders on this machine)
+  Setting up
 
+    quickstart                                the setup as a conversation: where it runs, Canvas, courses, Google, Todoist, the timer, then your agenda
+                                              (each step explained first, Enter takes the default, s skips; safe to run again)
+    quickstart --agent [--json]               the same steps as a plan for an AI agent that will run this CLI for you
     init <server-url>                         write ${configPath()} (device name, cache dir, model on); https, or http://localhost
     init --local [--data-dir <path>]          no server: run collected inside this command against a database on this machine
                                               (default ${defaultLocalDataDir()}); then: collected demo canvas, collected courses
@@ -50,6 +53,17 @@ function usage(): never {
     auth service-token <id> [secret] | auth helper-key [key] | auth token [token] | auth model [typesafe-api-key]
                                               leave the secret off to be prompted for it (or pipe it in): it then stays out of shell history
     login                                     sign in: opens Settings → Account on the server, then paste the token here
+    connect canvas [--browser X] [--domain host] [--dry-run]
+                                              read the Canvas session cookie from your browser and send it to the server
+    connect canvas --token [--domain host] [--dry-run]
+                                              or, if your school allows tokens, paste a Canvas access token (Canvas → Account →
+                                              Settings → New Access Token): checked, then saved
+    connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
+                                              (overrides, if you have your own OAuth client: ${localDotenvPath()})
+    connect todoist                           local mode: paste a Todoist API token (Todoist → Settings → Integrations → Developer) and sync
+
+  File sync (course files → folders on this machine)
+
     files courses                             what the server wants synced and where it lands here
     files link <course-id> <path>             root folder for a course;  files link <course-id> <target> <path>;  files unlink <course-id> [target]
     sync [--dry-run] [--course X] [--no-model]    everything this machine keeps current: in local mode every enabled source, then the
@@ -58,13 +72,6 @@ function usage(): never {
     daemon install [--interval N] | uninstall | status
                                               a user timer running \`collected sync\` every N minutes (15 in local mode, 30 against a server;
                                               daemon.intervalMinutes in agent.json wins); install-launchd / uninstall-launchd still mean the same
-    connect canvas [--browser X] [--domain host] [--dry-run]
-                                              read the Canvas session cookie from your browser and send it to the server
-    connect canvas --token [--domain host] [--dry-run]
-                                              or, if your school allows tokens, paste a Canvas access token (Canvas → Account →
-                                              Settings → New Access Token): checked, then saved
-    connect google [calendar|tasks] [--no-open]   local mode: the Google sign-in in your browser, without opening \`ui\`
-                                              (overrides, if you have your own OAuth client: ${localDotenvPath()})
 
   This program
 
@@ -187,27 +194,30 @@ try {
       if (!server || (values.local && positionals[0])) usage();
       if (values['data-dir'] && !values.local) throw new Error('--data-dir goes with --local');
       assertSecureUrl(server, 'the server URL');
-      let existing: ReturnType<typeof loadConfig> | null = null;
-      try {
-        existing = loadConfig();
-      } catch {
-        /* none yet */
-      }
-      if (existing && !values.force) {
+      if (existingConfig() && !values.force) {
         say(`config exists at ${configPath()}; pass --force to replace it`);
         process.exit(1);
       }
-      const cfg = defaultConfig(server);
-      if (values.device) cfg.device = values.device;
-      if (values.local) {
-        cfg.local = { dataDir: values['data-dir'] ? path.resolve(values['data-dir']) : defaultLocalDataDir() };
-        mkdirSync(cfg.local.dataDir, { recursive: true, mode: 0o700 });
-      }
-      saveConfig(cfg);
-      if (values.local) say(`wrote ${configPath()}\nlocal mode: data in ${cfg.local!.dataDir} (created on first command)\nnext: collected demo canvas              (fixture courses and assignments, to look around)\n      collected courses\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)`);
+      const cfg = initConfig(server, { local: values.local, dataDir: values['data-dir'], device: values.device });
+      if (values.local) say(`wrote ${configPath()}\nlocal mode: data in ${cfg.local!.dataDir} (created on first command)\nnext: collected quickstart                 (Canvas, courses, Google, Todoist, the timer, step by step)\n  or: collected demo canvas              (fixture courses and assignments, to look around)\n      collected courses\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)`);
       else say(`wrote ${configPath()}\nnext: collected auth service-token <id>   (prompts for the secret; or auth helper-key for a local server)\n      collected auth model                 (prompts for the TypeSafe key, for the Jev classifier; skip to use rules only)\n      collected courses`);
       break;
     }
+    case 'quickstart': {
+      const { values } = parseArgs({ args: rest, options: { agent: { type: 'boolean' }, json: { type: 'boolean' }, yes: { type: 'boolean' } } });
+      if (values.agent) {
+        say(values.json ? JSON.stringify(agentPlanJson(cliVersion()), null, 2) : agentPlan(cliVersion()));
+        break;
+      }
+      if (values.json) usage();
+      if (!process.stdin.isTTY && !values.yes) {
+        console.error('quickstart is interactive; run it in a terminal, or `collected quickstart --agent` for the step list');
+        process.exit(2);
+      }
+      const { runQuickstart, terminalIo } = await import('./quickstart.js');
+      process.exit(await runQuickstart({ io: terminalIo(readSecret, say), yes: values.yes, ...localOpts }));
+    }
+    // eslint-disable-next-line no-fallthrough
     case 'ui': {
       const { values } = parseArgs({ args: rest, options: { port: { type: 'string' }, 'no-open': { type: 'boolean' } } });
       const open = !values['no-open'];
@@ -271,26 +281,7 @@ try {
       break;
     }
     case 'login': {
-      const cfg = loadConfig();
-      if (isLocal(cfg)) throw new Error('local mode needs no sign-in: this command already owns the database.');
-      const url = `${cfg.server.replace(/\/$/, '')}/settings/account?cli=1&device=${encodeURIComponent(cfg.device)}`;
-      say(`Sign in and create a token for this machine:\n  ${url}`);
-      if (process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
-      const token = await readSecret('paste the token: ');
-      if (!token.startsWith('clt_')) {
-        say('that does not look like a collected token (they start with clt_)');
-        process.exit(1);
-      }
-      // Keep the edge credentials (Access service token or helper key): the Bearer token identifies the person to the app,
-      // the service token still gets the request past Cloudflare Access.
-      const trial = { ...cfg, auth: { ...cfg.auth, token } };
-      const me = await new Api(trial).get<{ identity: string | null }>('/api/auth/me');
-      if (!me.identity) {
-        say('the server did not accept that token; nothing saved');
-        process.exit(1);
-      }
-      saveConfig(trial);
-      say(`signed in as ${me.identity}`);
+      await login(loadConfig(), { say, readSecret, noOpen: rest.includes('--no-open') });
       break;
     }
     case 'connect': {
@@ -302,6 +293,11 @@ try {
         const r = await connectGoogle(loadConfig(), { target, log: say, noOpen: values['no-open'], ...localOpts });
         if (!r.ok) throw new Error(r.detail);
         say(r.detail);
+        break;
+      }
+      if (rest[0] === 'todoist') {
+        if (rest.length > 1) usage();
+        await connectTodoist(loadConfig(), { log: say, readSecret: () => readSecret('Todoist API token: ') });
         break;
       }
       if (rest[0] !== 'canvas') usage();

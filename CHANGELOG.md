@@ -7,6 +7,7 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+- CLI: `collected quickstart` sets everything up as a conversation (where it runs, Canvas, courses, Google, Todoist, the timer, then your agenda), and `collected quickstart --agent` prints the same plan for an AI agent; also `collected courses import` and `collected connect todoist`.
 - Homebrew: `brew install priyam-k/collected/collected-cli`; `collected upgrade` runs `brew upgrade` for that install.
 
 ## 1.3.0 — 2026-10-30 · recommended

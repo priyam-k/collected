@@ -21,6 +21,14 @@ npm i -g collected-cli
 Then:
 
 ```sh
+collected quickstart                   # the setup as a conversation: a few steps, each explained first
+```
+
+`quickstart` asks where collected should run (this computer, the default, or a server you already have) and writes the config; connects Canvas by reading the session cookie from your browser, with the paste and token routes printed when that fails; imports your current-term courses from Canvas; offers Google Calendar and Google Tasks (each a browser consent, yes or no); takes a Todoist API token at a hidden prompt, or Enter to skip; offers the background timer; then prints the next three days and, in local mode, offers to open the dashboard. Enter takes the default and `s` skips a step. It is safe to run again: a step whose work exists (the config, a connected source, the installed timer) says so and moves on, and a step that fails prints the error and the wizard continues. `collected quickstart --agent` prints the same steps as a plan for an AI agent that will run the CLI for you (`--json` for the structured form): the website says only "install, then run `collected quickstart --agent`", so the plan always matches the commands installed.
+
+Or by hand:
+
+```sh
 collected init --local                 # no server: a SQLite database in ~/.collected/data
 collected demo canvas                  # something to look at
 collected ui                           # the dashboard at http://127.0.0.1:4848
@@ -112,7 +120,7 @@ No Google Cloud project is needed: the package carries a Google OAuth client of 
 
 A build can ship without the built-in client (the Sources page says so, and `connect google` says so before it listens); then either add your own client to `~/.collected/.env` (below) or use the Google Calendar (iCal) source, which needs no sign-in.
 
-Todoist in local mode takes a pasted API token (Todoist → Settings → Integrations → Developer). Sign in with Todoist needs a Todoist app of your own, because Todoist registers one exact redirect URL per app and has no loopback exception: register one at `https://developer.todoist.com/appconsole.html` with `http://127.0.0.1:4848/api/todoist/callback` (the `ui` port) and put its id and secret in `~/.collected/.env`.
+Todoist in local mode takes a pasted API token (Todoist → Settings → Integrations → Developer): `collected connect todoist` prompts for it (or reads it from stdin), stores it and runs the first sync, and the Sources card in `collected ui` takes the same paste. Sign in with Todoist needs a Todoist app of your own, because Todoist registers one exact redirect URL per app and has no loopback exception: register one at `https://developer.todoist.com/appconsole.html` with `http://127.0.0.1:4848/api/todoist/callback` (the `ui` port) and put its id and secret in `~/.collected/.env`.
 
 ### `~/.collected/.env`: overrides for local mode
 
@@ -138,6 +146,7 @@ Look:
 
 ```
 courses                                     every course: role, schedule, hotlinks
+courses import [--list | --all | --term 2026-fall | <rows or Canvas ids>]   turn Canvas enrollments into courses (default: the current term), then sync
 course <course>                             one course: schedule, links, notes, grade, what's due, dates
 assignments [--course C] [--days 14] [--all]
 agenda [--days 7]                           events, due dates and tasks by day
@@ -166,6 +175,9 @@ jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
 resync [canvas|gradescope|gcal|todoist|jobs|all]
 connect canvas [--browser X] [--domain host] [--dry-run]   read the Canvas session cookie from a browser and send it
 connect canvas --token [--domain host] [--dry-run]   or, if your school allows tokens, paste a Canvas access token at the prompt (or pipe it on stdin); checked against Canvas, then saved
+connect google [calendar|tasks]             local mode: the Google consent in your browser
+connect todoist                             local mode: a Todoist API token at the prompt (or on stdin), then the first sync
+quickstart [--agent [--json]]               every step above as a conversation, or as a plan for an agent
 ```
 
 Local mode only (`collected init --local`):

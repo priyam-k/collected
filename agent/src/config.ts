@@ -87,6 +87,34 @@ export function defaultConfig(server = 'http://localhost:3000'): AgentConfig {
   return { server, auth: {}, device: hostname().replace(/\.local$/, ''), cacheDir: path.join(agentHome(), 'cache'), courses: {}, model: { enabled: true, baseUrl: 'https://api.typesafe.ai', model: 'jev-latest' } };
 }
 
+/** The config when there is one, else null: for commands that may run before `init`. */
+export function existingConfig(): AgentConfig | null {
+  try {
+    return loadConfig();
+  } catch {
+    return null;
+  }
+}
+
+export interface InitOptions {
+  /** `init --local`: the app runs inside the CLI over a database in `dataDir` (default `<agent home>/data`). */
+  local?: boolean | undefined;
+  dataDir?: string | undefined;
+  device?: string | undefined;
+}
+
+/** What `collected init` writes: the default config for `server`, the data directory created `0700` in local mode. */
+export function initConfig(server: string, opts: InitOptions = {}): AgentConfig {
+  const cfg = defaultConfig(server);
+  if (opts.device) cfg.device = opts.device;
+  if (opts.local) {
+    cfg.local = { dataDir: opts.dataDir ? path.resolve(opts.dataDir) : defaultLocalDataDir() };
+    mkdirSync(cfg.local.dataDir, { recursive: true, mode: 0o700 });
+  }
+  saveConfig(cfg);
+  return cfg;
+}
+
 export function loadConfig(): AgentConfig {
   const file = configPath();
   if (!existsSync(file)) throw new Error(`No agent config at ${file}. Run: collected-agent init <server-url>`);

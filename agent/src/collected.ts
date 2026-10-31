@@ -1,6 +1,8 @@
 import { parseArgs } from 'node:util';
 import type { Course, CourseGrades, EffectiveItem, Job, Meeting, Source } from '@collected/shared';
+import type { RunOutcome } from '@collected/core/ingest/runner';
 import type { CollectedApi as Api } from './api.js';
+import { defaultSelection, describeImport, enrollmentTable, importEnrollments, listEnrollments, pickEnrollments } from './enroll.js';
 import { dayOf, describeSchedule, htmlToText, linkedFiles, localDate, parseDuration, parseMeetings, parseWhen, table, when } from './format.js';
 
 /*
@@ -18,6 +20,7 @@ export const HELP = `collected: your classes, assignments and calendar from the 
 
   Look
     courses                                   every course: role, schedule, hotlinks
+    courses import [--list | --all | --term 2026-fall | <rows or Canvas ids>]   turn Canvas enrollments into courses (default: the current term)
     course <course>                           one course: schedule, links, notes, grade, what's due, dates
     assignments [--course C] [--days 14] [--all]   what's due (open, plus overdue from the last 14 days); --all = everything
     agenda [--days 7]                         events, due dates and tasks by day
@@ -81,10 +84,37 @@ const itemRow = (i: EffectiveItem) => [when(i.dueAt ?? i.startsAt), i.course?.co
 
 /* ---------- reads ---------- */
 
-async function courses(api: Api): Promise<Out> {
+async function courses(api: Api, args: string[]): Promise<Out> {
+  if (args[0] === 'import') return coursesImport(api, args.slice(1));
+  if (args.length) throw new Error('courses [--json] | courses import [--list | --all | --term <slug> | <row or Canvas id>...]');
   const all = (await api.get<Course[]>('/api/courses')).filter((c) => !c.archived);
   return { json: all, text: table(['Course', 'Role', 'Schedule', 'Links', 'Id'], all.map((c) => [c.code, c.role, describeSchedule(c.schedule), c.links.map((l) => l.label).join(', '), c.id]), 90) };
 }
+
+/**
+ * `courses import`: what Canvas says you are enrolled in, and the import the dashboard's first-run card does. With
+ * nothing else it imports the current term's enrollments that are not courses yet; `--all` every active one;
+ * `--term 2026-fall` one term; row numbers or Canvas ids pick. `--list` only prints the list. After an import the
+ * Canvas sync runs so the new courses fill (a server starts one of its own; this one waits for the lock or the run).
+ */
+async function coursesImport(api: Api, args: string[]): Promise<Out> {
+  const { values, positionals } = parseArgs({ args, options: { list: { type: 'boolean' }, all: { type: 'boolean' }, term: { type: 'string' } }, allowPositionals: true });
+  const list = await listEnrollments(api);
+  if (values.list) return { json: list, text: `${enrollmentTable(list, new Set(defaultSelection(list).map((e) => e.canvasCourseId)))}\n* = what \`collected courses import\` takes by default (the current term, not yet here)` };
+  const picks = positionals.length ? pickEnrollments(list, positionals) : values.all ? list : values.term ? list.filter((e) => e.suggested.term === values.term) : defaultSelection(list);
+  const fresh = picks.filter((e) => !e.trackedAs);
+  if (!fresh.length) return { json: { created: [], skipped: [] }, text: picks.length ? 'nothing to import: every course picked is already here' : `nothing to import${values.term ? ` for term ${values.term}` : ''}; \`collected courses import --list\` shows the enrollments` };
+  const r = await importEnrollments(api, fresh);
+  let text = describeImport(r);
+  if (r.created.length) {
+    const sync = await api.send<{ outcome: RunOutcome }>('POST', '/api/sources/canvas/sync').catch((e: Error) => ({ outcome: { ok: false as const, error: e.message, status: 'error' as const, ms: 0 } }));
+    text += `\n${describeOutcome('canvas', sync.outcome)}`;
+  }
+  return { json: r, text };
+}
+
+/** One line for a sync outcome, as `resync` prints it. */
+const describeOutcome = (id: string, o: RunOutcome): string => (o.ok ? `${id} synced: ${JSON.stringify(o.result.counts ?? {})}` : 'skipped' in o ? `${id} sync skipped: ${o.skipped}` : `${id} sync ${o.status}: ${o.error}`);
 
 async function course(api: Api, args: string[]): Promise<Out> {
   const c = await resolveCourse(api, args[0]);

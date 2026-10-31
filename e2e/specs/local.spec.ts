@@ -144,6 +144,21 @@ test.describe.serial('collected CLI, local mode', () => {
     expect(cli(['sync', 'canvas']).stderr).toContain('local mode only');
   });
 
+  test('quickstart --agent prints the setup plan for an agent; quickstart itself wants a terminal', () => {
+    const plan = cliOk(['quickstart', '--agent'], { home });
+    expect(plan).toContain('https://raw.githubusercontent.com/priyam-k/collected/main/skills/collected/SKILL.md');
+    expect(plan).toContain('`collected connect canvas`');
+    expect(plan).toContain('`collected init --local`');
+    expect(plan.split('\n').length).toBeLessThanOrEqual(60);
+    const json = JSON.parse(cliOk(['quickstart', '--agent', '--json'], { home })) as { version: string; steps: { id: string; command: string }[] };
+    expect(json.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(json.steps.map((s) => s.id)).toEqual(['where', 'canvas', 'courses', 'google', 'todoist', 'daemon', 'finish']);
+    // stdin is a pipe here, not a terminal: the wizard refuses rather than taking every default unasked.
+    const r = cli(['quickstart'], { home });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('collected quickstart --agent');
+  });
+
   test('demo clear takes the fixtures out again', () => {
     expect(cliOk(['demo', 'clear'], { home })).toMatch(/removed \d+ items?/);
     expect(JSON.parse(cliOk(['assignments', '--all', '--json'], { home }))).toEqual([]);
