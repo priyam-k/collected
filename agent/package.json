@@ -45,7 +45,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@googleapis/calendar": "^16.0.0",
+    "@googleapis/calendar": "^20.1.0",
     "@hono/node-server": "^2.1.5",
     "@libsql/client": "^0.18.0",
     "cheerio": "^1.2.0",

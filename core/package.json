@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@collected/shared": "workspace:*",
-    "@googleapis/calendar": "^16.0.0",
+    "@googleapis/calendar": "^20.1.0",
     "@libsql/client": "^0.18.0",
     "cheerio": "^1.2.0",
     "croner": "^10.0.1",
