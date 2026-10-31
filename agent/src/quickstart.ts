@@ -106,35 +106,40 @@ export async function runQuickstart(opts: QuickstartOptions): Promise<number> {
 
   say('collected quickstart: a few steps, each explained first. Enter takes the default, s skips a step, Ctrl-C leaves; run it again any time.');
 
+  // A config that already exists is settled before the numbered step, so the step reads as one question.
+  let cfg: AgentConfig | null = null;
+  const existing = existingConfig();
+  if (existing) {
+    say(`config exists at ${configPath()}: ${isLocal(existing) ? `local · data in ${localDataDir(existing)}` : `server ${existing.server}${existing.auth.token ? ' (signed in)' : ''}`}`);
+    if (await confirm('Keep it?', true)) cfg = existing;
+  }
+
   // 1. Where: the config.
   begin('where');
-  let cfg: AgentConfig | null = null;
   try {
-    const existing = existingConfig();
-    if (existing) {
-      say(`  config exists at ${configPath()}: ${isLocal(existing) ? `local · data in ${localDataDir(existing)}` : `server ${existing.server}${existing.auth.token ? ' (signed in)' : ''}`}`);
-      if (await confirm('  Keep it?', true)) cfg = existing;
-    }
+    if (cfg) say('  using the config above');
     if (!cfg) {
       say('    1  this computer: everything runs here, data in ~/.collected, nothing to host');
       say('    2  a collected server you already run: this machine becomes a client of it');
       say('    3  help me set up a server: prints the steps and stops here');
-      const a = (await ask('  Which one? [Enter = 1, or a server URL]', '1')).trim();
+      const a = (await ask('  Choose 1, 2 or 3 [1]', '1')).trim();
       if (SKIP.has(a.toLowerCase())) throw new Error('nothing to set up without a config');
-      if (a === '1' || a.toLowerCase() === 'local') {
+      if (a === '' || a === '1' || a.toLowerCase() === 'local') {
         cfg = initConfig('local', { local: true });
         say(`  wrote ${configPath()}; data in ${localDataDir(cfg)}`);
       } else if (a === '3' || /^help/i.test(a)) {
         say(SERVER_SETUP_STEPS);
         return 0;
-      } else {
-        const raw = a === '2' ? (await ask('  Server URL?', '')).trim() : a;
+      } else if (a === '2' || /^https?:\/\//.test(a) || /\./.test(a)) {
+        const raw = a === '2' ? (await ask('  Server URL (https://…)', '')).trim() : a;
         if (!raw) throw new Error('no server URL given');
         const server = /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
         assertSecureUrl(server, 'the server URL');
         cfg = initConfig(server);
         say(`  wrote ${configPath()} for ${server}`);
         cfg = await login(cfg, { say: (s) => say(`  ${s}`), readSecret: io.readSecret, open: opts.openBrowser });
+      } else {
+        throw new Error(`"${a}" is not one of 1, 2 or 3`);
       }
     }
   } catch (e) {
