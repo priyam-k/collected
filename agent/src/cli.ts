@@ -223,8 +223,10 @@ try {
       const open = !values['no-open'];
       const cfg = cfgOf();
       if (!isLocal(cfg)) {
-        say(`the dashboard is at ${cfg.server}`);
-        if (open) (await import('./ui.js')).openBrowser(cfg.server);
+        // The board lives at /dashboard; the server's root is the public home page.
+        const board = `${cfg.server.replace(/\/$/, '')}/dashboard`;
+        say(`the dashboard is at ${board}`);
+        if (open) (await import('./ui.js')).openBrowser(board);
         break;
       }
       const port = values.port === undefined ? (await import('./ui.js')).DEFAULT_UI_PORT : Number(values.port);
