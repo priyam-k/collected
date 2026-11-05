@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import type { Course, CourseGrades, EffectiveItem, Job, Meeting, Source } from '@collected/shared';
+import { isReservedStage, stageIdFrom, stageLabel, type Course, type CourseGrades, type EffectiveItem, type Job, type JobStage, type Meeting, type Source } from '@collected/shared';
 import type { RunOutcome } from '@collected/core/ingest/runner';
-import type { CollectedApi as Api } from './api.js';
+import { ApiError, type CollectedApi as Api } from './api.js';
 import { defaultSelection, describeImport, enrollmentTable, importEnrollments, listEnrollments, pickEnrollments } from './enroll.js';
 import { dayOf, describeSchedule, htmlToText, linkedFiles, localDate, parseDuration, parseMeetings, parseWhen, table, when } from './format.js';
 
@@ -29,7 +30,20 @@ export const HELP = `collected: your classes, assignments and calendar from the 
     announcements [--course C] [--limit 5]
     dates [--course C]                        exams, quizzes, finals, cancelled or virtual sessions
     sources                                   sync status of Canvas, Gradescope, Google Calendar, Todoist, Google Tasks, jobs
-    jobs [--state applied,screen] [--limit 20]    the applications tracker (default: everything tracked)
+
+  Jobs (the feed and the applications tracker; ids are printed in full)
+    jobs [--state applied,screen] [--limit 20]    everything tracked, most recently touched first
+    jobs feed [--all] [--limit 50] [--since YYYY-MM-DD]   the matched feed, newest first (--all: every listing, hidden and inactive too)
+    jobs search "<text>" [--tracked | --feed] [--state a,b] [--limit N]   company, title, location, notes or an exact req id; every word must match
+    jobs find <req-id | url>                  the job with that requisition id or posting URL (tracking parameters ignored), or "no match"
+    jobs show <id>                            every field: notes, resume, req id, next action, timestamps
+    jobs add "<company>" "<title>" [--url U] [--req R] [--location L]... [--state applied] [--applied YYYY-MM-DD] [--resume PATH] [--notes N] [--next "what" --next-at D] [--force]
+                                              a job by hand; refused with the existing job when the URL or req id is already here (--force adds anyway)
+    jobs set <id> [<state>] [--notes N] [--next "what" --next-at D] [--applied D] [--resume PATH] [--req R]   any stage id; a new one becomes a board column
+    jobs rm <id>                              remove a hand-added job (a feed job is hidden instead: jobs set <id> hidden)
+    jobs seen [<id>...]                       mark feed jobs seen (default: every unseen match)
+    jobs stages                               the tracker's stages in order;  jobs stages add <id> [--label L] [--closed] [--after <id>]
+    jobs stages rm <id> | rename <id> "<label>" | move <id> --after <other>
 
   Change
     task add "<text>" [--to todoist|gtasks] [--due YYYY-MM-DD]   a task in the default to-do app (Todoist parses "fri 5pm #School" itself)
@@ -44,7 +58,6 @@ export const HELP = `collected: your classes, assignments and calendar from the 
     event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]   a Google Calendar event
     event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD] [--calendar …]   an all-day event;  <when> is "2026-11-03 14:00", "today 14:00", "tomorrow 9:30" or "fri 17:00"
     event calendars                           the connected Google calendars, with the default
-    jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
     resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]   run a sync now and wait for it
 
   Canvas (read-only)
@@ -222,18 +235,217 @@ async function sources(api: Api): Promise<Out> {
   return { json: all, text: table(['Source', 'Status', 'Last success', 'Error'], all.map((s) => [s.id, s.running ? `${s.status} (running)` : s.status, when(s.lastSuccessAt), s.lastError ?? ''])) };
 }
 
+/* ---------- jobs ---------- */
+
+const JOBS_USAGE = 'jobs [--state a,b] [--limit N] | jobs feed | jobs search "<text>" | jobs find <req-id|url> | jobs show <id> | jobs add … | jobs set <id> [<state>] … | jobs rm <id> | jobs seen [<id>…] | jobs stages …';
+const isoDay = (v: string | undefined, flag: string): string | undefined => {
+  if (v !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`${flag} must be YYYY-MM-DD`);
+  return v;
+};
+const nextOf = (j: Job): string => (j.nextAction ? `${j.nextAction}${j.nextActionAt ? ` (${j.nextActionAt})` : ''}` : '');
+const jobLine = (j: Job): string => `${j.company} · ${j.title} · ${j.state}${j.reqId ? ` · req ${j.reqId}` : ''} · ${j.id}`;
+const jobsTable = (list: Job[]): string => table(['Company', 'Title', 'State', 'Applied', 'Req', 'Next', 'Id'], list.map((j) => [j.company, j.title, j.state, j.appliedAt ?? '', j.reqId ?? '', nextOf(j), j.id]), 40, true);
+const feedTable = (list: Job[]): string => table(['Posted', 'Company', 'Title', 'Locations', 'State', 'Req', 'Id'], list.map((j) => [j.postedAt?.slice(0, 10) ?? '', j.company, j.title, j.locations.join('; '), j.state, j.reqId ?? '', j.id]), 40, true);
+const looksLikeUrl = (s: string): boolean => /^https?:\/\//i.test(s) || /^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s);
+/** `--state a,b` as the server wants it: lowercase ids, no blanks. */
+const stateList = (v: string | undefined): string | undefined => v?.split(',').map((x) => stageIdFrom(x)).filter(Boolean).join(',') || undefined;
+
+/** Everything about one job, for `jobs show` and the 409 on `jobs add`. The resume path is printed, never opened. */
+function describeJob(j: Job, stages: readonly JobStage[]): string {
+  const row = (k: string, v: string | null | undefined) => (v ? `  ${k.padEnd(11)}${v}` : null);
+  const lines = [
+    `${j.company} · ${j.title}`,
+    row('id', j.id),
+    row('source', j.source),
+    row('state', `${j.state} (${stageLabel(stages, j.state)})`),
+    row('url', j.url),
+    row('req id', j.reqId),
+    row('locations', j.locations.join('; ')),
+    row('terms', j.terms.join(', ')),
+    row('category', j.category),
+    row('sponsor', j.sponsorship),
+    row('applied', j.appliedAt),
+    row('next', j.nextAction ? `${j.nextAction}${j.nextActionAt ? ` by ${j.nextActionAt}` : ''}` : null),
+    row('resume', j.resumePath ? `${j.resumePath}${existsSync(j.resumePath.replace(/^~(?=$|\/)/, process.env.HOME ?? '~')) ? ' (exists)' : ''}` : null),
+    row('posted', when(j.postedAt)),
+    row('first seen', when(j.firstSeenAt)),
+    row('seen', when(j.seenAt)),
+    row('updated', when(j.stateUpdatedAt ?? j.updatedAt)),
+    row('active', j.source === 'manual' ? null : j.active ? 'yes' : 'no'),
+    j.notes ? `  notes:\n${j.notes.replace(/^/gm, '    ')}` : null,
+  ];
+  return lines.filter((l): l is string => l !== null).join('\n');
+}
+
+const getStages = async (api: Api): Promise<JobStage[]> => (await api.get<{ stages: JobStage[] }>('/api/jobs/stages')).stages;
+
 async function jobs(api: Api, args: string[]): Promise<Out> {
-  if (args[0] === 'set') {
-    const { values, positionals } = parseArgs({ args: args.slice(1), options: { notes: { type: 'string' }, next: { type: 'string' }, 'next-at': { type: 'string' } }, allowPositionals: true });
-    const [id, state] = positionals;
-    if (!id || !state) throw new Error('usage: jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]');
-    const body = { state, ...(values.notes !== undefined ? { notes: values.notes } : {}), ...(values.next !== undefined ? { nextAction: values.next } : {}), ...(values['next-at'] !== undefined ? { nextActionAt: values['next-at'] } : {}) };
-    const j = await api.send<Job>('PATCH', `/api/jobs/${encodeURIComponent(id)}/state`, body);
-    return { json: j, text: `${j.company} · ${j.title}: ${j.state}${j.nextAction ? ` · next: ${j.nextAction}${j.nextActionAt ? ` by ${j.nextActionAt}` : ''}` : ''}` };
+  const sub = args[0];
+  const rest = args.slice(1);
+  switch (sub) {
+    case 'feed': {
+      const { values } = parseArgs({ args: rest, options: { all: { type: 'boolean' }, limit: { type: 'string', default: '50' }, since: { type: 'string' } }, allowPositionals: true });
+      isoDay(values.since, '--since');
+      const list = await api.get<Job[]>(`/api/jobs?${q({ limit: values.limit, since: values.since, ...(values.all ? { matchesOnly: 0, active: 0, includeHidden: 1 } : {}) })}`);
+      return { json: list, text: feedTable(list) };
+    }
+    case 'search': {
+      const { values, positionals } = parseArgs({ args: rest, options: { tracked: { type: 'boolean' }, feed: { type: 'boolean' }, state: { type: 'string' }, limit: { type: 'string', default: '50' } }, allowPositionals: true });
+      const text = positionals.join(' ').trim();
+      if (!text) throw new Error('usage: jobs search "<text>" [--tracked | --feed] [--state a,b] [--limit N]');
+      if (values.tracked && values.feed) throw new Error('--tracked or --feed, not both (the default searches both)');
+      const state = stateList(values.state);
+      const tracked = values.feed ? [] : await api.get<Job[]>(`/api/jobs/tracked?${q({ query: text, state, limit: values.limit })}`);
+      const feed = values.tracked ? [] : await api.get<Job[]>(`/api/jobs?${q({ query: text, state, limit: values.limit, matchesOnly: 0, active: 0, includeHidden: 1 })}`);
+      const seen = new Set(tracked.map((j) => j.id));
+      const list = [...tracked, ...feed.filter((j) => !seen.has(j.id))].slice(0, Number(values.limit) || 50);
+      return { json: list, text: jobsTable(list) };
+    }
+    case 'find': {
+      const key = rest.join(' ').trim();
+      if (!key) throw new Error('usage: jobs find <req-id | url>');
+      const list = await api.get<Job[]>(`/api/jobs/find?${q(looksLikeUrl(key) ? { url: key } : { req: key })}`);
+      if (!list.length) return { json: [], text: 'no match' };
+      const stages = await getStages(api);
+      return { json: list, text: list.map((j) => describeJob(j, stages)).join('\n\n') };
+    }
+    case 'show': {
+      const id = rest[0];
+      if (!id) throw new Error('usage: jobs show <id>');
+      const [j, stages] = await Promise.all([api.get<Job>(`/api/jobs/${encodeURIComponent(id)}`), getStages(api)]);
+      return { json: j, text: describeJob(j, stages) };
+    }
+    case 'add':
+      return jobsAdd(api, rest);
+    case 'set':
+      return jobsSet(api, rest);
+    case 'rm': {
+      const id = rest[0];
+      if (!id) throw new Error('usage: jobs rm <id>   (a hand-added job; a feed job is hidden with `jobs set <id> hidden`)');
+      if (!id.startsWith('manual:')) throw new Error(`${id} came from the feed and cannot be removed; \`collected jobs set ${id} hidden\` takes it out of the feed`);
+      const j = await api.get<Job>(`/api/jobs/${encodeURIComponent(id)}`);
+      await api.send('DELETE', `/api/jobs/${encodeURIComponent(id)}`);
+      return { json: { removed: j }, text: `removed: ${jobLine(j)}` };
+    }
+    case 'seen': {
+      const ids = rest.length ? rest : (await api.get<Job[]>('/api/jobs?limit=1000')).filter((j) => !j.seenAt).map((j) => j.id);
+      if (!ids.length) return { json: { ids: [] }, text: 'nothing unseen' };
+      await api.send('PATCH', '/api/jobs/seen', { ids });
+      return { json: { ids }, text: `marked ${ids.length} job${ids.length === 1 ? '' : 's'} seen` };
+    }
+    case 'stages':
+      return jobsStages(api, rest);
+    default: {
+      if (sub && !sub.startsWith('--')) throw new Error(`unknown: jobs ${sub}\n${JOBS_USAGE}`);
+      const { values } = parseArgs({ args, options: { state: { type: 'string' }, limit: { type: 'string', default: '20' } }, allowPositionals: true });
+      const list = await api.get<Job[]>(`/api/jobs/tracked?${q({ state: stateList(values.state), limit: values.limit })}`);
+      return { json: list, text: jobsTable(list) };
+    }
   }
-  const { values } = parseArgs({ args, options: { state: { type: 'string' }, limit: { type: 'string', default: '20' } }, allowPositionals: true });
-  const list = values.state ? await api.get<Job[]>(`/api/jobs?${q({ state: values.state, matchesOnly: 0, active: 0, limit: values.limit })}`) : (await api.get<Job[]>('/api/jobs/tracked')).slice(0, Number(values.limit) || 20);
-  return { json: list, text: table(['Company', 'Title', 'State', 'Applied', 'Next', 'Id'], list.map((j) => [j.company, j.title, j.state, j.appliedAt ?? '', j.nextAction ? `${j.nextAction}${j.nextActionAt ? ` (${j.nextActionAt})` : ''}` : '', j.id]), 48) };
+}
+
+/** The one-line body for `jobs add` and `jobs set`: only the flags that were given. */
+function trackerFields(values: { notes?: string; next?: string; 'next-at'?: string; applied?: string; resume?: string; req?: string }): Record<string, string | null> {
+  const body: Record<string, string | null> = {};
+  if (values.notes !== undefined) body.notes = values.notes;
+  if (values.next !== undefined) body.nextAction = values.next || null;
+  if (values['next-at'] !== undefined) body.nextActionAt = isoDay(values['next-at'] || undefined, '--next-at') ?? null;
+  if (values.applied !== undefined) body.appliedAt = isoDay(values.applied || undefined, '--applied') ?? null;
+  if (values.resume !== undefined) body.resumePath = values.resume || null;
+  if (values.req !== undefined) body.reqId = values.req.trim() || null;
+  return body;
+}
+
+const TRACKER_OPTIONS = { notes: { type: 'string' }, next: { type: 'string' }, 'next-at': { type: 'string' }, applied: { type: 'string' }, resume: { type: 'string' }, req: { type: 'string' } } as const;
+
+async function jobsAdd(api: Api, args: string[]): Promise<Out> {
+  const { values, positionals } = parseArgs({ args, options: { ...TRACKER_OPTIONS, url: { type: 'string' }, location: { type: 'string', multiple: true }, state: { type: 'string' }, force: { type: 'boolean' } }, allowPositionals: true });
+  const [company, title] = positionals;
+  if (!company || !title || positionals.length > 2) throw new Error('usage: jobs add "<company>" "<title>" [--url U] [--req R] [--location L]... [--state S] [--applied YYYY-MM-DD] [--resume PATH] [--notes N] [--next "what" --next-at D] [--force]');
+  const state = values.state ? stageIdFrom(values.state) : undefined;
+  if (values.state && !state) throw new Error(`"${values.state}" is not usable as a stage id (lowercase letters, digits, spaces, _ / or -)`);
+  const body = { company, title, ...(values.url ? { url: values.url } : {}), locations: values.location ?? [], ...(state ? { state } : {}), ...trackerFields(values) };
+  try {
+    const j = await api.send<Job>('POST', `/api/jobs${values.force ? '?force=1' : ''}`, body);
+    return { json: j, text: `added: ${jobLine(j)}${j.appliedAt ? ` · applied ${j.appliedAt}` : ''}` };
+  } catch (e) {
+    const existing = e instanceof ApiError && e.status === 409 ? (e.body as { existing?: Job } | undefined)?.existing : undefined;
+    if (!existing) throw e;
+    const stages = await getStages(api).catch(() => [] as JobStage[]);
+    throw new Error(`already here:\n${describeJob(existing, stages)}\n\nnothing added. \`collected jobs set ${existing.id} …\` edits it; \`collected jobs add … --force\` adds a second entry anyway.`);
+  }
+}
+
+async function jobsSet(api: Api, args: string[]): Promise<Out> {
+  const { values, positionals } = parseArgs({ args, options: TRACKER_OPTIONS, allowPositionals: true });
+  const [id, rawState, extra] = positionals;
+  if (!id || extra !== undefined) throw new Error('usage: jobs set <id> [<state>] [--notes N] [--next "what" --next-at D] [--applied D] [--resume PATH] [--req R]');
+  const state = rawState !== undefined ? stageIdFrom(rawState) : undefined;
+  if (rawState !== undefined && !state) throw new Error(`"${rawState}" is not usable as a stage id (lowercase letters, digits, spaces, _ / or -)`);
+  const body = { ...(state ? { state } : {}), ...trackerFields(values) };
+  if (!Object.keys(body).length) throw new Error('nothing to change: give a state or one of --notes --next --next-at --applied --resume --req');
+  const before = await api.get<Job>(`/api/jobs/${encodeURIComponent(id)}`);
+  const j = await api.send<Job>('PATCH', `/api/jobs/${encodeURIComponent(id)}/state`, body);
+  const changed: string[] = [];
+  if (state && before.state !== j.state) changed.push(`${before.state} → ${j.state}`);
+  for (const [k, label] of [['notes', 'notes'], ['nextAction', 'next'], ['nextActionAt', 'next-at'], ['appliedAt', 'applied'], ['resumePath', 'resume'], ['reqId', 'req id']] as const) {
+    if (k in body && before[k] !== j[k]) changed.push(`${label}: ${before[k] ?? '(none)'} → ${j[k] ?? '(none)'}`);
+  }
+  return { json: j, text: `${j.company} · ${j.title}: ${j.state}${j.nextAction ? ` · next: ${j.nextAction}${j.nextActionAt ? ` by ${j.nextActionAt}` : ''}` : ''}${changed.length ? `\n  ${changed.join('\n  ')}` : '\n  (no change)'}` };
+}
+
+/** The stage list is edited whole: read, change one thing, PUT it back. The server refuses to drop a stage with jobs in it. */
+async function jobsStages(api: Api, args: string[]): Promise<Out> {
+  const sub = args[0];
+  const stagesTable = (stages: JobStage[]) => table(['Id', 'Label', 'Kind', 'Stamps applied'], stages.map((s) => [s.id, s.label, s.kind, s.appliedStage ? 'yes' : '']), 64, true);
+  if (!sub) {
+    const stages = await getStages(api);
+    return { json: stages, text: `${stagesTable(stages)}\n(new, starred and hidden are feed markers, not stages)` };
+  }
+  const stages = await getStages(api);
+  const put = async (next: JobStage[]) => (await api.send<{ stages: JobStage[] }>('PUT', '/api/jobs/stages', { stages: next })).stages;
+  const place = (list: JobStage[], stage: JobStage, after: string | undefined): JobStage[] => {
+    if (after === undefined) return [...list, stage];
+    if (after === '' || after === 'first') return [stage, ...list];
+    const i = list.findIndex((s) => s.id === after);
+    if (i === -1) throw new Error(`no stage "${after}" to put it after. Stages: ${list.map((s) => s.id).join(', ')}`);
+    return [...list.slice(0, i + 1), stage, ...list.slice(i + 1)];
+  };
+  if (sub === 'add') {
+    const { values, positionals } = parseArgs({ args: args.slice(1), options: { label: { type: 'string' }, closed: { type: 'boolean' }, after: { type: 'string' } }, allowPositionals: true });
+    const id = stageIdFrom(positionals.join(' '));
+    if (!id) throw new Error('usage: jobs stages add <id> [--label L] [--closed] [--after <id>]');
+    if (isReservedStage(id)) throw new Error(`"${id}" is a feed marker (new, starred, hidden), not a stage`);
+    if (stages.some((s) => s.id === id)) throw new Error(`stage "${id}" is already there`);
+    const stage: JobStage = { id, label: values.label?.trim() || stageLabel([], id), kind: values.closed ? 'closed' : 'open', ...(values.closed ? {} : { appliedStage: false }) };
+    const next = await put(place(stages, stage, values.after));
+    return { json: next, text: `added stage ${id} (${stage.label}, ${stage.kind})\n${stagesTable(next)}` };
+  }
+  if (sub === 'rm') {
+    const id = args[1];
+    if (!id || !stages.some((s) => s.id === id)) throw new Error(id ? `no stage "${id}". Stages: ${stages.map((s) => s.id).join(', ')}` : 'usage: jobs stages rm <id>');
+    const next = await put(stages.filter((s) => s.id !== id));
+    return { json: next, text: `removed stage ${id}\n${stagesTable(next)}` };
+  }
+  if (sub === 'rename') {
+    const [id, ...labelWords] = args.slice(1);
+    const label = labelWords.join(' ').trim();
+    if (!id || !label) throw new Error('usage: jobs stages rename <id> "<label>"');
+    const was = stages.find((s) => s.id === id);
+    if (!was) throw new Error(`no stage "${id}". Stages: ${stages.map((s) => s.id).join(', ')}`);
+    const next = await put(stages.map((s) => (s.id === id ? { ...s, label } : s)));
+    return { json: next, text: `stage ${id}: "${was.label}" → "${label}"` };
+  }
+  if (sub === 'move') {
+    const { values, positionals } = parseArgs({ args: args.slice(1), options: { after: { type: 'string' }, first: { type: 'boolean' } }, allowPositionals: true });
+    const id = positionals[0];
+    const stage = stages.find((s) => s.id === id);
+    if (!id || !stage || (values.after === undefined && !values.first)) throw new Error(id && !stage ? `no stage "${id}". Stages: ${stages.map((s) => s.id).join(', ')}` : 'usage: jobs stages move <id> --after <other> | --first');
+    if (values.after === id) throw new Error('a stage cannot go after itself');
+    const next = await put(place(stages.filter((s) => s.id !== id), stage, values.first ? 'first' : values.after));
+    return { json: next, text: stagesTable(next) };
+  }
+  throw new Error('jobs stages | jobs stages add <id> [--label L] [--closed] [--after <id>] | rm <id> | rename <id> "<label>" | move <id> --after <other>');
 }
 
 /* ---------- writes ---------- */

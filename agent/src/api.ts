@@ -16,6 +16,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** The server's JSON body when it sent one: a 409 on `POST /api/jobs` carries the existing job in it. */
+    readonly body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,13 +61,15 @@ export async function readJson<T>(p: string, res: Response): Promise<T> {
   const text = await res.text();
   if (!res.ok) {
     let msg = text.slice(0, 300);
+    let body: unknown;
     try {
-      msg = (JSON.parse(text) as { error?: string }).error ?? msg;
+      body = JSON.parse(text);
+      msg = (body as { error?: string }).error ?? msg;
     } catch {
       /* keep text */
     }
     const hint = res.status === 401 ? ' (not signed in: run `collected login`, or `collected auth helper-key` for a local server)' : '';
-    throw new ApiError(`${p}: ${res.status} ${msg}${hint}`, res.status);
+    throw new ApiError(`${p}: ${res.status} ${msg}${hint}`, res.status, body);
   }
   return JSON.parse(text) as T;
 }

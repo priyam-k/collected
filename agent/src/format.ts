@@ -4,10 +4,13 @@ import type { Meeting } from '@collected/shared';
 
 const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** Left-aligned columns, long cells cut. No box drawing: it has to read well in a transcript and in a terminal. */
-export function table(headers: string[], rows: (string | number | null | undefined)[][], maxCell = 64): string {
+/**
+ * Left-aligned columns, long cells cut. No box drawing: it has to read well in a transcript and in a terminal.
+ * `fullLast` leaves the last column uncut, for an id a reader will paste back into a command.
+ */
+export function table(headers: string[], rows: (string | number | null | undefined)[][], maxCell = 64, fullLast = false): string {
   if (!rows.length) return '(none)';
-  const cells = rows.map((r) => r.map((c) => cut(String(c ?? '').replace(/\s+/g, ' ').trim(), maxCell)));
+  const cells = rows.map((r) => r.map((c, i) => cut(String(c ?? '').replace(/\s+/g, ' ').trim(), fullLast && i === r.length - 1 ? Number.POSITIVE_INFINITY : maxCell)));
   const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((r) => (r[i] ?? '').length)));
   const line = (r: string[]) => r.map((c, i) => (i === r.length - 1 ? c : c.padEnd(widths[i]!))).join('  ').trimEnd();
   return [line(headers), line(widths.map((w) => '-'.repeat(w))), ...cells.map(line)].join('\n');
