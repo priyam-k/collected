@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { count, eq } from 'drizzle-orm';
-import { INGESTED_SOURCE_IDS, gtasksPushConfigSchema, jobsFilterSchema, seedConfigSchema, todoistPushConfigSchema } from '@collected/shared';
+import { DEFAULT_JOB_STAGES, INGESTED_SOURCE_IDS, gtasksPushConfigSchema, jobsFilterSchema, seedConfigSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from './context.js';
 import { courses, settings, sources, widgetInstances } from './db/schema.js';
 
@@ -101,6 +101,7 @@ async function ensureSettingDefaults(ctx: AppContext): Promise<void> {
     'jobs.filter': jobsFilterSchema.parse({}),
     'todoist.push': todoistPushConfigSchema.parse({}),
     'gtasks.push': gtasksPushConfigSchema.parse({}),
+    'jobs.stages': [...DEFAULT_JOB_STAGES],
     'todo.sections': ['homework'],
     timezone: ctx.env.TZ ?? 'America/New_York',
   };

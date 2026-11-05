@@ -61,6 +61,8 @@ export function identityAllows(user: string, method: string, pathWithQuery: stri
     // clearing it (DELETE) and every other source's config stay the owner's.
     if (method === 'PUT' && p === '/api/sources/canvas/config') return true;
     if (/^\/api\/sources\/[^/]+\/(config|enabled|meta)$/.test(p)) return false;
+    // `collected jobs rm`: the route itself only ever deletes a hand-added tracker entry, never a feed row or anything synced.
+    if (method === 'DELETE' && /^\/api\/jobs\/[^/]+$/.test(p)) return true;
     if (method === 'DELETE') return false;
   }
   return true;

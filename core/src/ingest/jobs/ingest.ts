@@ -1,5 +1,5 @@
 import { eq, ne, sql } from 'drizzle-orm';
-import { jobsFilterSchema, type JobsSource } from '@collected/shared';
+import { extractReqId, jobsFilterSchema, type JobsSource } from '@collected/shared';
 import type { AppContext } from '../../context.js';
 import { jobState, jobs } from '../../db/schema.js';
 import { assertAllowedOutboundUrl, MB, readJson, safeUrlForLog, withTimeout } from '../../lib/http.js';
@@ -57,6 +57,7 @@ type ListingValues = {
   title: string;
   locations: string[];
   url: string;
+  reqId: string | null;
   terms: string[];
   sponsorship: string | null;
   degrees: string[];
@@ -68,7 +69,7 @@ type ListingValues = {
 };
 
 const fingerprint = (v: Omit<ListingValues, 'id' | 'source' | 'externalId'>) =>
-  JSON.stringify([v.company, v.title, v.locations, v.url, v.terms, v.sponsorship, v.degrees, v.category, v.postedAt, v.active, v.visible, v.matchesFilter]);
+  JSON.stringify([v.company, v.title, v.locations, v.url, v.reqId, v.terms, v.sponsorship, v.degrees, v.category, v.postedAt, v.active, v.visible, v.matchesFilter]);
 
 function chunks<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -76,7 +77,7 @@ function chunks<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-/** Rows per multi-row INSERT. 16 bound values per row keeps this far under SQLite's variable limit. */
+/** Rows per multi-row INSERT. 17 bound values per row keeps this far under SQLite's variable limit. */
 const WRITE_CHUNK = 250;
 
 /**
@@ -103,6 +104,7 @@ export async function upsertListings(
       title: jobs.title,
       locations: jobs.locations,
       url: jobs.url,
+      reqId: jobs.reqId,
       terms: jobs.terms,
       sponsorship: jobs.sponsorship,
       degrees: jobs.degrees,
@@ -118,6 +120,16 @@ export async function upsertListings(
   }
   const withState = new Set((await ctx.db.select({ jobId: jobState.jobId }).from(jobState)).map((r) => r.jobId));
 
+  // Requisition ids are unique per source. Two listings whose URLs yield the same id, or an id another stored
+  // listing already holds, are an extraction that was not conservative enough: those rows keep no id at all.
+  const reqOwner = new Map<string, string>();
+  for (const r of await ctx.db.select({ id: jobs.id, reqId: jobs.reqId }).from(jobs).where(eq(jobs.source, sourceId))) if (r.reqId) reqOwner.set(r.reqId, r.id);
+  const reqCount = new Map<string, number>();
+  for (const l of listings) {
+    const r = httpUrl(l?.url) ? extractReqId(l.url) : null;
+    if (r) reqCount.set(r, (reqCount.get(r) ?? 0) + 1);
+  }
+
   const toWrite: ListingValues[] = [];
   const newStates: string[] = [];
   const seen = new Set<string>();
@@ -127,6 +139,8 @@ export async function upsertListings(
     const id = `${sourceId}:${l.id}`;
     if (seen.has(id)) continue;
     seen.add(id);
+    let reqId = extractReqId(l.url);
+    if (reqId && ((reqCount.get(reqId) ?? 0) > 1 || (reqOwner.has(reqId) && reqOwner.get(reqId) !== id))) reqId = null;
     const matches = filter.matches({
       title: l.title,
       locations: l.locations ?? [],
@@ -145,6 +159,7 @@ export async function upsertListings(
       title: l.title,
       locations: l.locations ?? [],
       url: l.url,
+      reqId,
       terms: l.terms ?? [],
       sponsorship: l.sponsorship ?? null,
       degrees: l.degrees ?? [],
@@ -171,6 +186,7 @@ export async function upsertListings(
               title: sql`excluded.title`,
               locations: sql`excluded.locations`,
               url: sql`excluded.url`,
+              reqId: sql`excluded.req_id`,
               terms: sql`excluded.terms`,
               sponsorship: sql`excluded.sponsorship`,
               degrees: sql`excluded.degrees`,

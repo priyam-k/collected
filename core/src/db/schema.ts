@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type { CourseLink, CourseSchedule, FileSyncConfig, GradingConfig, LayoutItem } from '@collected/shared';
 
@@ -138,6 +139,8 @@ export const jobs = sqliteTable(
     title: text('title').notNull(),
     locations: text('locations', { mode: 'json' }).$type<string[]>().notNull().$defaultFn(() => []),
     url: text('url').notNull(),
+    // Requisition id: read out of the posting URL by the ingester, typed in for manual entries. Null when unknown.
+    reqId: text('req_id'),
     terms: text('terms', { mode: 'json' }).$type<string[]>().notNull().$defaultFn(() => []),
     sponsorship: text('sponsorship'),
     degrees: text('degrees', { mode: 'json' }).$type<string[]>().notNull().$defaultFn(() => []),
@@ -152,6 +155,9 @@ export const jobs = sqliteTable(
   },
   (t) => [
     uniqueIndex('jobs_source_external_idx').on(t.source, t.externalId),
+    uniqueIndex('jobs_source_req_idx')
+      .on(t.source, t.reqId)
+      .where(sql`req_id is not null`),
     index('jobs_posted_idx').on(t.postedAt),
     index('jobs_matches_idx').on(t.matchesFilter),
   ],

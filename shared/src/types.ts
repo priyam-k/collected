@@ -88,15 +88,29 @@ export type CourseRole = (typeof COURSE_ROLES)[number];
 export const SUBMITS_VIA = ['canvas', 'gradescope', 'both'] as const;
 export type SubmitsVia = (typeof SUBMITS_VIA)[number];
 
+/**
+ * The built-in job states: three reserved feed markers (`new` untracked, `starred` the Saved pile, `hidden` dismissed)
+ * and the eight stages a fresh install's tracker starts with. A job's state is free text at the storage level: any
+ * other id is a stage from the `jobs.stages` setting (DECISIONS 063), which the server appends to when it first sees it.
+ */
 export const JOB_STATES = ['new', 'starred', 'hidden', 'applied', 'screen', 'interviewing', 'offer', 'rejected', 'ghosted', 'withdrawn'] as const;
-export type JobStateValue = (typeof JOB_STATES)[number];
-/** Stages the tracker shows, in pipeline order. `new` is untracked, `hidden` is dismissed from the feed. */
-export const TRACKED_STATES: readonly JobStateValue[] = ['starred', 'applied', 'screen', 'interviewing', 'offer', 'rejected', 'ghosted', 'withdrawn'];
-export const OPEN_STAGES: readonly JobStateValue[] = ['starred', 'applied', 'screen', 'interviewing', 'offer'];
-export const CLOSED_STAGES: readonly JobStateValue[] = ['rejected', 'ghosted', 'withdrawn'];
-/** States that imply an application went out; moving into one stamps applied_at if it is empty. */
-export const APPLIED_STAGES: readonly JobStateValue[] = ['applied', 'screen', 'interviewing', 'offer'];
-export const JOB_STATE_LABELS: Record<JobStateValue, string> = {
+export type KnownJobState = (typeof JOB_STATES)[number];
+/** A job's state: a reserved marker, a default stage, or any stage id from `jobs.stages`. */
+export type JobStateValue = string;
+/** Feed markers, never stages: refused as stage ids and kept out of the board's columns. */
+export const RESERVED_STAGE_IDS = ['new', 'starred', 'hidden'] as const;
+export const isReservedStage = (id: string): boolean => (RESERVED_STAGE_IDS as readonly string[]).includes(id);
+
+/** One tracker stage, in the order `jobs.stages` lists them (the pipeline's). */
+export interface JobStage {
+  id: string;
+  label: string;
+  kind: 'open' | 'closed';
+  /** Moving a job into this stage stamps its applied date when that is empty. */
+  appliedStage?: boolean;
+}
+
+export const JOB_STATE_LABELS: Record<KnownJobState, string> = {
   new: 'New',
   starred: 'Saved',
   hidden: 'Hidden',
@@ -108,6 +122,54 @@ export const JOB_STATE_LABELS: Record<JobStateValue, string> = {
   ghosted: 'Ghosted',
   withdrawn: 'Withdrawn',
 };
+
+/* The default pipeline, also what the stage-dependent constants below describe. Live code reads the setting instead. */
+export const DEFAULT_JOB_STAGES: readonly JobStage[] = [
+  { id: 'applied', label: 'Applied', kind: 'open', appliedStage: true },
+  { id: 'screen', label: 'Screen', kind: 'open', appliedStage: true },
+  { id: 'interviewing', label: 'Interviewing', kind: 'open', appliedStage: true },
+  { id: 'offer', label: 'Offer', kind: 'open', appliedStage: true },
+  { id: 'rejected', label: 'Rejected', kind: 'closed' },
+  { id: 'ghosted', label: 'Ghosted', kind: 'closed' },
+  { id: 'withdrawn', label: 'Withdrawn', kind: 'closed' },
+];
+/** The default tracked states in pipeline order: Saved, then the default stages. `new` is untracked, `hidden` dismissed. */
+export const TRACKED_STATES: readonly KnownJobState[] = ['starred', 'applied', 'screen', 'interviewing', 'offer', 'rejected', 'ghosted', 'withdrawn'];
+export const OPEN_STAGES: readonly KnownJobState[] = ['starred', 'applied', 'screen', 'interviewing', 'offer'];
+export const CLOSED_STAGES: readonly KnownJobState[] = ['rejected', 'ghosted', 'withdrawn'];
+/** Default stages that imply an application went out; moving into one stamps applied_at if it is empty. */
+export const APPLIED_STAGES: readonly KnownJobState[] = ['applied', 'screen', 'interviewing', 'offer'];
+
+/* The same questions over a live stage list. Unknown ids read as open stages, which is what the server makes them. */
+
+/** Tracked = shows in the Applications widget: everything but `new` and `hidden`. */
+export const isTrackedState = (id: string): boolean => id !== 'new' && id !== 'hidden' && id !== '';
+export const trackedStates = (stages: readonly JobStage[]): string[] => ['starred', ...stages.map((s) => s.id)];
+export const openStages = (stages: readonly JobStage[]): JobStage[] => stages.filter((s) => s.kind === 'open');
+export const closedStages = (stages: readonly JobStage[]): JobStage[] => stages.filter((s) => s.kind === 'closed');
+export const findStage = (stages: readonly JobStage[], id: string): JobStage | undefined => stages.find((s) => s.id === id);
+export const isClosedStage = (stages: readonly JobStage[], id: string): boolean => findStage(stages, id)?.kind === 'closed';
+export const isOpenStage = (stages: readonly JobStage[], id: string): boolean => isTrackedState(id) && !isClosedStage(stages, id);
+export const isAppliedStage = (stages: readonly JobStage[], id: string): boolean => findStage(stages, id)?.appliedStage === true;
+
+/** The label an id gets when the server adds it on the fly: the id with its first letter capitalised. */
+export const labelFromStageId = (id: string): string => (id ? id[0]!.toUpperCase() + id.slice(1) : id);
+/** The name a state shows under: the reserved markers keep theirs, listed stages their label, unknown ids read as words. */
+export function stageLabel(stages: readonly JobStage[], id: string): string {
+  if (isReservedStage(id)) return JOB_STATE_LABELS[id as KnownJobState];
+  return findStage(stages, id)?.label ?? labelFromStageId(id);
+}
+/** What a typed stage name becomes as an id: lowercase, inner spaces kept, anything else dropped. Empty when nothing usable is left. */
+export function stageIdFrom(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^a-z0-9 _/-]/g, '')
+    .replace(/^[^a-z0-9]+/, '')
+    .trim()
+    .slice(0, 40);
+}
 
 export const LINK_METHODS = ['auto', 'manual'] as const;
 export type LinkMethod = (typeof LINK_METHODS)[number];
@@ -419,6 +481,8 @@ export interface Job {
   score: number | null;
   firstSeenAt: string;
   updatedAt: string;
+  /** Requisition id from the posting URL (feed) or typed in (manual); unique per source. Best-effort, often null. */
+  reqId: string | null;
   state: JobStateValue;
   notes: string | null;
   seenAt: string | null;

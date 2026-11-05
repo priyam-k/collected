@@ -32,6 +32,9 @@ describe('identityAllows', () => {
       ['GET', '/api/todo/status'],
       ['POST', '/api/sources/canvas/sync'],
       ['PATCH', '/api/jobs/x/state'],
+      ['POST', '/api/jobs'],
+      ['PUT', '/api/jobs/stages'],
+      ['DELETE', '/api/jobs/manual:abc'],
       // `connect canvas --token` stores the token it verified; the one credential write a machine may make.
       ['PUT', '/api/sources/canvas/config'],
     ] as const)
@@ -49,6 +52,8 @@ describe('identityAllows', () => {
       ['PATCH', '/api/sources/canvas/meta'],
       ['PATCH', '/api/sources/jobs/meta'],
       ['PUT', '/api/settings/jobs.filter'],
+      ['PUT', '/api/settings/jobs.stages'],
+      ['DELETE', '/api/jobs/x/state'],
       ['PUT', '/api/layout'],
       ['GET', '/api/google/start'],
       ['GET', '/api/todoist/connect'],

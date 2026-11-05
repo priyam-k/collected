@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERVED_TARGETS, FILE_SYNC_SKIP, INGESTED_SOURCE_IDS, JOB_STATES, SUBMITS_VIA, BREAKPOINTS, TODO_APPS } from './types.js';
+import { COURSE_EVENT_KINDS, COURSE_ROLES, FILE_SYNC_FALLBACKS, FILE_SYNC_RESERVED_TARGETS, FILE_SYNC_SKIP, INGESTED_SOURCE_IDS, SUBMITS_VIA, BREAKPOINTS, TODO_APPS, isReservedStage } from './types.js';
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
@@ -243,13 +243,46 @@ export const overrideInputSchema = z.object({
   note: text(4000).nullable().optional(),
 });
 
+/** A job state as stored: a reserved marker, a default stage, or any stage id (lowercase; letters, digits, space, `_`, `/`, `-`). */
+export const jobStateSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z0-9][a-z0-9 _/-]*$/, 'a stage id is lowercase letters, digits, spaces, _ / or -');
+
+export const jobStageSchema = z.object({
+  id: jobStateSchema.refine((id) => !isReservedStage(id), { message: 'new, starred and hidden are feed markers, not stages' }),
+  label: text(60).trim().min(1),
+  kind: z.enum(['open', 'closed']),
+  appliedStage: z.boolean().optional(),
+});
+/** The `jobs.stages` setting and the body of `PUT /api/jobs/stages`: the whole ordered list. */
+export const jobStagesSchema = z
+  .array(jobStageSchema)
+  .min(1)
+  .max(50)
+  .refine((list) => new Set(list.map((s) => s.id)).size === list.length, { message: 'stage ids must be unique' })
+  .refine((list) => list.some((s) => s.kind === 'open'), { message: 'at least one open stage is required' });
+export const jobStagesBodySchema = z.object({ stages: jobStagesSchema });
+
+/** A requisition id as typed or extracted: short, no whitespace inside. */
+const reqIdText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^\S+$/, 'a requisition id has no spaces');
+
 export const jobStatePatchSchema = z.object({
-  state: z.enum(JOB_STATES).optional(),
+  state: jobStateSchema.optional(),
   notes: text(10_000).nullable().optional(),
   appliedAt: isoDay.nullable().optional(),
   nextAction: text(500).nullable().optional(),
   nextActionAt: isoDay.nullable().optional(),
   resumePath: text(1024).nullable().optional(),
+  reqId: reqIdText.nullable().optional(),
 });
 
 /** A job you add by hand (not from the feed): referral, career fair, a company site. */
@@ -257,10 +290,14 @@ export const manualJobInputSchema = z.object({
   company: text(200).trim().min(1),
   title: text(300).trim().min(1),
   url: z.union([httpUrlSchema, z.literal('')]).default(''),
-  locations: z.array(z.string().trim().min(1)).default([]),
-  state: z.enum(JOB_STATES).default('applied'),
+  reqId: reqIdText.nullable().optional(),
+  locations: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  state: jobStateSchema.default('applied'),
   appliedAt: isoDay.nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notes: text(10_000).nullable().optional(),
+  resumePath: text(1024).nullable().optional(),
+  nextAction: text(500).nullable().optional(),
+  nextActionAt: isoDay.nullable().optional(),
 });
 export type ManualJobInput = z.infer<typeof manualJobInputSchema>;
 

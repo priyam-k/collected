@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { gtasksPushConfigSchema, jobsFilterSchema, todoDefaultAppSchema, todoistPushConfigSchema } from '@collected/shared';
+import { gtasksPushConfigSchema, jobStagesSchema, jobsFilterSchema, todoDefaultAppSchema, todoistPushConfigSchema } from '@collected/shared';
 import type { AppContext } from '../context.js';
 import { allSettings, getSetting, setSetting } from '@collected/core/lib/settings';
 import { bad, parseBody } from './util.js';
@@ -8,6 +8,7 @@ import { bad, parseBody } from './util.js';
 /** Keys with a schema are validated on write; anything else is stored as given. */
 const KNOWN: Record<string, z.ZodTypeAny> = {
   'jobs.filter': jobsFilterSchema,
+  'jobs.stages': jobStagesSchema,
   'todoist.push': todoistPushConfigSchema,
   'gtasks.push': gtasksPushConfigSchema,
   'todo.sections': z.array(z.string()),
