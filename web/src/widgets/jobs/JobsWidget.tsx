@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
-import { Check, ExternalLink, Star, X } from 'lucide-react';
+import { Check, ExternalLink, Search, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { JOB_STATE_LABELS, type Job } from '@collected/shared';
+import type { Job } from '@collected/shared';
 import { WidgetHeader } from '@/dashboard/WidgetHeader';
+import { stageLabel } from '@/lib/jobStages';
 import { useLiquid } from '@/lib/liquid';
-import { useJobStats, useJobs, useMarkJobsSeen, usePatchJobState } from '@/lib/queries';
+import { useJobSearch, useJobStages, useJobStats, useJobs, useMarkJobsSeen, usePatchJobState } from '@/lib/queries';
 import { friendlyDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { safeHref } from '@/lib/url';
@@ -94,8 +95,9 @@ function Orb({ on, tone, label, onClick, children }: { on?: boolean; tone: strin
   );
 }
 
-function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState: (s: Job['state']) => void; tape?: boolean; compact?: boolean; tall?: boolean; refCb: (el: HTMLElement | null) => void | (() => void) }) {
+function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState: (s: string) => void; tape?: boolean; compact?: boolean; tall?: boolean; refCb: (el: HTMLElement | null) => void | (() => void) }) {
   const { open } = usePane();
+  const { stages } = useJobStages();
   const tracked = job.state !== 'new' && job.state !== 'starred' && job.state !== 'hidden';
   return (
     <div
@@ -126,15 +128,17 @@ function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState:
         <Orb on={job.state === 'starred'} tone="var(--caution)" label={job.state === 'starred' ? 'Remove star' : 'Star: keep this one in the Starred list'} onClick={() => onState(job.state === 'starred' ? 'new' : 'starred')}>
           <Star className={cn('size-3.5', job.state === 'starred' && 'fill-current')} />
         </Orb>
-        <Orb on={tracked} tone="var(--positive)" label={tracked ? `${JOB_STATE_LABELS[job.state]} · open to change` : 'Mark as applied'} onClick={() => (tracked ? open({ kind: 'job', jobId: job.id }) : onState('applied'))}>
+        <Orb on={tracked} tone="var(--positive)" label={tracked ? `${stageLabel(stages, job.state)} · open to change` : 'Mark as applied'} onClick={() => (tracked ? open({ kind: 'job', jobId: job.id }) : onState('applied'))}>
           <Check className="size-3.5" />
         </Orb>
-        <Orb tone="var(--critical)" label="Hide this listing from the feed" onClick={() => onState('hidden')}>
-          <X className="size-3.5" />
-        </Orb>
+        {job.source !== 'manual' && (
+          <Orb tone="var(--critical)" label="Hide this listing from the feed" onClick={() => onState('hidden')}>
+            <X className="size-3.5" />
+          </Orb>
+        )}
         <span className="flex-1" />
         {tracked ? (
-          <span className="grid h-6 place-items-center rounded-full px-2.5 text-[11px] font-semibold text-positive" style={{ background: 'color-mix(in srgb, var(--positive) 12%, var(--surface))' }}>{JOB_STATE_LABELS[job.state]}</span>
+          <span className="grid h-6 place-items-center rounded-full px-2.5 text-[11px] font-semibold text-positive" style={{ background: 'color-mix(in srgb, var(--positive) 12%, var(--surface))' }}>{stageLabel(stages, job.state)}</span>
         ) : job.category ? (
           <span className="grid h-6 max-w-[7rem] place-items-center truncate rounded-full bg-surface px-2.5 text-[11px] font-medium text-sub">{shortCategory(job.category)}</span>
         ) : null}
@@ -143,27 +147,81 @@ function Card({ job, onState, tape, compact, tall, refCb }: { job: Job; onState:
   );
 }
 
+/** The value after `ms` of quiet. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setV(value), ms);
+    return () => window.clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+/** The header's search field: a compact input with a clear button. Escape clears it, then lets go. */
+function SearchField({ value, onChange, onDone, autoFocus, className }: { value: string; onChange(v: string): void; onDone?(): void; autoFocus?: boolean; className?: string }) {
+  return (
+    <span className={cn('relative flex h-7 min-w-0 items-center', className)} onMouseDown={(e) => e.stopPropagation()}>
+      <Search className="pointer-events-none absolute left-2.5 size-3.5 text-ter" />
+      <input
+        type="search"
+        autoFocus={autoFocus}
+        value={value}
+        placeholder="Search jobs"
+        aria-label="Search jobs"
+        maxLength={200}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return;
+          e.stopPropagation();
+          if (value) onChange('');
+          else onDone?.();
+        }}
+        onBlur={() => !value && onDone?.()}
+        className="h-7 w-full min-w-0 rounded-full bg-well pl-7 pr-7 text-[12.5px] text-ink outline-none placeholder:text-ter focus:bg-well2 [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value && (
+        <button type="button" aria-label="Clear the search" title="Clear" className="absolute right-1 grid size-5 place-items-center rounded-full text-ter hover:bg-well-deep hover:text-ink" onClick={() => { onChange(''); onDone?.(); }}>
+          <X className="size-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 export function JobsWidget({ size }: WidgetProps) {
   const fade = useScrollEdges();
   const [mode, setMode] = useState<Mode>('new');
   const liquid = useLiquid();
   const [visible, setVisible] = useState(PAGE);
-  const q = useJobs({ matchesOnly: true, limit: 200, state: mode === 'starred' ? ['starred'] : undefined });
+  const [text, setText] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const query = useDebounced(text.trim(), 250);
+  const searching = query.length > 0;
+  // A search spans everything stored, the feed and tracked entries alike, not just the filter's matches.
+  const feed = useJobs({ matchesOnly: true, limit: 200, state: mode === 'starred' ? ['starred'] : undefined }, !searching);
+  const found = useJobSearch(query);
+  const q = searching ? found : feed;
   const stats = useJobStats();
   const patch = usePatchJobState();
   const refCb = useMarkSeenWhenVisible(q.data ?? []);
   const tape = size.aspect === 'wide' && size.height < 340;
   const compact = tape && size.height < 165;
   const tall = tape && size.height >= 200;
+  const lg = size.tier === 'lg';
+  const fieldOpen = lg || searchOpen || !!text;
 
-  const onState = (job: Job, state: Job['state']) =>
+  const onState = (job: Job, state: string) =>
     patch.mutate({ id: job.id, state }, { onError: (e) => toast.error(e.message), onSuccess: () => state === 'applied' && toast.success(`Marked ${job.company} as applied`) });
+  const onSearch = (v: string) => {
+    setText(v);
+    setVisible(PAGE);
+  };
 
   const jobs = useMemo(() => {
     const list = (q.data ?? []).filter((j) => j.state !== 'hidden');
-    if (mode === 'new') return list.slice().sort((a, b) => Number(!!a.seenAt) - Number(!!b.seenAt) || (b.postedAt ?? '').localeCompare(a.postedAt ?? ''));
+    if (mode === 'new' && !searching) return list.slice().sort((a, b) => Number(!!a.seenAt) - Number(!!b.seenAt) || (b.postedAt ?? '').localeCompare(a.postedAt ?? ''));
     return list;
-  }, [q.data, mode]);
+  }, [q.data, mode, searching]);
   const shown = jobs.slice(0, visible);
   const rest = jobs.length - shown.length;
 
@@ -172,14 +230,27 @@ export function JobsWidget({ size }: WidgetProps) {
   return (
     <div className="flex h-full flex-col">
       <WidgetHeader>
-        {stats.data && (
-          <>
-            <span className="shrink-0 text-[15px] font-semibold whitespace-nowrap">{stats.data.unseen} new</span>
-            {size.tier !== 'xs' && <span className="min-w-0 truncate text-[12.5px] text-ter">{stats.data.matched} match · {stats.data.active.toLocaleString()} active</span>}
-          </>
+        {searching && fieldOpen ? (
+          <span className="shrink-0 whitespace-nowrap text-[12.5px] text-sub" aria-live="polite">
+            <span className="font-semibold text-ink">{q.isPlaceholderData ? '…' : jobs.length}</span> found
+          </span>
+        ) : (
+          stats.data && (lg || !fieldOpen) && (
+            <>
+              <span className="shrink-0 text-[15px] font-semibold whitespace-nowrap">{stats.data.unseen} new</span>
+              {size.tier !== 'xs' && !fieldOpen && <span className="min-w-0 truncate text-[12.5px] text-ter">{stats.data.matched} match · {stats.data.active.toLocaleString()} active</span>}
+            </>
+          )
         )}
-        {size.tier !== 'xs' && (
-          <span className="seg" ref={liquid}>
+        {fieldOpen ? (
+          <SearchField value={text} onChange={onSearch} autoFocus={!lg} onDone={lg ? undefined : () => setSearchOpen(false)} className={lg ? 'w-44 shrink' : 'flex-1'} />
+        ) : (
+          <button type="button" className="orb shrink-0" aria-label="Search jobs" title="Search company, title, location, req id, notes" onMouseDown={(e) => e.stopPropagation()} onClick={() => setSearchOpen(true)}>
+            <Search className="size-3.5" />
+          </button>
+        )}
+        {size.tier !== 'xs' && !searching && (lg || !fieldOpen) && (
+          <span className="seg shrink-0" ref={liquid}>
             {(['new', 'starred', 'matches'] as Mode[]).map((m) => (
               <button key={m} className={cn(mode === m && 'seg-on')} aria-pressed={mode === m} onClick={() => { setMode(m); setVisible(PAGE); }} title={m === 'new' ? 'Unseen matches first' : m === 'starred' ? 'Only starred listings' : 'Every listing that matches your filter, newest first'}>
                 {m === 'new' ? 'New' : m === 'starred' ? 'Starred' : 'Matches'}
@@ -187,11 +258,16 @@ export function JobsWidget({ size }: WidgetProps) {
             ))}
           </span>
         )}
-        {size.tier === 'lg' && <Link to="/settings/jobs" title="Edit the match filter" className="text-xs text-ter hover:text-ink">Filter</Link>}
+        {lg && <Link to="/settings/jobs" title="Edit the match filter" className="shrink-0 text-xs text-ter hover:text-ink">Filter</Link>}
       </WidgetHeader>
       <div ref={fade} className={cn('scroll-fade min-h-0 flex-1', tape ? 'overflow-x-auto overflow-y-hidden [--fade-size:40px]' : 'overflow-auto')}>
         {q.isPending ? (
           <div className="m-3 h-16 animate-pulse rounded-xl bg-well" />
+        ) : !jobs.length && searching ? (
+          <EmptyState>
+            Nothing matches “{query}”.{' '}
+            <button type="button" className="underline" onClick={() => onSearch('')}>Clear the search</button>
+          </EmptyState>
         ) : !jobs.length ? (
           <EmptyState>
             {mode === 'starred' ? 'No starred jobs yet.' : 'No matching listings yet.'} <Link to="/settings/jobs" className="underline">Adjust the filter.</Link>
@@ -203,7 +279,7 @@ export function JobsWidget({ size }: WidgetProps) {
               <button type="button" onMouseDown={(e) => e.stopPropagation()} onClick={() => setVisible((v) => v + 2 * PAGE)} className="grid w-[120px] shrink-0 place-items-center rounded-2xl bg-well p-3.5 text-center transition-colors hover:bg-well2">
                 <span>
                   <span className="block text-xl font-[600] tracking-[-0.02em]">{rest}</span>
-                  <span className="mt-0.5 block text-xs text-sub">more {mode === 'starred' ? 'starred' : mode === 'new' ? 'new' : 'matches'}</span>
+                  <span className="mt-0.5 block text-xs text-sub">more {searching ? 'found' : mode === 'starred' ? 'starred' : mode === 'new' ? 'new' : 'matches'}</span>
                 </span>
               </button>
             )}

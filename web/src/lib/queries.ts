@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type {
   ApiToken,
   CanvasEnrollment,
@@ -27,7 +27,8 @@ import type {
   TodoStatus,
   GtasksPushConfig,
 } from '@collected/shared';
-import { api } from './api';
+import { ApiError, api } from './api';
+import { DEFAULT_JOB_STAGES, type JobStage } from './jobStages';
 
 export const qk = {
   health: ['health'] as const,
@@ -43,6 +44,8 @@ export const qk = {
   jobStats: ['jobs', 'stats'] as const,
   job: (id: string) => ['jobs', 'one', id] as const,
   trackedJobs: ['jobs', 'tracked'] as const,
+  jobStages: ['jobs', 'stages'] as const,
+  jobFind: (by: 'url' | 'req', value: string) => ['jobs', 'find', by, value] as const,
   courseContent: (id: string) => ['courses', id, 'content'] as const,
   grades: ['grades'] as const,
   courseGrades: (id: string) => ['grades', id] as const,
@@ -225,9 +228,78 @@ export function useJob(id: string | null) {
   return useQuery({ queryKey: qk.job(id ?? ''), queryFn: () => api<Job>(`/jobs/${encodeURIComponent(id!)}`), enabled: !!id, staleTime: 15_000 });
 }
 
+/**
+ * Free-text search across the feed and the tracker: `/jobs` holds feed listings only, `/jobs/tracked` the saved and
+ * applied ones including manual entries, so both are asked and merged, tracked first, each job once.
+ */
+export function useJobSearch(query: string) {
+  const qs = toQueryString({ query, matchesOnly: '0', limit: '200' });
+  return useQuery({
+    queryKey: ['jobs', 'search', query] as const,
+    queryFn: async () => {
+      const [tracked, feed] = await Promise.all([api<Job[]>(`/jobs/tracked${toQueryString({ query })}`), api<Job[]>(`/jobs${qs}`)]);
+      const seen = new Set<string>();
+      return [...tracked, ...feed].filter((j) => !seen.has(j.id) && seen.add(j.id));
+    },
+    enabled: !!query,
+    placeholderData: keepPreviousData,
+    ...poll,
+  });
+}
+
 /** Everything saved or applied to, feed and manual, most recently touched first. */
 export function useTrackedJobs() {
   return useQuery({ queryKey: qk.trackedJobs, queryFn: () => api<Job[]>('/jobs/tracked'), ...poll });
+}
+
+/**
+ * The tracker's stages in pipeline order. A server without the stages route answers 404 (it reads "stages" as a job
+ * id), and then the shared defaults stand in, so `stages` is always a usable list.
+ */
+export function useJobStages() {
+  const q = useQuery({
+    queryKey: qk.jobStages,
+    queryFn: async () => {
+      try {
+        const r = await api<{ stages: JobStage[] }>('/jobs/stages');
+        return Array.isArray(r?.stages) && r.stages.length ? r.stages : DEFAULT_JOB_STAGES;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return DEFAULT_JOB_STAGES;
+        throw e;
+      }
+    },
+    staleTime: 60_000,
+  });
+  return { ...q, stages: q.data ?? DEFAULT_JOB_STAGES };
+}
+
+/** An exact match by posting URL or req id, or null. Waits until `value` is set. */
+export function useJobFind(by: 'url' | 'req', value: string) {
+  return useQuery({
+    queryKey: qk.jobFind(by, value),
+    queryFn: async () => {
+      try {
+        const r = await api<unknown>(`/jobs/find${toQueryString({ [by]: value })}`);
+        return pickJob(r);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    enabled: !!value,
+    staleTime: 10_000,
+    retry: false,
+  });
+}
+
+/** `find` may answer the job itself, `{ job }`, or a list: the first job in whichever shape. */
+export function pickJob(r: unknown): Job | null {
+  if (!r || typeof r !== 'object') return null;
+  if (Array.isArray(r)) return (r[0] as Job | undefined) ?? null;
+  if ('id' in r && 'company' in r) return r as Job;
+  if ('job' in r) return pickJob((r as { job: unknown }).job);
+  if ('existing' in r) return pickJob((r as { existing: unknown }).existing);
+  return null;
 }
 
 /* ---------- mutations ---------- */
@@ -516,7 +588,9 @@ export function useMarkJobsSeen() {
 
 export interface JobStatePatch {
   id: string;
+  /** Any stage id; one the list doesn't have yet is appended to it as open. */
   state?: JobStateValue;
+  reqId?: string | null;
   notes?: string | null;
   appliedAt?: string | null;
   nextAction?: string | null;
@@ -534,10 +608,30 @@ export function usePatchJobState() {
   });
 }
 
+export type NewJobInput = Omit<ManualJobInput, 'state'> & { state: JobStateValue; reqId?: string | null };
+
+/**
+ * Adds a job by hand. The server answers 409 `{ error, existing }` when the URL or req id is already stored; `force`
+ * adds it anyway. `duplicateOf` reads the existing job off such an error.
+ */
 export function useCreateJob() {
   const inv = useInvalidate();
   return useMutation({
-    mutationFn: (body: ManualJobInput) => api<Job>('/jobs', { method: 'POST', json: body }),
+    mutationFn: ({ force, ...body }: NewJobInput & { force?: boolean }) => api<Job>(`/jobs${force ? '?force=1' : ''}`, { method: 'POST', json: body }),
+    onSettled: () => inv(['jobs']),
+  });
+}
+
+export function duplicateOf(e: unknown): Job | null {
+  return e instanceof ApiError && e.status === 409 ? pickJob(e.body) : null;
+}
+
+export function useSaveJobStages() {
+  const qc = useQueryClient();
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (stages: JobStage[]) => api<{ stages: JobStage[] }>('/jobs/stages', { method: 'PUT', json: { stages } }),
+    onSuccess: (r, sent) => qc.setQueryData(qk.jobStages, r?.stages?.length ? r.stages : sent),
     onSettled: () => inv(['jobs']),
   });
 }

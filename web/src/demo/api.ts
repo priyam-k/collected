@@ -1,4 +1,4 @@
-import { OPEN_STAGES, TRACKED_STATES, type CourseGrades, type EffectiveItem, type GradedAssignment, type Job, type JobStateValue, type Layouts, type WidgetInstance } from '@collected/shared';
+import { DEFAULT_JOB_STAGES, isClosedStage, isReservedStage, isTrackedState, labelFromStageId, type CourseGrades, type EffectiveItem, type GradedAssignment, type Job, type JobStage, type Layouts, type WidgetInstance } from '@collected/shared';
 import { ApiError } from '@/lib/api';
 import type { GradesSummary } from '@/lib/queries';
 import { makeDemoState, type DemoState } from './data';
@@ -10,9 +10,16 @@ import { makeDemoState, type DemoState } from './data';
  */
 
 let state: DemoState = makeDemoState();
+let stages: JobStage[] = DEFAULT_JOB_STAGES.map((s) => ({ ...s }));
 
 export function resetDemo(): void {
   state = makeDemoState();
+  stages = DEFAULT_JOB_STAGES.map((s) => ({ ...s }));
+}
+
+/** The server appends a stage it hasn't seen as open; the demo does the same. */
+function noteStage(id: string | undefined) {
+  if (id && !isReservedStage(id) && !stages.some((s) => s.id === id)) stages.push({ id, label: labelFromStageId(id), kind: 'open' });
 }
 
 const json = (body: unknown) => (typeof body === 'string' ? (JSON.parse(body) as unknown) : body);
@@ -68,12 +75,20 @@ function gradesSummary(): GradesSummary {
   return out;
 }
 
+/** The server's `?query=`: every word in the company, title, locations, req id or notes. */
+function matchesQuery(j: Job, q: URLSearchParams): boolean {
+  const hay = [j.company, j.title, ...j.locations, j.reqId ?? '', j.notes ?? ''].join(' ').toLowerCase();
+  return (q.get('query') ?? '').toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+}
+
 function filterJobs(q: URLSearchParams): Job[] {
-  const states = csv(q.get('state')) as JobStateValue[] | null;
+  const states = csv(q.get('state'));
   const includeHidden = q.get('includeHidden') === '1' || q.get('includeHidden') === 'true';
   const limit = Number(q.get('limit')) || 200;
   return state.jobs
+    .filter((j) => j.source !== 'manual')
     .filter((j) => (states ? states.includes(j.state) : includeHidden || j.state !== 'hidden'))
+    .filter((j) => matchesQuery(j, q))
     .sort((a, b) => (b.postedAt ?? '').localeCompare(a.postedAt ?? ''))
     .slice(0, limit);
 }
@@ -118,8 +133,17 @@ function addTask(source: 'todoist' | 'gtasks', text: string): EffectiveItem {
   return it;
 }
 
-/** Answers a request the way the server would, or returns undefined to let it through to the network. */
+/**
+ * Answers a request the way the server would, or returns undefined to let it through to the network. Answers are
+ * copies, as JSON off the wire would be: handing out the live objects let a write change data a query already held,
+ * so React Query saw nothing new and memoised views (the tracker's columns) kept the old grouping.
+ */
 export async function demoApi(path: string, init: RequestInit & { json?: unknown } = {}): Promise<unknown> {
+  const answer = await answerDemo(path, init);
+  return answer === undefined ? undefined : structuredClone(answer);
+}
+
+async function answerDemo(path: string, init: RequestInit & { json?: unknown }): Promise<unknown> {
   const url = new URL(path, 'http://demo');
   const p = url.pathname;
   const q = url.searchParams;
@@ -143,10 +167,18 @@ export async function demoApi(path: string, init: RequestInit & { json?: unknown
     if (/^\/courses\/[^/]+\/links$/.test(p)) return { canvas: [], gradescope: [], links: [] };
     if (p === '/file-sync/devices') return [];
     if (p === '/jobs') return filterJobs(q);
-    if (p === '/jobs/tracked') return state.jobs.filter((j) => TRACKED_STATES.includes(j.state));
+    if (p === '/jobs/tracked') return state.jobs.filter((j) => isTrackedState(j.state) && matchesQuery(j, q));
+    if (p === '/jobs/stages') return { stages };
+    if (p === '/jobs/find') {
+      const url = q.get('url');
+      const req = q.get('req');
+      const j = state.jobs.find((x) => (url && x.url === url) || (req && x.reqId?.toLowerCase() === req.toLowerCase()));
+      if (j) return j;
+      throw new ApiError(404, 'No such job');
+    }
     if (p === '/jobs/stats') {
       const active = state.jobs.filter((j) => j.active).length;
-      return { total: state.jobs.length + 4_980, active: active + 4_920, matched: state.jobs.length + 731, unseen: state.jobs.filter((j) => !j.seenAt).length, tracked: state.jobs.filter((j) => OPEN_STAGES.includes(j.state)).length };
+      return { total: state.jobs.length + 4_980, active: active + 4_920, matched: state.jobs.length + 731, unseen: state.jobs.filter((j) => !j.seenAt).length, tracked: state.jobs.filter((j) => isTrackedState(j.state) && !isClosedStage(stages, j.state)).length };
     }
     if (p.startsWith('/jobs/')) {
       const j = state.jobs.find((x) => x.id === decodeURIComponent(p.slice('/jobs/'.length)));
@@ -203,8 +235,29 @@ export async function demoApi(path: string, init: RequestInit & { json?: unknown
   const jobState = p.match(/^\/jobs\/(.+)\/state$/);
   if (jobState) {
     const j = state.jobs.find((x) => x.id === decodeURIComponent(jobState[1]!));
+    noteStage((body as Partial<Job>).state);
     if (j) Object.assign(j, body as Partial<Job>, { stateUpdatedAt: new Date().toISOString() });
     return j;
+  }
+  if (p === '/jobs/stages' && method === 'PUT') {
+    stages = ((body as { stages?: JobStage[] }).stages ?? []).map((s) => ({ ...s }));
+    return { stages };
+  }
+  if (p === '/jobs' && method === 'POST') {
+    const b = body as Partial<Job>;
+    const existing = state.jobs.find((x) => (b.url && x.url === b.url) || (b.reqId && x.reqId === b.reqId));
+    if (existing && url.searchParams.get('force') !== '1') throw new ApiError(409, 'Already stored', { error: 'Already stored', existing });
+    const now = new Date().toISOString();
+    const id = `manual:demo-${Date.now()}`;
+    const job: Job = {
+      id, source: 'manual', externalId: id, company: b.company ?? '', title: b.title ?? '', locations: b.locations ?? [], url: b.url ?? '',
+      terms: [], sponsorship: null, degrees: [], category: null, postedAt: now, active: true, visible: true, matchesFilter: false, score: null,
+      firstSeenAt: now, updatedAt: now, reqId: b.reqId ?? null, state: b.state ?? 'applied', notes: b.notes ?? null, seenAt: now,
+      appliedAt: b.appliedAt ?? null, nextAction: null, nextActionAt: null, resumePath: null, stateUpdatedAt: now,
+    };
+    noteStage(job.state);
+    state.jobs.push(job);
+    return job;
   }
   if (p === '/sources/sync') return { started: [], skipped: state.sources.filter((s) => s.enabled).map((s) => ({ id: s.id, reason: 'running' })) };
   const sync = p.match(/^\/sources\/([^/]+)\/sync$/);

@@ -7,7 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { useInvalidate, useJobStats, useSaveSetting, useSettings } from '@/lib/queries';
-import { Field, PageTitle } from './ui';
+import { JobStagesSection } from './JobStagesSection';
+import { Field, PageTitle, Section } from './ui';
 
 export function JobsPage() {
   const settings = useSettings();
@@ -60,7 +61,8 @@ export function JobsPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle sub="Which listings count as a match. Regexes are case-insensitive; a broken regex is ignored and reported.">Jobs</PageTitle>
+      <PageTitle sub="Which feed listings count as a match, and the stages the Applications board tracks.">Jobs</PageTitle>
+      <Section title="Match filter" sub="Regexes are case-insensitive; a broken regex is ignored and reported.">
       {stats.data && (
         <p className="text-sm text-muted-foreground">
           {stats.data.total} stored · {stats.data.active} active · <span className="font-medium text-foreground">{stats.data.matched} match</span> · {stats.data.unseen} unseen
@@ -97,6 +99,10 @@ export function JobsPage() {
         </Field>
       </div>
       <Button onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Save and re-run filter'}</Button>
+      </Section>
+      <div className="pt-6">
+        <JobStagesSection />
+      </div>
     </div>
   );
 }

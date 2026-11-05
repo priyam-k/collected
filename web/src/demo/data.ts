@@ -287,8 +287,8 @@ function makeJobs(): Job[] {
     ['Parallax', 'Backend Engineering Intern', 'New York, NY', 'Software', 1, 'new', {}],
     ['Lumen Health', 'Data Science Intern', 'Remote', 'AI/ML/Data', 1, 'new', {}],
     ['Cobalt Systems', 'Embedded Firmware Intern', 'Austin, TX', 'Hardware', 2, 'new', {}],
-    ['Tessellate', 'Frontend Engineering Intern', 'Chicago, IL', 'Software', 2, 'applied', { appliedAt: ymd(at(-6, 12)) }],
-    ['Quarry Capital', 'Quantitative Developer Intern', 'New York, NY', 'Quant', 3, 'interviewing', { appliedAt: ymd(at(-20, 12)), nextAction: 'Technical interview', nextActionAt: ymd(at(4, 12)) }],
+    ['Tessellate', 'Frontend Engineering Intern', 'Chicago, IL', 'Software', 2, 'applied', { appliedAt: ymd(at(-6, 12)), resumePath: 'resumes/swe-frontend.pdf' }],
+    ['Quarry Capital', 'Quantitative Developer Intern', 'New York, NY', 'Quant', 3, 'interviewing', { appliedAt: ymd(at(-20, 12)), nextAction: 'Technical interview', nextActionAt: ymd(at(4, 12)), reqId: 'R0042817', resumePath: 'resumes/quant-2027.pdf' }],
     ['Fieldnote', 'Full-stack Intern', 'Denver, CO', 'Software', 3, 'screen', { appliedAt: ymd(at(-12, 12)), nextAction: 'Recruiter call', nextActionAt: ymd(at(1, 12)) }],
     ['Orbital', 'Systems Engineering Intern', 'Los Angeles, CA', 'Hardware', 4, 'new', {}],
     ['Brightline', 'Software Engineer Intern, Infrastructure', 'Seattle, WA', 'Software', 4, 'starred', {}],
@@ -324,6 +324,7 @@ function makeJobs(): Job[] {
       nextAction: null,
       nextActionAt: null,
       resumePath: null,
+      reqId: null,
       stateUpdatedAt: state === 'new' ? null : at(-2, 12).toISOString(),
       ...extra,
     };
