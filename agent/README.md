@@ -155,7 +155,7 @@ grades [course]
 announcements [--course C] [--limit 5]
 dates [--course C]                          exams, quizzes, finals, cancelled or virtual sessions
 sources                                     sync status of every source
-jobs [--state applied,screen] [--limit 20]  the applications tracker
+jobs [--state applied,screen] [--limit 20]  the applications tracker (see Jobs below)
 ```
 
 Change:
@@ -171,7 +171,6 @@ date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-D
 event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]   a Google Calendar event
 event add "<title>" --on YYYY-MM-DD [--until YYYY-MM-DD]   all day; <when> is "2026-11-03 14:00", "today 14:00", "tomorrow 9:30" or "fri 17:00"
 event calendars                             the connected Google calendars, with the default marked
-jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]
 resync [canvas|gradescope|gcal|todoist|jobs|all]
 connect canvas [--browser X] [--domain host] [--dry-run]   read the Canvas session cookie from a browser and send it
 connect canvas --token [--domain host] [--dry-run]   or, if your school allows tokens, paste a Canvas access token at the prompt (or pipe it on stdin); checked against Canvas, then saved
@@ -190,6 +189,24 @@ demo clear                                  remove everything the demo loaders c
 sync <source|all>                           run a source sync in-process and wait for it (same as resync); bare `sync` runs them all, then the files
 --fresh | --stale-ok                        on any read: sync first regardless of age, or never (default: older than freshness.maxAgeMinutes)
 ```
+
+Jobs, the feed and the applications tracker. Every table prints ids in full; every read takes `--json`:
+
+```
+jobs [--state applied,screen] [--limit 20]  everything tracked, most recently touched first
+jobs feed [--all] [--limit 50] [--since YYYY-MM-DD]   the matched feed, newest first; --all is every listing, hidden and inactive too
+jobs search "<text>" [--tracked | --feed] [--state a,b] [--limit N]   company, title, location, notes, or an exact requisition id; every word must match
+jobs find <req-id | url>                    the job with that requisition id or posting URL (tracking parameters ignored), or "no match"
+jobs show <id>                              every field: notes, resume path, req id, next action, timestamps
+jobs add "<company>" "<title>" [--url U] [--req R] [--location L]... [--state applied] [--applied YYYY-MM-DD] [--resume PATH] [--notes N] [--next "what" --next-at D] [--force]
+jobs set <id> [<state>] [--notes N] [--next "what" --next-at D] [--applied D] [--resume PATH] [--req R]
+jobs rm <id>                                a hand-added job; a feed job is hidden instead (jobs set <id> hidden)
+jobs seen [<id>...]                         mark feed jobs seen (default: every unseen match)
+jobs stages                                 the tracker's stages in order
+jobs stages add <id> [--label L] [--closed] [--after <id>]   |   rm <id>   |   rename <id> "<label>"   |   move <id> --after <other>
+```
+
+A state is any stage id: the defaults are `applied`, `screen`, `interviewing`, `offer` (open) and `rejected`, `ghosted`, `withdrawn` (closed), and `jobs set <id> oa` adds `oa` as an open stage the moment it is used, so the board grows a column. `new`, `starred` and `hidden` are feed markers, not stages. Moving into `applied` or a later default stage stamps the applied date when it is empty. `jobs add` refuses a posting whose URL or requisition id is already here and prints the existing job; `--force` adds a second entry anyway. A requisition id is read out of the posting URL where the feed's URLs carry one (Workday, Greenhouse, Lever, iCIMS, `jid=`, `req_id=` and the like) and can be typed with `--req`. Resume paths are stored as given and never opened; `jobs show` prints the path and says `(exists)` when it is on this machine. The `jobs` source syncs first when it is stale, like the other reads.
 
 Canvas, read-only (one GET through the server with its stored session; nothing is ever written to Canvas):
 

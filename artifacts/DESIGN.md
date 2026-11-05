@@ -114,10 +114,12 @@ Unique on (`source`, `external_id`). Soft-delete when a source stops returning a
 `item_id`, `todoist_task_id`, `last_pushed_hash`, `closed_by_us`, `created_at`.
 
 **jobs**
-`id`, `source` (simplify | vanshb03), `external_id`, `company`, `title`, `locations` (JSON), `url`, `terms` (JSON), `sponsorship`, `degrees` (JSON), `posted_at`, `active`, `matches_filter`, `score?` (v2), `first_seen_at`, `updated_at`.
+`id`, `source` (simplify | vanshb03 | manual), `external_id`, `company`, `title`, `locations` (JSON), `url`, `req_id?` (requisition id: read out of the posting URL by the ingester, typed for manual entries; unique per source where set), `terms` (JSON), `sponsorship`, `degrees` (JSON), `posted_at`, `active`, `matches_filter`, `score?` (v2), `first_seen_at`, `updated_at`.
 
 **job_state** — the tracker. One row per job the user touched.
-`job_id`, `state` (new | starred | hidden | applied | screen | interviewing | offer | rejected | ghosted | withdrawn), `notes?`, `resume_path?`, `seen_at?`, `applied_at?` (YYYY-MM-DD, stamped once when the state first reaches applied or later), `next_action?`, `next_action_at?`, `updated_at`. `new` is untracked, `hidden` is dismissed from the feed; everything else shows in the Applications widget. Jobs added by hand are `jobs` rows with `source = manual`; they never appear in the feed and can be deleted, unlike feed rows, which are hidden so the next sync doesn't resurrect them.
+`job_id`, `state` (free text: `new`, `starred`, `hidden`, or any stage id), `notes?`, `resume_path?` (stored as given, never opened by the server), `seen_at?`, `applied_at?` (YYYY-MM-DD, stamped once when the state first reaches a stage flagged `appliedStage`), `next_action?`, `next_action_at?`, `updated_at`. `new` is untracked, `hidden` is dismissed from the feed, `starred` is the Saved pile; everything else shows in the Applications widget. Jobs added by hand are `jobs` rows with `source = manual`; they never appear in the feed and can be deleted, unlike feed rows, which are hidden so the next sync doesn't resurrect them.
+
+**Stages are data** (DECISIONS 063): the `jobs.stages` setting is an ordered list of `{ id, label, kind: open | closed, appliedStage? }`, defaulting to `applied, screen, interviewing, offer` (open, applied-stamping) then `rejected, ghosted, withdrawn` (closed). `new`, `starred` and `hidden` are reserved and never in the list. A state set on any job that is not listed is appended as `{ id, label: id capitalised, kind: open }` server-side, so `jobs set <id> oa` works and the board grows a column. `shared` keeps the default constants and offers the same questions as functions over the live list (`isOpenStage(stages, id)`, `isAppliedStage`, `stageLabel`, `trackedStates`). The server also dedupes manual adds: a posting whose normalised URL (`normalizeJobUrl`: host lowercased, `www.`, scheme, tracking parameters and fragment dropped) or requisition id is already here answers 409 with the existing job unless `?force=1`. `extractReqId` is best-effort and conservative (Workday suffixes, Greenhouse and other `/jobs/<digits>`, Lever and Rippling UUIDs, `jid=`/`req_id=`/`requisition` parameters, `R0123456` tokens); no match is null, and two listings that would share an id in one source keep none.
 
 **Manual items** — `items` rows with `source = manual`: exam, quiz, and final dates, cancelled or virtual sessions, notes on a day. `kind = event`, `raw` is `ManualEventRaw` (`eventKind`, `date`, `start`/`end` or all-day, `location`, `note`, `meetingKind` for session tags). No `sources` row and no ingester; `INGESTED_SOURCE_IDS` is the list with ingesters. Written through `POST/PUT/DELETE /api/items/manual`.
 
@@ -214,8 +216,8 @@ Course files land in folders on the laptop automatically, so local tools (Claude
 
 The dashboard from a terminal, for a person or for an agent working in another folder (the class-notes vault). It lives in the `agent` workspace because that already holds the laptop's credentials for the API; one binary, `collected` (`collected-agent` is the same file). Every read prints a plain table, or JSON with `--json`. `collected help` lists everything.
 
-- **Look**: `courses`, `course <c>`, `assignments [--course --days --all]`, `agenda [--days]`, `todo`, `grades [c]`, `announcements`, `dates`, `sources`, `jobs`.
-- **Change**: `task add "<text>"` (Todoist quick add) and `task done`, `done <item> [--undo]` (a dashboard-only override), `link add|rm`, `schedule set|rm` (`"mon,wed 14:00-14:50 @ CHE 2110"`), `notes set|clear`, `date add|rm` (exams, quizzes, finals, cancelled or virtual sessions), `jobs set <id> <state>`, `resync [source|all]`.
+- **Look**: `courses`, `course <c>`, `assignments [--course --days --all]`, `agenda [--days]`, `todo`, `grades [c]`, `announcements`, `dates`, `sources`, `jobs`, `jobs feed`, `jobs search "<text>"`, `jobs find <req-id|url>`, `jobs show <id>`, `jobs stages`.
+- **Change**: `task add "<text>"` (Todoist quick add) and `task done`, `done <item> [--undo]` (a dashboard-only override), `link add|rm`, `schedule set|rm` (`"mon,wed 14:00-14:50 @ CHE 2110"`), `notes set|clear`, `date add|rm` (exams, quizzes, finals, cancelled or virtual sessions), `jobs add|set|rm|seen` and `jobs stages add|rm|rename|move` (the tracker: any stage id, dedupe by URL or requisition id on add, ids printed in full), `resync [source|all]`.
 - **Canvas, read-only**: `canvas ls <c> [modules|files|pages|assignments|announcements]`, `canvas show <c> syllabus | page <slug> | assignment <id> | announcement <id>` (the full body as text, the rubric, and the ids of files it links), `canvas get "<api path>" [--all]`, and `pull <file-id> --to <folder>`.
 - **Connect**: `connect canvas [--browser chrome|brave|edge|arc|chromium|firefox] [--domain host] [--dry-run]` reads the Canvas session cookie (`canvas_session` / `_normandy_session` / `_legacy_normandy_session`) out of the local browser's cookie store — decrypting Chromium's Keychain-encrypted store in `agent/src/browser-cookies.ts` with no external dependency (`node:sqlite`, `node:crypto`) — and posts it to `POST /api/sources/canvas/cookie`, which stores it and runs a Canvas sync. Only the session cookies leave the machine; values are never printed. Replaces the old Python `local/canvas_cookie.py`.
 - **File sync**: `sync` (bare: everything this machine keeps current, DECISIONS 058), `status`, `files courses|link|unlink`, `daemon install|uninstall|status` (both modes; `install-launchd`/`uninstall-launchd` are aliases).
@@ -270,7 +272,7 @@ Adding a widget = adding a folder and a registry entry.
 - **exams**: countdown to every exam, quiz, and final across courses: hand-entered dates plus assignments titled like one, days-until tiles that turn coral or amber inside three days, a this-week pill in the header.
 - **announcements**: every course's announcements newest first; unread is tracked per browser in localStorage (Canvas exposes nothing worth syncing), opening one clears it, Mark all read in the header.
 - **clock**: analog when the box is roughly square, digital otherwise, pinnable per instance (`config.style`, `config.hour24`); shows the soonest scheduled session across courses, honouring cancellations.
-- **tracker** ("Applications"): every job with a tracked state. Wide = a board with a column per open stage (saved, applied, screen, interviewing, offer) and an optional closed column; narrow = one list with stage pills. Cards open the job pane; a stage select on each card moves it without opening. "Add" opens the manual-entry form.
+- **tracker** ("Applications"): every job with a tracked state. Wide = a board with Saved first, then a column per open stage from `GET /api/jobs/stages`, and an optional closed column; narrow = one list with stage pills. Cards open the job pane; a stage select on each card moves it without opening. "Add" opens the manual-entry form.
 - **settings** is a page, not a widget: sources (connect, paste cookie, credentials, Google connect button), courses editor (schedule drawn on a week grid, JSON one click away; session kinds are open, lecture / discussion / lab / office_hours built in and any snake_case key accepted, labelled by `meetingLabel()`), todoist sync options, job filter, layout reset, JSON export/import.
 
 ## API
@@ -291,8 +293,11 @@ POST /api/calendar/events              (write-through to GCal)
 
 GET/PUT /api/courses  /api/courses/:id
 GET/PUT /api/layout   GET/PUT /api/widgets
-GET  /api/jobs?state&matchesOnly       PATCH /api/jobs/:id/state   { state?, notes?, appliedAt?, nextAction?, nextActionAt?, resumePath? }
-GET  /api/jobs/tracked  GET /api/jobs/:id  POST /api/jobs (manual entry)  DELETE /api/jobs/:id (manual only)
+GET  /api/jobs?query&state&since&matchesOnly&active&includeHidden&limit   (the feed; query = every word in company/title/locations/notes or the exact req id)
+PATCH /api/jobs/:id/state   { state?, notes?, appliedAt?, nextAction?, nextActionAt?, resumePath?, reqId? }   (any stage id; 409 with { existing } on a req id clash)
+GET  /api/jobs/tracked?query&state&limit   GET /api/jobs/:id   GET /api/jobs/find?req=|url=   GET /api/jobs/stats (per-stage counts in byStage)
+POST /api/jobs[?force=1] (manual entry; 409 { error, existing } on a duplicate URL or req id)   DELETE /api/jobs/:id (manual only)
+GET/PUT /api/jobs/stages   { stages: [{ id, label, kind, appliedStage? }] }   (PUT replaces the list; 409 when a dropped stage still has jobs)
 GET  /api/canvas/files/:id/open?download  (302 to a one-shot inline link)
 GET  /api/canvas/raw?path=/api/v1/…&all   (read-only Canvas API passthrough for the CLI)
 POST /api/items/manual  PUT/DELETE /api/items/manual/:externalId   (course dates and session tags)

@@ -24,7 +24,12 @@ The CLI may instead be in local mode (`collected status` prints `local · <data 
 | `collected announcements [--course C] [--limit 5] --json` | recent announcements with text |
 | `collected dates [--course C] --json` | exams, quizzes, finals, cancelled or virtual sessions |
 | `collected sources --json` | sync status per source: `status` is `connected`, `needs_auth`, `error` or `disconnected`, with `lastError` |
-| `collected jobs [--state applied,screen] [--limit 20] --json` | the applications tracker |
+| `collected jobs [--state applied,screen] [--limit 20] --json` | the applications tracker: `id`, `company`, `title`, `state`, `reqId`, `appliedAt`, `nextAction`, `nextActionAt`, `resumePath`, `notes` |
+| `collected jobs feed [--all] [--limit 50] [--since YYYY-MM-DD] --json` | the matched job feed, newest first |
+| `collected jobs search "<text>" [--tracked \| --feed] [--state a,b] --json` | jobs whose company, title, location, notes or exact requisition id match every word |
+| `collected jobs find <req-id \| url> --json` | the job with that requisition id or posting URL (`[]` when none) |
+| `collected jobs show <id> --json` | one job, every field |
+| `collected jobs stages --json` | the tracker's stages in order: `id`, `label`, `kind` (open/closed), `appliedStage` |
 
 A `<course>` is its code (`enme480`, case-insensitive), the full id (`2026-fall-enme480-0101`), or three or more of its digits (`480`). When several match, the CLI says so; ask the user rather than guessing.
 
@@ -49,7 +54,7 @@ These change the dashboard, Todoist, Google Tasks or Google Calendar. Say what y
 - `collected notes set <course> "<text>"` and `collected notes clear <course>`
 - `collected date add <course> <exam|quiz|final|cancelled|virtual|other> "<title>" <YYYY-MM-DD> [--start HH:MM --end HH:MM --location L --note N]` and `collected date rm <id>`
 - `collected event add "<title>" --at "<when>" [--for 1h30m | --end "<when>"] [--calendar <id or name>] [--location L] [--note N]`, or `--on YYYY-MM-DD [--until YYYY-MM-DD]` for an all-day event: writes to the user's Google Calendar (not the dashboard alone), so confirm first like the other writes. `<when>` is `2026-11-03 14:00`, `today 14:00`, `tomorrow 9:30` or `fri 17:00` (the next Friday) in the user's timezone; without `--for`/`--end` the event is an hour; without `--calendar` it goes to the default calendar. `collected event calendars` lists the calendars with the default marked; it says `Google Calendar is not connected` when there is nowhere to write.
-- `collected jobs set <job-id> <state> [--notes N] [--next "what" --next-at YYYY-MM-DD]`
+- Jobs. `collected jobs set <id> [<state>] [--notes N] [--next "what" --next-at YYYY-MM-DD] [--applied YYYY-MM-DD] [--resume PATH] [--req R]` moves a job or edits its fields; a state is any stage id (`jobs stages` lists them; an unknown one such as `oa` becomes a new open stage on the board, so spell new ones deliberately). `collected jobs add "<company>" "<title>" [--url U] [--req R] [--location L] [--state S] [--applied D] [--resume PATH] [--notes N] [--next … --next-at …]` writes a new tracker entry: before adding, run `collected jobs search "<company> <title>"` and, when you have a requisition id or a posting URL, `collected jobs find <req-id|url>` to confirm it is not already here; the add itself refuses a duplicate URL or req id and prints the existing job (`--force` overrides, rarely right). `collected jobs rm <id>` removes a hand-added entry only; a feed job is `jobs set <id> hidden`. `collected jobs stages add|rm|rename|move` edits the board's columns; `rm` is refused while jobs sit in the stage. A resume path is stored as text and never opened by the CLI.
 - `collected resync [canvas|gradescope|gcal|gcal_ical|todoist|gtasks|jobs|all]`: runs a sync now and waits. Cheap; use it when data looks stale.
 - In local mode (`collected status` says `local · <data dir>`, no server) a read syncs a source on its own when its last success is older than 30 minutes, which can take a few seconds; add `--stale-ok` to a read when speed matters more than freshness, `--fresh` when it must be current. A failed sync is one line on stderr and the read still answers.
 

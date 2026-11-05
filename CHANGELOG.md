@@ -7,6 +7,10 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+- Jobs: tracker stages are editable (`jobs stages`, or set any stage name and it becomes a column); `new`, `starred` and `hidden` keep their meanings.
+- Jobs: requisition ids read out of posting URLs, search across company, title, location, notes and req id, and a duplicate check when adding a job by hand (`jobs find`, `jobs search`).
+- CLI: `jobs feed`, `jobs search`, `jobs find`, `jobs show`, `jobs add`, `jobs rm`, `jobs seen` and `jobs stages`; `jobs set` can edit notes, dates, resume path and req id without changing the stage.
+
 ## 1.4.1 — 2026-10-31 · recommended
 
 - Dependencies: newer Google client libraries; the three audit advisories in their old dependency tree are gone.
