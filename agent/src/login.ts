@@ -1,3 +1,4 @@
+import { describeScopes, type Me } from '@collected/shared';
 import { Api } from './api.js';
 import { isLocal, saveConfig, type AgentConfig } from './config.js';
 import { openBrowser } from './open.js';
@@ -30,9 +31,9 @@ export async function login(cfg: AgentConfig, opts: LoginOptions): Promise<Agent
   const token = await opts.readSecret('paste the token: ');
   if (!token.startsWith('clt_')) throw new Error('that does not look like a collected token (they start with clt_)');
   const trial = { ...cfg, auth: { ...cfg.auth, token } };
-  const me = await new Api(trial).get<{ identity: string | null }>('/api/auth/me');
+  const me = await new Api(trial).get<Pick<Me, 'identity' | 'scopes'>>('/api/auth/me');
   if (!me.identity) throw new Error('the server did not accept that token; nothing saved');
   saveConfig(trial);
-  opts.say(`signed in as ${me.identity}`);
+  opts.say(`signed in as ${me.identity}${me.scopes !== undefined ? ` (${describeScopes(me.scopes)})` : ''}`);
   return trial;
 }

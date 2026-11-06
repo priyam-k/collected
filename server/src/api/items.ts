@@ -7,6 +7,8 @@ import type { AppContext } from '../context.js';
 import { itemLinks, items, overrides, type NewItemRow } from '@collected/core/db/schema';
 import { queryEffectiveItems } from '@collected/core/lib/effective';
 import { bad, csv, intParam, parseBody } from './util.js';
+import type { AuthVariables } from '../auth/cloudflare-access.js';
+import { allowedSources } from './scopes.js';
 
 /** A local wall-clock date/time (server TZ) as ISO. Dates in the tracker and course events are days, not instants. */
 const localIso = (date: string, time: string | null | undefined): string => new Date(`${date}T${time ?? '00:00'}:00`).toISOString();
@@ -50,7 +52,7 @@ export function manualEventRow(id: string, b: ManualEventInput): NewItemRow {
 }
 
 export function itemsRoutes(ctx: AppContext) {
-  const r = new Hono();
+  const r = new Hono<{ Variables: AuthVariables }>();
 
   /* ---------- manual course events ---------- */
   r.post('/manual', async (c) => {
@@ -83,7 +85,11 @@ export function itemsRoutes(ctx: AppContext) {
   r.get('/', async (c) => {
     const q = c.req.query();
     const kind = csv(q.kind)?.filter((k): k is ItemKind => (ITEM_KINDS as readonly string[]).includes(k));
-    const source = csv(q.source)?.filter((s): s is SourceId => (SOURCE_IDS as readonly string[]).includes(s));
+    const asked = csv(q.source)?.filter((s): s is SourceId => (SOURCE_IDS as readonly string[]).includes(s));
+    // A scoped token sees only the sources in its areas (scopes.ts): a calendar-only token gets events, not coursework.
+    const visible = allowedSources(c.get('scopes'));
+    const source = visible ? (asked ?? visible).filter((s) => visible.includes(s)) : asked;
+    if (visible && source!.length === 0) return c.json([]);
     const rows = await queryEffectiveItems(ctx, {
       from: q.from,
       to: q.to,

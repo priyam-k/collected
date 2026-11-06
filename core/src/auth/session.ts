@@ -4,6 +4,7 @@ import type { AppContext } from '../context.js';
 import { apiTokens, sessions, users, type ApiTokenRow, type UserRow } from '../db/schema.js';
 import { getSetting, setSetting } from '../lib/settings.js';
 import { nowIso } from '../lib/time.js';
+import { normalizeScopes, type TokenScopes } from '@collected/shared';
 
 export const SESSION_COOKIE = 'collected_session';
 export const SESSION_DAYS = 30;
@@ -71,11 +72,11 @@ export async function deleteSession(ctx: AppContext, id: string): Promise<void> 
 
 // --- API tokens (the CLI) --------------------------------------------------------------------------------------------
 
-export async function createToken(ctx: AppContext, userId: string, name: string): Promise<{ token: string; row: ApiTokenRow }> {
+export async function createToken(ctx: AppContext, userId: string, name: string, scopes: TokenScopes | null = null): Promise<{ token: string; row: ApiTokenRow }> {
   const secret = `${TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`;
   const [row] = await ctx.db
     .insert(apiTokens)
-    .values({ id: newId(), userId, name: name.trim().slice(0, 80), tokenHash: sha256(secret), prefix: secret.slice(0, 10) })
+    .values({ id: newId(), userId, name: name.trim().slice(0, 80), tokenHash: sha256(secret), prefix: secret.slice(0, 10), scopes: scopes ? JSON.stringify(scopes) : null })
     .returning();
   return { token: secret, row: row! };
 }
@@ -89,6 +90,16 @@ export async function tokenUser(ctx: AppContext, token: string): Promise<{ user:
   if (!user) return null;
   if (!row.lastUsedAt || Date.now() - Date.parse(row.lastUsedAt) > TOUCH_MS) await ctx.db.update(apiTokens).set({ lastUsedAt: nowIso() }).where(eq(apiTokens.id, row.id));
   return { user, token: row };
+}
+
+/** The row's scopes column as `TokenScopes`; an unreadable value counts as no access rather than all. */
+export function tokenScopes(row: Pick<ApiTokenRow, 'scopes'>): TokenScopes | null {
+  if (row.scopes == null) return null;
+  try {
+    return normalizeScopes(JSON.parse(row.scopes));
+  } catch {
+    return {};
+  }
 }
 
 export async function listTokens(ctx: AppContext, userId: string): Promise<ApiTokenRow[]> {

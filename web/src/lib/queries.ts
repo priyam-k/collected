@@ -25,6 +25,7 @@ import type {
   WidgetInstance,
   TodoAppStatus,
   TodoStatus,
+  TokenScopes,
   GtasksPushConfig,
 } from '@collected/shared';
 import { ApiError, api } from './api';
@@ -664,7 +665,8 @@ export function useTokens() {
 export function useCreateToken() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api<ApiToken & { token: string }>('/auth/tokens', { method: 'POST', json: { name } }),
+    mutationFn: ({ name, scopes }: { name: string; scopes: TokenScopes | null }) =>
+      api<ApiToken & { token: string }>('/auth/tokens', { method: 'POST', json: { name, scopes } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.tokens }),
   });
 }

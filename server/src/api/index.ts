@@ -3,7 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { compress } from 'hono/compress';
 import { etag } from 'hono/etag';
-import { accessAuth, verifyAccess, type AuthVariables } from '../auth/cloudflare-access.js';
+import { accessAuth, resolveIdentity, type AuthVariables } from '../auth/cloudflare-access.js';
 import type { AppContext } from '../context.js';
 import { MB } from '@collected/core/lib/http';
 import { createUpdateChecker, type UpdateChecker } from '@collected/core/lib/updates';
@@ -20,6 +20,7 @@ import { gtasksRoutes } from './gtasks.js';
 import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
 import { jobsRoutes } from './jobs.js';
+import { MUTATING, scopeDenial } from './scopes.js';
 import { layoutRoutes, widgetRoutes } from './layout.js';
 import { onboardingRoutes } from './onboarding.js';
 import { settingsRoutes } from './settings.js';
@@ -28,7 +29,6 @@ import { systemRoutes } from './system.js';
 import { todoRoutes } from './todo.js';
 import { todoistRoutes } from './todoist.js';
 
-const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
  * What a non-person identity may do. A person who passed the Access login is the owner and may do anything.
@@ -106,7 +106,9 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; goog
     }
     // /me answers for everyone: it is how the web app learns whether to show the sign-in page.
     if (c.req.path === '/api/auth/me' && c.req.method === 'GET') {
-      c.set('user', await verifyAccess(ctx, c));
+      const id = await resolveIdentity(ctx, c);
+      c.set('user', id?.user ?? null);
+      c.set('scopes', id?.scopes);
       return next();
     }
     return guard(c, next);
@@ -116,7 +118,11 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; goog
   // cross-site form posts if its SameSite attribute allows it; this check does not depend on that setting.
   api.use('*', async (c, next) => {
     const user = c.get('user');
-    if (user && !identityAllows(user, c.req.method, c.req.path + new URL(c.req.url).search)) return c.json({ error: 'forbidden for this credential' }, 403);
+    const pathWithQuery = c.req.path + new URL(c.req.url).search;
+    if (user && !identityAllows(user, c.req.method, pathWithQuery)) return c.json({ error: 'forbidden for this credential' }, 403);
+    // A scoped API token is further narrowed to its areas (scopes.ts); the message names what it lacks.
+    const denied = user ? scopeDenial(c.get('scopes'), c.req.method, pathWithQuery) : null;
+    if (denied) return c.json({ error: denied }, 403);
     if (MUTATING.has(c.req.method) && crossSite({ origin: c.req.header('origin'), secFetchSite: c.req.header('sec-fetch-site') }, ctx.env.PUBLIC_URL)) {
       return c.json({ error: 'cross-site request refused' }, 403);
     }

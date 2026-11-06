@@ -274,6 +274,8 @@ export const apiTokens = sqliteTable(
     prefix: text('prefix').notNull(),
     lastUsedAt: text('last_used_at'),
     revokedAt: text('revoked_at'),
+    /** JSON `TokenScopes` (shared/src/tokens.ts): area → read|write. NULL = everything a token may do (tokens from before 1.6.0 too). */
+    scopes: text('scopes'),
     createdAt: text('created_at').notNull().$defaultFn(nowIso),
   },
   (t) => [index('api_tokens_user_idx').on(t.userId)],

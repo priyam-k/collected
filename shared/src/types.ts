@@ -1,3 +1,4 @@
+import type { TokenScopes } from './tokens.js';
 // Vocabulary shared by server and web. Keep in sync with artifacts/DESIGN.md.
 
 /** Sources with an ingester and a row in `sources`. */
@@ -573,6 +574,8 @@ export interface Me {
   user: { email: string; name: string | null; picture: string | null } | null;
   authDisabled: boolean;
   signIn: { google: boolean; access: boolean };
+  /** For a token identity: what it may touch (`null` = everything a token may do). Absent for people. */
+  scopes?: TokenScopes | null;
 }
 
 /** A CLI token as listed; the plaintext is returned once, on creation, as `token`. */
@@ -582,6 +585,8 @@ export interface ApiToken {
   prefix: string;
   createdAt: string;
   lastUsedAt: string | null;
+  /** Per-area access (shared/src/tokens.ts); `null` means everything a token may do. */
+  scopes: TokenScopes | null;
 }
 
 /** One active Canvas enrollment as the onboarding lists it, with the course row it would become. */

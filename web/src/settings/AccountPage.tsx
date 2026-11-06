@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
+import { describeScopes, scopeGrantsAny, type TokenScopes } from '@collected/shared';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { isLocalOwner, useCreateToken, useMe, useRevokeToken, useTokens } from '@/lib/queries';
 import { useSignOut } from '@/lib/useSignOut';
+import { ScopeChips, TokenScopePicker } from './TokenScopes';
 import { Field, PageTitle } from './ui';
 
 function when(iso: string | null): string {
@@ -24,7 +26,9 @@ export function AccountPage() {
   const [params] = useSearchParams();
   const cli = params.get('cli') === '1';
   const [name, setName] = useState('');
-  const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null);
+  // null is Everything, the default and what `collected login` (?cli=1) wants.
+  const [scopes, setScopes] = useState<TokenScopes | null>(null);
+  const [fresh, setFresh] = useState<{ name: string; token: string; scopes: TokenScopes | null } | null>(null);
   useEffect(() => {
     if (!name) setName(params.get('device') ?? '');
   }, [params, name]);
@@ -36,11 +40,12 @@ export function AccountPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const n = name.trim();
-    if (!n) return;
+    if (!n || !scopeGrantsAny(scopes)) return;
     try {
-      const t = await create.mutateAsync(n);
-      setFresh({ name: t.name, token: t.token });
+      const t = await create.mutateAsync({ name: n, scopes });
+      setFresh({ name: t.name, token: t.token, scopes: t.scopes ?? null });
       setName('');
+      setScopes(null);
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -100,19 +105,25 @@ export function AccountPage() {
           {cli && !local && ' Paste the new token back into the terminal that sent you here.'}
         </p>
         {person && (
-          <form onSubmit={submit} className="flex max-w-md items-end gap-2">
-            <Field label="Token name" hint="Usually the machine, e.g. macbook-air.">
-              <Input value={name} maxLength={80} placeholder="macbook-air" onChange={(e) => setName(e.target.value)} autoFocus={cli} />
-            </Field>
-            <Button type="submit" disabled={!name.trim() || create.isPending}>
-              Create
-            </Button>
+          <form onSubmit={submit} className="max-w-xl space-y-3">
+            <div className="max-w-md">
+              <Field label="Token name" hint="Usually the machine or the agent, e.g. macbook-air.">
+                <Input value={name} maxLength={80} placeholder="macbook-air" onChange={(e) => setName(e.target.value)} autoFocus={cli} />
+              </Field>
+            </div>
+            <TokenScopePicker value={scopes} onChange={setScopes} />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button type="submit" disabled={!name.trim() || !scopeGrantsAny(scopes) || create.isPending}>
+                {create.isPending ? 'Creating…' : 'Create'}
+              </Button>
+              {!scopeGrantsAny(scopes) && <span className="text-xs text-muted-foreground">Give it read or write on at least one area.</span>}
+            </div>
           </form>
         )}
         {fresh && (
           <div role="status" className="space-y-2 rounded-2xl bg-well p-3.5">
             <div className="text-[13px]">
-              Token for <strong>{fresh.name}</strong>. It is shown once; copy it now.
+              Token for <strong>{fresh.name}</strong>, with access to {describeScopes(fresh.scopes)}. It is shown once; copy it now.
             </div>
             <div className="flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded bg-card px-2 py-1 font-mono text-[12px]">{fresh.token}</code>
@@ -129,7 +140,10 @@ export function AccountPage() {
           {(tokens.data ?? []).map((t) => (
             <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-[13px]">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{t.name}</div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-[4rem] shrink truncate font-medium">{t.name}</span>
+                  <ScopeChips scopes={t.scopes ?? null} />
+                </div>
                 <div className="truncate text-xs text-sub">
                   <span className="font-mono">{t.prefix}…</span> · created {when(t.createdAt)} · last used {when(t.lastUsedAt)}
                 </div>

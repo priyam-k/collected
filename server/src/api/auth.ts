@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { ApiToken, Me } from '@collected/shared';
+import { normalizeScopes, scopeGrantsAny, TOKEN_AREAS, type ApiToken, type Me } from '@collected/shared';
 import { exchangeSignIn, googleSignInConfigured, signInUrl } from '@collected/core/auth/google';
 import { createPkce } from '@collected/core/auth/pkce';
-import { SYNTHETIC_PERSONS, createSession, createToken, deleteSession, emailAllowed, isPerson, listTokens, revokeToken, upsertUser, userByEmail } from '@collected/core/auth/session';
+import { SYNTHETIC_PERSONS, createSession, createToken, deleteSession, emailAllowed, isPerson, listTokens, revokeToken, tokenScopes, upsertUser, userByEmail } from '@collected/core/auth/session';
 import { type AuthVariables } from '../auth/cloudflare-access.js';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from '../auth/cookies.js';
 import type { AppContext } from '../context.js';
@@ -18,12 +18,22 @@ const STATE_TTL_MS = 10 * 60_000;
 /** Only a path on this site may be the post-sign-in destination; without one, the board (web/src/lib/routes.ts). */
 const safeNext = (v: string | undefined): string => (v && /^\/(?!\/)/.test(v) && v.length < 500 ? v : '/dashboard');
 
-const toToken = (r: { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null }): ApiToken => ({
+const toToken = (r: { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; scopes: string | null }): ApiToken => ({
   id: r.id,
   name: r.name,
   prefix: r.prefix,
   createdAt: r.createdAt,
   lastUsedAt: r.lastUsedAt,
+  scopes: tokenScopes(r),
+});
+
+/** The create body: a name and, optionally, per-area grants. Omitted or `null` scopes mean everything a token may do. */
+const createTokenSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  scopes: z
+    .union([z.null(), z.partialRecord(z.enum(TOKEN_AREAS), z.enum(['read', 'write']))])
+    .optional()
+    .transform((v) => normalizeScopes(v)),
 });
 
 /**
@@ -44,6 +54,7 @@ export function authRoutes(ctx: AppContext) {
       user: synthetic ? { ...synthetic, picture: null } : row ? { email: row.email, name: row.name, picture: row.picture } : email ? { email, name: null, picture: null } : null,
       authDisabled: ctx.env.AUTH_DISABLED,
       signIn: { google: googleSignInConfigured(ctx.env), access: !!(ctx.env.CF_ACCESS_TEAM_DOMAIN && ctx.env.CF_ACCESS_AUD) },
+      ...(identity?.startsWith('token:') ? { scopes: c.get('scopes') ?? null } : {}),
     };
     c.header('Cache-Control', 'no-store');
     return c.json(body);
@@ -108,9 +119,10 @@ export function authRoutes(ctx: AppContext) {
 
   r.post('/tokens', async (c) => {
     const user = await personRow(c);
-    const { name } = await parseBody(c, z.object({ name: z.string().trim().min(1).max(80) }));
-    const { token, row } = await createToken(ctx, user.id, name);
-    ctx.log.info({ user: user.email, token: row.prefix }, 'api token created');
+    const { name, scopes } = await parseBody(c, createTokenSchema);
+    if (!scopeGrantsAny(scopes)) bad('a token needs read or write access to at least one area');
+    const { token, row } = await createToken(ctx, user.id, name, scopes);
+    ctx.log.info({ user: user.email, token: row.prefix, scopes: scopes ?? 'all' }, 'api token created');
     c.header('Cache-Control', 'no-store');
     return c.json({ ...toToken(row), token }, 201);
   });

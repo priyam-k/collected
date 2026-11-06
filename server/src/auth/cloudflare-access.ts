@@ -4,10 +4,18 @@ import { getCookie } from 'hono/cookie';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { AppContext } from '../context.js';
 import type { Env } from '../env.js';
-import { sessionUser, tokenUser } from '@collected/core/auth/session';
+import { sessionUser, tokenScopes, tokenUser } from '@collected/core/auth/session';
+import type { TokenScopes } from '@collected/shared';
 import { readSessionCookie } from './cookies.js';
 
-export type AuthVariables = { user: string | null };
+/** `scopes` is set for a bearer token (server/src/api/scopes.ts); undefined for every other identity. */
+export type AuthVariables = { user: string | null; scopes?: TokenScopes | null };
+
+export interface ResolvedIdentity {
+  user: string;
+  /** For a token: its per-area grants, `null` when unrestricted. Absent for people, `dev`, `local`, `helper` and Access service tokens. */
+  scopes?: TokenScopes | null;
+}
 
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
@@ -23,21 +31,29 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
  *    configured in front (DECISIONS 038). Access is optional: a self-host without it uses the sign-in alone.
  */
 export async function verifyAccess(ctx: AppContext, c: Context): Promise<string | null> {
+  return (await resolveIdentity(ctx, c))?.user ?? null;
+}
+
+/** `verifyAccess` with the token's scopes alongside, for the middleware that enforces them. */
+export async function resolveIdentity(ctx: AppContext, c: Context): Promise<ResolvedIdentity | null> {
   const env = ctx.env;
-  if (env.LOCAL_OWNER) return 'local';
-  if (env.AUTH_DISABLED) return 'dev';
-  if (helperKeyMatches(env, c.req.header('x-collected-key'))) return 'helper';
+  if (env.LOCAL_OWNER) return { user: 'local' };
+  if (env.AUTH_DISABLED) return { user: 'dev' };
+  if (helperKeyMatches(env, c.req.header('x-collected-key'))) return { user: 'helper' };
   const authz = c.req.header('authorization');
   if (authz?.toLowerCase().startsWith('bearer ')) {
     const t = await tokenUser(ctx, authz.slice(7).trim());
-    return t ? `token:${t.token.name}` : null;
+    return t ? { user: `token:${t.token.name}`, scopes: tokenScopes(t.token) } : null;
   }
   const sid = readSessionCookie(c);
   if (sid) {
     const u = await sessionUser(ctx, sid);
-    if (u) return u.email;
+    if (u) return { user: u.email };
   }
-  if (env.CF_ACCESS_TEAM_DOMAIN && env.CF_ACCESS_AUD) return verifyAccessJwt(env, c);
+  if (env.CF_ACCESS_TEAM_DOMAIN && env.CF_ACCESS_AUD) {
+    const user = await verifyAccessJwt(env, c);
+    return user ? { user } : null;
+  }
   return null;
 }
 
@@ -59,9 +75,10 @@ async function verifyAccessJwt(env: Env, c: Context): Promise<string | null> {
 
 export function accessAuth(ctx: AppContext): MiddlewareHandler<{ Variables: AuthVariables }> {
   return async (c, next) => {
-    const user = await verifyAccess(ctx, c);
-    if (!user) return c.json({ error: 'unauthorized' }, 401);
-    c.set('user', user);
+    const id = await resolveIdentity(ctx, c);
+    if (!id) return c.json({ error: 'unauthorized' }, 401);
+    c.set('user', id.user);
+    c.set('scopes', id.scopes);
     await next();
   };
 }

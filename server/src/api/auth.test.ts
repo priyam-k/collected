@@ -71,6 +71,44 @@ describe('sign-in, sessions and tokens', () => {
     expect((await a.request('/api/items', { headers: bearer })).status).toBe(401);
   });
 
+  it('a scoped token is narrowed to its areas and says what it lacks', async () => {
+    const ctx = await signedCtx();
+    const a = app(ctx);
+    const user = await upsertUser(ctx, { email: 'me@example.com' });
+    const s = await createSession(ctx, user.id);
+    const cookie = { cookie: `collected_session=${s.id}` };
+
+    expect((await a.request('/api/auth/tokens', json({ name: 'empty', scopes: {} }, cookie))).status).toBe(400);
+    expect((await a.request('/api/auth/tokens', json({ name: 'bad', scopes: { jobs: 'admin' } }, cookie))).status).toBe(422);
+    expect((await a.request('/api/auth/tokens', json({ name: 'bad', scopes: { grades: 'read' } }, cookie))).status).toBe(422);
+    const created = await a.request('/api/auth/tokens', json({ name: 'agent', scopes: { jobs: 'read', calendar: 'write' } }, cookie));
+    expect(created.status).toBe(201);
+    const body = (await created.json()) as { id: string; token: string; scopes: unknown };
+    expect(body.scopes).toEqual({ jobs: 'read', calendar: 'write' });
+    const bearer = { authorization: `Bearer ${body.token}` };
+
+    expect(await (await a.request('/api/auth/me', { headers: bearer })).json()).toMatchObject({ identity: 'token:agent', scopes: { jobs: 'read', calendar: 'write' } });
+    expect((await a.request('/api/jobs', { headers: bearer })).status).toBe(200);
+    const denied = await a.request('/api/jobs', json({ company: 'x', title: 'y' }, bearer));
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({ error: 'this token has no write access to jobs' });
+    expect((await a.request('/api/courses', { headers: bearer })).status).toBe(403);
+    expect((await a.request('/api/grades', { headers: bearer })).status).toBe(403);
+    expect((await a.request('/api/sources', { headers: bearer })).status).toBe(200);
+    expect((await a.request('/api/sources/sync', json({}, bearer))).status).toBe(403);
+    // Agenda rows come narrowed to the token's sources: a calendar scope never sees coursework.
+    expect((await a.request('/api/items', { headers: bearer })).status).toBe(200);
+    expect(await (await a.request('/api/items?source=canvas', { headers: bearer })).json()).toEqual([]);
+    // Still a token: the machine deny list applies before the scopes do.
+    expect((await a.request('/api/export', { headers: bearer })).status).toBe(403);
+
+    const list = (await (await a.request('/api/auth/tokens', { headers: cookie })).json()) as { name: string; scopes: unknown }[];
+    expect(list.find((t) => t.name === 'agent')?.scopes).toEqual({ jobs: 'read', calendar: 'write' });
+    // A token created without scopes, and one with every write, both list as unrestricted.
+    const full = await a.request('/api/auth/tokens', json({ name: 'laptop', scopes: { courses: 'write', jobs: 'write', calendar: 'write', tasks: 'write' } }, cookie));
+    expect(((await full.json()) as { scopes: unknown }).scopes).toBeNull();
+  });
+
   it('the first sign-in claims the instance; ALLOWED_EMAILS overrides', async () => {
     const ctx = await signedCtx();
     expect(await emailAllowed(ctx, 'first@example.com')).toBe(true);
