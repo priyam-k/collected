@@ -59,6 +59,10 @@ brew uninstall collected-cli && brew untap priyam-k/collected && brew untrust pr
 
 `brew style homebrew/Formula/collected-cli.rb` needs no tap and catches most formula-shape mistakes on its own.
 
+## Which number moves
+
+collected is an app, not a library, so the number is a label for people and a compatibility signal between CLI and server, not a promise about the kind of change. The rule since 1.7.0: **patch is the default**, for small features and fixes alike; **minor** when the changelog entry is something you would tell a friend about (local mode, the jobs rework, the MCP server); **major** only when old clients must upgrade (a CLI that cannot talk to the old server, a migration that cannot be rolled back, a config format change). The `recommended` or `optional` mark on the changelog heading says how urgent a release is; the digits do not. One consequence: the CLI's once-a-day upgrade nudge fires on a minor gap, so a user behind by patches alone is not nudged, which is fine while the server still talks to them.
+
 ## Cutting a release
 
 ```sh
