@@ -1,7 +1,8 @@
 import { createInterface } from 'node:readline/promises';
 import { Writable } from 'node:stream';
 import { parseArgs } from 'node:util';
-import { openApi, versionWatch } from './api.js';
+import { describeScopes, type Me } from '@collected/shared';
+import { Api, openApi, versionWatch } from './api.js';
 import { HELP, isCollectedCommand, runCollected } from './collected.js';
 import { connectCanvas, connectCanvasToken } from './connect.js';
 import { connectTodoist } from './connect-todoist.js';
@@ -31,7 +32,7 @@ const localOpts = { logLevel: verbose ? 'info' : undefined, verbose };
 /** The once-a-day npm check at the end of a command waits this long at most; `collected upgrade` itself waits 10 s. */
 const NOTICE_REGISTRY_TIMEOUT_MS = 3_000;
 /** Commands that end without the version notice: nothing was asked of a server, or the command is the notice's own remedy. */
-const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon', 'install-launchd', 'uninstall-launchd', 'quickstart']);
+const NO_NOTICE = new Set<string | undefined>([undefined, 'help', '--help', '--version', '-v', 'version', 'upgrade', 'init', 'ui', 'daemon', 'install-launchd', 'uninstall-launchd', 'quickstart', 'mcp']);
 
 function usage(): never {
   console.log(`${HELP}
@@ -72,6 +73,12 @@ function usage(): never {
     daemon install [--interval N] | uninstall | status
                                               a user timer running \`collected sync\` every N minutes (15 in local mode, 30 against a server;
                                               daemon.intervalMinutes in agent.json wins); install-launchd / uninstall-launchd still mean the same
+
+  For an agent
+
+    quickstart --agent                        the setup plan for an AI agent that will run this CLI for you (see above)
+    mcp                                       the same commands as MCP tools on stdio, for Claude Code, Cursor or Claude Desktop:
+                                              claude mcp add collected -- collected mcp      (or {"command":"collected","args":["mcp"]})
 
   This program
 
@@ -278,12 +285,29 @@ try {
       else if (what === 'model') cfg.model = { ...cfg.model, enabled: true, apiKey: a ?? (await readSecret('TypeSafe API key: ')) };
       else usage();
       saveConfig(cfg);
-      say('saved');
+      if (what === 'token') {
+        // Saved first, then proved: a token that does not answer stays saved, with the reason, so a retry is a plain rerun.
+        try {
+          const me = await new Api(cfg).get<Pick<Me, 'identity' | 'scopes'>>('/api/auth/me');
+          say(me.identity ? `saved · signed in as ${me.identity}${me.scopes !== undefined ? ` (${describeScopes(me.scopes)})` : ''}` : 'saved, but the server did not accept it: check the token (Settings → Account) and run this again');
+        } catch (e) {
+          say(`saved, but the server could not be reached: ${(e as Error).message}`);
+        }
+      } else say('saved');
       if ((what === 'service-token' && b) || (what !== 'service-token' && a)) console.error('note: a secret on the command line lands in shell history; next time leave it off and type it at the prompt');
       break;
     }
     case 'login': {
       await login(loadConfig(), { say, readSecret, noOpen: rest.includes('--no-open') });
+      break;
+    }
+    case 'mcp': {
+      // stdout is the protocol stream from here on: anything that would have printed goes to stderr instead.
+      console.log = (...a: unknown[]) => console.error(...a);
+      const cfg = cfgOf();
+      const api = await apiFor(cfg);
+      const { serveMcp } = await import('./mcp.js');
+      await serveMcp({ api, cfg, warn: (line) => console.error(line) });
       break;
     }
     case 'connect': {
