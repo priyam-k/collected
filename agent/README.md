@@ -253,6 +253,34 @@ A `<course>` is its code (`cs101`), the digits (`101`), or the full id.
 - Downloads follow only `https` redirects to public hosts, with a size cap and a timeout; no auth header crosses a redirect.
 - Secrets are read from a prompt or stdin, never from a command-line argument.
 
+## Agents: a token of their own, or MCP
+
+An agent on another machine (a cloud coding agent, a scheduled job) does not need your laptop's setup. Give it its own token, scoped to what it should touch, and either the CLI or the MCP server:
+
+```sh
+export COLLECTED_AGENT_HOME=/some/persistent/dir     # before every command; the default is ~/.collected
+npm i -g collected-cli
+collected init https://collected.example.com
+printf '%s' "$COLLECTED_TOKEN" | collected auth token   # the token from Settings → Account, piped, never an argument
+collected --help
+```
+
+Tokens are scoped per area and per direction when you create them in Settings → Account: `courses` (Canvas and Gradescope: courses, assignments, grades, announcements, dates, files), `jobs`, `calendar` and `tasks` (Todoist and Google Tasks), each none, read or read and write. A read-only token can look at everything in its areas and change nothing; a scoped token that tries something outside its areas gets a 403 that names what it lacks (`this token has no write access to jobs`). Whatever the scopes, a token can never touch credentials, settings, layout, other tokens or the export. `collected login` and `collected auth token` print the scopes they were given. The laptop CLI normally gets "Everything".
+
+`collected mcp` serves the same commands as MCP tools on stdio, for Claude Code, Cursor, Claude Desktop or any other MCP client, in client mode and local mode alike. Every tool is one command with `--json`; reads are marked read-only, `jobs_rm` is the one destructive tool, and the CLI's help is published as the `collected://help` resource.
+
+```sh
+claude mcp add collected -- collected mcp
+```
+
+or, in a `.mcp.json` or Claude Desktop's configuration:
+
+```json
+{ "mcpServers": { "collected": { "command": "collected", "args": ["mcp"], "env": { "COLLECTED_AGENT_HOME": "/some/persistent/dir" } } } }
+```
+
+Setup (`init`, `login`, `connect`), the file sync and `pull` stay in the terminal: they touch the machine, not the dashboard.
+
 ## Keep it current
 
 ```sh

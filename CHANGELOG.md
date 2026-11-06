@@ -7,6 +7,12 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.6.0 — 2026-11-05 · recommended
+
+- Tokens: Settings → Account creates tokens scoped per area (courses, jobs, calendar, tasks) and per direction (read, or read and write); a scoped token that oversteps gets a 403 naming what it lacks. Existing tokens are unchanged.
+- CLI: `collected mcp` serves every command as an MCP tool on stdio, for Claude Code, Cursor and Claude Desktop (`claude mcp add collected -- collected mcp`).
+- CLI: `collected login` and `auth token` say what the token may do.
+
 ## 1.5.0 — 2026-11-05 · recommended
 
 - Jobs: tracker stages are editable (`jobs stages`, or set any stage name and it becomes a column); `new`, `starred` and `hidden` keep their meanings.

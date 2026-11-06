@@ -141,6 +141,8 @@ The same commands work in local mode and against a server; in local mode `collec
 
 `skills/collected/SKILL.md` teaches an agent (Claude Code, or anything that reads a skill file) what the `collected` CLI can do, which commands are safe to run freely and which change things. Copy it into your agent's skills folder (for Claude Code: `~/.claude/skills/collected/SKILL.md`) and the agent can answer "what's due this week" or "add an exam date" through the CLI. It works the same in local mode, where reads come straight from the database on your laptop: the skill tells the agent to pass `--stale-ok` on repeated calls, `--fresh` when you ask for the latest, and to suggest `collected upgrade` when a version notice shows up.
 
+`collected mcp` is the same set of commands as an MCP server on stdio (`claude mcp add collected -- collected mcp`), for clients that prefer tools to a shell. An agent on another machine gets its own token from Settings → Account, scoped per area (courses, jobs, calendar, tasks) and per direction (read, or read and write), so a job-search agent can read and stage applications and nothing else; see [`agent/README.md`](agent/README.md#agents-a-token-of-their-own-or-mcp).
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for how to report a vulnerability. The trust model in four lines:
@@ -148,7 +150,7 @@ See [SECURITY.md](SECURITY.md) for how to report a vulnerability. The trust mode
 - Credentials (Canvas token or cookie, Gradescope password, Google and Todoist tokens) are AES-256-GCM encrypted at rest and never returned by the API or written to logs.
 - The laptop never trusts the server for a filesystem path: targets are validated against the names you configured, every write is checked to be inside the linked folder, and downloads follow only `https` redirects to public hosts.
 - Every outbound URL the server fetches is validated (`https`, public host), bounded in time and size, and pinned to its origin across redirects and pagination.
-- CLI tokens are scoped: a service token can do what the CLI needs and nothing destructive; the helper key opens a single route.
+- CLI tokens are scoped: per area (courses, jobs, calendar, tasks) and per direction (read or write), and never credentials, settings, layout, other tokens or the export; the helper key opens a single route.
 
 ## Docs
 
