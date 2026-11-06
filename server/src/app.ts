@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
-import { createUpdateChecker, type UpdateChecker } from '@collected/core/lib/updates';
+import { createUpdateChecker, systemVersion, type UpdateChecker } from '@collected/core/lib/updates';
 import { createApi } from './api/index.js';
+import { CodeStore } from './mcp/oauth.js';
+import { mcpRoutes } from './mcp/routes.js';
 import type { GoogleConnectResult } from './api/google.js';
 import type { AppContext } from './context.js';
 import { mountStatic } from './static.js';
@@ -48,7 +50,10 @@ export function createApp(ctx: AppContext, opts: AppOptions = {}): { app: Hono; 
     }),
   );
   const updates = opts.updates ?? createUpdateChecker(ctx);
-  app.route('/api', createApi(ctx, { updates, google: { onResult: opts.onGoogleConnect } }));
+  const oauthCodes = new CodeStore();
+  app.route('/api', createApi(ctx, { updates, google: { onResult: opts.onGoogleConnect }, oauthCodes }));
+  // The remote MCP endpoint and its OAuth front door (DECISIONS 065); the tools call back into this same app.
+  app.route('/', mcpRoutes(ctx, { fetchApp: async (req) => app.request(req), version: systemVersion(ctx).version, codes: oauthCodes }));
   // The owner's own machine has no visitor to show a landing page to: `/` is the board (DECISIONS 054).
   if (ctx.env.LOCAL_OWNER) app.get('/', (c) => c.redirect('/dashboard', 302));
   const servingSpa = opts.webDist ? mountStatic(app, opts.webDist) : false;

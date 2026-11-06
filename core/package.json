@@ -23,6 +23,7 @@
     "@collected/shared": "workspace:*",
     "@googleapis/calendar": "^20.1.0",
     "@libsql/client": "^0.18.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "cheerio": "^1.2.0",
     "croner": "^11.0.0",
     "drizzle-orm": "^0.45.4",

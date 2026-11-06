@@ -12,17 +12,8 @@ import { cliVersion } from './version.js';
 const JSON_TIMEOUT_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    /** The server's JSON body when it sent one: a 409 on `POST /api/jobs` carries the existing job in it. */
-    readonly body?: unknown,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError, readJson } from '@collected/core/commands/api';
+import { ApiError, readJson, type CommandApi } from '@collected/core/commands/api';
 
 /** What the sync needs from the server; `Api` is the real one, tests pass a fake. */
 export interface SyncApi {
@@ -35,11 +26,7 @@ export interface SyncApi {
 }
 
 /** Everything the commands call. `Api` speaks HTTP to a server; `LocalApi` (local.ts) runs the same app in-process. */
-export interface CollectedApi extends SyncApi {
-  /** Any GET on collected's API. */
-  get<T>(p: string): Promise<T>;
-  /** Any write on collected's API with a JSON body. */
-  send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', p: string, body?: unknown): Promise<T>;
+export interface CollectedApi extends SyncApi, CommandApi {
   postCanvasCookie(body: { cookieHeader: string; baseUrl?: string }): Promise<{ ok: boolean; outcome: unknown }>;
 }
 
@@ -50,31 +37,6 @@ export async function openApi(cfg: AgentConfig, opts: { logLevel?: string; verbo
   return LocalApi.open(cfg, opts);
 }
 
-/**
- * Reads an API answer the way every command expects: a redirect is an Access login wall, a non-2xx is an error with
- * the server's message, anything else is JSON.
- */
-export async function readJson<T>(p: string, res: Response): Promise<T> {
-  if (res.status >= 300 && res.status < 400) {
-    throw new ApiError(`${p} redirected to ${res.headers.get('location') ?? '?'}: Cloudflare Access did not accept the credentials (service token missing or wrong)`, res.status);
-  }
-  const text = await res.text();
-  if (!res.ok) {
-    let msg = text.slice(0, 300);
-    let body: unknown;
-    try {
-      body = JSON.parse(text);
-      msg = (body as { error?: string }).error ?? msg;
-    } catch {
-      /* keep text */
-    }
-    const hint = res.status === 401 ? ' (not signed in: run `collected login`, or `collected auth helper-key` for a local server)' : '';
-    throw new ApiError(`${p}: ${res.status} ${msg}${hint}`, res.status, body);
-  }
-  return JSON.parse(text) as T;
-}
-
-/** Query string for the items a course's facts files are built from. */
 export const itemsQuery = (courseId: string, kind: 'assignment' | 'announcement'): string => new URLSearchParams({ kind, course: courseId, includeDone: '1', includeInformational: '1', includeHidden: '1', limit: '1000' }).toString();
 
 /** Where a download redirect may point: https, a public host, never an Access login wall. Throws the ApiError the command shows. */

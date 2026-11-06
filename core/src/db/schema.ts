@@ -280,7 +280,17 @@ export const apiTokens = sqliteTable(
   },
   (t) => [index('api_tokens_user_idx').on(t.userId)],
 );
+/** MCP clients that registered themselves (RFC 7591) to run the OAuth flow at /oauth/authorize; public clients, PKCE only. */
+export const oauthClients = sqliteTable('oauth_clients', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  /** JSON string[]: the exact redirect URIs the client registered; /oauth/authorize matches one of them exactly. */
+  redirectUris: text('redirect_uris').notNull(),
+  createdAt: text('created_at').notNull().$defaultFn(nowIso),
+});
+
 export type UserRow = typeof users.$inferSelect;
+export type OAuthClientRow = typeof oauthClients.$inferSelect;
 export type ApiTokenRow = typeof apiTokens.$inferSelect;
 
 export type SourceRow = typeof sources.$inferSelect;

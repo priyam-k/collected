@@ -7,6 +7,11 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.7.0 — 2026-11-06 · recommended
+
+- MCP: the server is a remote MCP endpoint at `/mcp` with OAuth sign-in, so the Claude apps (Settings → Connectors → Add custom connector) and other remote clients connect with the URL alone; the consent page picks the connector's access and the result is an ordinary scoped token in Settings → Account.
+- CLI: the command module moved into the core package so the CLI, `collected mcp` and the server's endpoint run the same code.
+
 ## 1.6.0 — 2026-11-05 · recommended
 
 - Tokens: Settings → Account creates tokens scoped per area (courses, jobs, calendar, tasks) and per direction (read, or read and write); a scoped token that oversteps gets a 403 naming what it lacks. Existing tokens are unchanged.

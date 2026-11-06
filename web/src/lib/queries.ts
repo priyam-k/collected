@@ -686,6 +686,24 @@ export function useLogout() {
   });
 }
 
+/** The body the consent page posts to approve an MCP connector (OAuth authorization code flow with PKCE). */
+export interface OAuthApproval {
+  clientId: string;
+  redirectUri: string;
+  state?: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+  scopes: TokenScopes | null;
+  resource?: string;
+}
+
+/** Approves an OAuth client; the server answers with the redirect URL that carries the code back to the client. */
+export function useApproveOAuth() {
+  return useMutation({
+    mutationFn: (body: OAuthApproval) => api<{ redirect: string }>('/oauth/approve', { method: 'POST', json: body }),
+  });
+}
+
 // --- onboarding ------------------------------------------------------------------------------------------------------
 
 export function useCanvasEnrollments(enabled = true) {

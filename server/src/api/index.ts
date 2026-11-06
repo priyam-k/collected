@@ -21,6 +21,8 @@ import { healthRoutes } from './health.js';
 import { itemsRoutes } from './items.js';
 import { jobsRoutes } from './jobs.js';
 import { MUTATING, scopeDenial } from './scopes.js';
+import { oauthApproveRoutes } from './oauth.js';
+import { CodeStore } from '../mcp/oauth.js';
 import { layoutRoutes, widgetRoutes } from './layout.js';
 import { onboardingRoutes } from './onboarding.js';
 import { settingsRoutes } from './settings.js';
@@ -46,7 +48,7 @@ export function identityAllows(user: string, method: string, pathWithQuery: stri
   if (user === 'helper') return path === '/api/sources/canvas/cookie' && method === 'POST';
   const p = path.replace(/\/+$/, '');
   if (p === '/api/import' || p === '/api/export' || p === '/api/demo') return false;
-  if (p.startsWith('/api/auth/tokens') || p === '/api/auth/logout-all') return false;
+  if (p.startsWith('/api/auth/tokens') || p === '/api/auth/logout-all' || p.startsWith('/api/oauth')) return false;
   if (p.startsWith('/api/google') || p.startsWith('/api/layout') || p.startsWith('/api/widgets')) return false;
   if (p === '/api/sources/canvas/cookie') return false;
   if (p === '/api/todoist/connect' || p === '/api/todoist/callback' || p === '/api/todoist/disconnect') return false;
@@ -79,7 +81,7 @@ export function crossSite(headers: { origin?: string; secFetchSite?: string }, p
   }
 }
 
-export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; google?: GoogleRouteOptions } = {}) {
+export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; google?: GoogleRouteOptions; oauthCodes?: CodeStore } = {}) {
   const updates = deps.updates ?? createUpdateChecker(ctx);
   const api = new Hono<{ Variables: AuthVariables }>();
 
@@ -161,6 +163,7 @@ export function createApi(ctx: AppContext, deps: { updates?: UpdateChecker; goog
   api.route('/widgets', widgetRoutes(ctx));
   api.route('/settings', settingsRoutes(ctx));
   api.route('/google', googleRoutes(ctx, deps.google));
+  api.route('/oauth', oauthApproveRoutes(ctx, deps.oauthCodes ?? new CodeStore()));
   api.route('/calendar', calendarRoutes(ctx));
   api.route('/canvas', canvasRoutes(ctx));
   api.route('/grades', gradesRoutes(ctx));

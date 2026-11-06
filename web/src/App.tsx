@@ -4,6 +4,7 @@ import { isSignedIn, useMe } from '@/lib/queries';
 import { DASHBOARD } from '@/lib/routes';
 import { useSignedOutToast } from '@/lib/useSignOut';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { OAuthConsentPage } from '@/pages/OAuthConsentPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SignInPage } from '@/pages/SignInPage';
 import { DemoPage, Landing, Privacy, Terms } from '@/pages/public';
@@ -42,6 +43,7 @@ export default function App() {
           }
         />
         <Route path="/signin" element={<SignInPage />} />
+        <Route path="/oauth/consent" element={<OAuthConsentPage />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/demo" element={<DemoPage />} />

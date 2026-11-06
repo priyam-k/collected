@@ -281,6 +281,8 @@ or, in a `.mcp.json` or Claude Desktop's configuration:
 
 Setup (`init`, `login`, `connect`), the file sync and `pull` stay in the terminal: they touch the machine, not the dashboard.
 
+**The Claude apps and other remote clients** need no install at all: a collected server is a remote MCP endpoint with OAuth. In Claude's Settings → Connectors → Add custom connector, enter a name and `https://<your server>/mcp`, continue, sign in with Google when collected asks, pick what the connector may access, and allow. The result is an ordinary token named `<client> · MCP` in Settings → Account, revocable there like any other. This works against a server you can reach over HTTPS; local mode (`collected ui`) has no sign-in and is not meant to be exposed.
+
 ## Keep it current
 
 ```sh

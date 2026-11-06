@@ -27,7 +27,7 @@ function fakeApi(gets: Record<string, unknown> = {}) {
   return { api, calls };
 }
 
-const deps = (api: Api) => ({ api, cfg: { server: 'https://collected.example.com' } });
+const deps = (api: Api) => ({ api, version: '0.0.0-test' });
 const spec = (name: string) => TOOLS.find((t) => t.name === name)!;
 
 describe('mcp tools', () => {
