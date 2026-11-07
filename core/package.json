@@ -28,7 +28,7 @@
     "croner": "^11.0.0",
     "drizzle-orm": "^0.45.4",
     "fetch-cookie": "^3.2.0",
-    "google-auth-library": "^11.3.2",
+    "google-auth-library": "^11.3.3",
     "node-ical": "^0.27.3",
     "pino": "^10.4.0",
     "tough-cookie": "^6.0.2",
@@ -39,6 +39,6 @@
     "drizzle-kit": "^0.31.11",
     "pino-pretty": "^13.2.0",
     "typescript": "~5.9.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }

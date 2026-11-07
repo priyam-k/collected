@@ -46,16 +46,16 @@
   },
   "dependencies": {
     "@googleapis/calendar": "^20.1.0",
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.6",
     "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "cheerio": "^1.2.0",
     "croner": "^11.0.0",
     "drizzle-orm": "^0.45.4",
     "fetch-cookie": "^3.2.0",
-    "google-auth-library": "^11.3.2",
-    "hono": "^4.13.14",
-    "jose": "^6.2.13",
+    "google-auth-library": "^11.3.3",
+    "hono": "^4.13.16",
+    "jose": "^6.2.15",
     "node-ical": "^0.27.3",
     "pino": "^10.4.0",
     "tough-cookie": "^6.0.2",
@@ -69,6 +69,6 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
