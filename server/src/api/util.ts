@@ -1,6 +1,10 @@
-import type { Context } from 'hono';
+import type { Context, ErrorHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { z } from 'zod';
+import type { SourceId } from '@collected/shared';
+import { NeedsAuthError, NotConfiguredError } from '@collected/core/ingest/types';
+import { setSourceStatus } from '@collected/core/lib/sources';
+import type { AppContext } from '../context.js';
 
 export function bad(message: string, status: 400 | 403 | 404 | 409 | 422 = 400): never {
   throw new HTTPException(status, { message, res: new Response(JSON.stringify({ error: message }), { status, headers: { 'content-type': 'application/json' } }) });
@@ -72,3 +76,26 @@ export const csv = (v: string | undefined): string[] | undefined =>
         .map((s) => s.trim())
         .filter(Boolean)
     : undefined;
+
+/**
+ * What a to-do app's routes answer when the app itself is the problem, so the widget's toast says something a
+ * person can act on instead of "internal error": not connected → 409, credentials rejected → 502 and the source
+ * marked needs_auth, any other answer from the app (a 404 for a task already gone, a 5xx, a rate limit) → the
+ * app's own text, 404 kept and the rest 502. `label` is how the app's client prefixes its errors ("Todoist",
+ * "Google Tasks"). Anything else is rethrown to the api-wide handler, which logs it.
+ */
+export function todoAppErrors(ctx: AppContext, source: SourceId, label: string): ErrorHandler {
+  return async (err, c) => {
+    if (err instanceof HTTPException) return err.getResponse();
+    if (err instanceof NotConfiguredError) return c.json({ error: `${label} is not connected; connect it in Settings → Sources` }, 409);
+    if (err instanceof NeedsAuthError) {
+      await setSourceStatus(ctx, source, 'needs_auth', { lastError: err.message });
+      return c.json({ error: `${label} rejected its credentials; reconnect it in Settings → Sources` }, 502);
+    }
+    if (err instanceof Error && err.message.startsWith(`${label} `)) {
+      ctx.log.warn({ err, path: c.req.path }, `${source} request failed`);
+      return c.json({ error: err.message }, new RegExp(`^${label} .*\\b404\\b`).test(err.message) ? 404 : 502);
+    }
+    throw err;
+  };
+}

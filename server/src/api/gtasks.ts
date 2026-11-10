@@ -9,7 +9,7 @@ import { getSettingParsed, setSetting } from '@collected/core/lib/settings';
 import { getSourceRow } from '@collected/core/lib/sources';
 import { nowIso } from '@collected/core/lib/time';
 import { executeGtasksPush, planGtasksPush } from '@collected/core/sync/gtasks-push';
-import { bad, parseBody, parsePatch } from './util.js';
+import { bad, parseBody, parsePatch, todoAppErrors } from './util.js';
 
 interface GtasksMeta {
   lists?: { id: string; title: string }[];
@@ -23,6 +23,7 @@ interface GtasksMeta {
  */
 export function gtasksRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<GTasksApi> = gtasksApiForCtx) {
   const r = new Hono();
+  r.onError(todoAppErrors(ctx, 'gtasks', 'Google Tasks'));
 
   /** Preview (dryRun=1) or execute the one-way push. Execution requires the setting to be enabled unless force=1. */
   r.post('/push', async (c) => {

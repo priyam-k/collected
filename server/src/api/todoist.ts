@@ -15,7 +15,7 @@ import { getSettingParsed, setSetting } from '@collected/core/lib/settings';
 import { getSourceConfig, getSourceRow, mergeSourceMeta, setSourceConfig, setSourceStatus } from '@collected/core/lib/sources';
 import { nowIso } from '@collected/core/lib/time';
 import { executePush, planPush } from '@collected/core/sync/todoist-push';
-import { bad, parseBody, parsePatch } from './util.js';
+import { bad, parseBody, parsePatch, todoAppErrors } from './util.js';
 
 /** OAuth state → who started the flow and when it expires. Bound to the identity like the Google flow (api/google.ts). */
 const pendingStates = new Map<string, { user: string | null; exp: number }>();
@@ -34,6 +34,7 @@ export interface TodoistRouteDeps {
 
 export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => Promise<TodoistApi> = todoistApiForCtx, deps: TodoistRouteDeps = {}) {
   const r = new Hono<{ Variables: AuthVariables }>();
+  r.onError(todoAppErrors(ctx, 'todoist', 'Todoist'));
   const fetchImpl = deps.fetchImpl ?? fetch;
   const run = deps.run ?? runIngester;
   const now = deps.now ?? Date.now;

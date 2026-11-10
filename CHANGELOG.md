@@ -7,6 +7,10 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.7.1 — 2026-11-10 · optional
+
+- To-do widget: checking off or adding a Todoist or Google Tasks task while that app is disconnected, or after it rejected its token, now says so ("Todoist is not connected; connect it in Settings → Sources") instead of "internal error"; a rejected token also marks the source as needing a reconnect, and an answer from the app itself (a task already gone, a rate limit) comes through with its own text.
+
 ## 1.7.0 — 2026-11-06 · recommended
 
 - MCP: the server is a remote MCP endpoint at `/mcp` with OAuth sign-in, so the Claude apps (Settings → Connectors → Add custom connector) and other remote clients connect with the URL alone; the consent page picks the connector's access and the result is an ordinary scoped token in Settings → Account.
