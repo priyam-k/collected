@@ -22,7 +22,7 @@
     "smoke:cli": "node scripts/smoke-cli-package.mjs"
   },
   "devDependencies": {
-    "concurrently": "^10.0.6",
+    "concurrently": "^10.0.7",
     "typescript": "~5.9.3"
   }
 }
