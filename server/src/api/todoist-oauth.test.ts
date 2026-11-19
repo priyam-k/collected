@@ -113,6 +113,20 @@ describe('Todoist OAuth connect', () => {
     expect(await getSourceConfig(ctx, 'todoist')).toBeNull();
   });
 
+  it('stores the refresh token and expiry a refresh-enabled app answers with', async () => {
+    const t0 = Date.parse('2026-11-18T12:00:00Z');
+    const { app, ctx } = await setup({
+      now: () => t0,
+      fetchImpl: async () => Response.json({ access_token: 'access-1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'refresh-1', scope: 'data:read_write,data:delete' }),
+    });
+    const state = await startFlow(app);
+    const res = await app.request(`/api/todoist/callback?code=abc&state=${state}`);
+    expect(location(res).searchParams.get('todoist')).toBe('connected');
+    const cfg = (await getSourceConfig(ctx, 'todoist')) as { token: string; refreshToken?: string; expiresAt?: string };
+    expect(cfg).toMatchObject({ token: 'access-1', refreshToken: 'refresh-1' });
+    expect(Date.parse(cfg.expiresAt!) - Date.now()).toBeGreaterThan(3500_000);
+  });
+
   it('maps access_denied to reason=denied and a failed exchange to reason=exchange without storing anything', async () => {
     const { app, ctx } = await setup({ fetchImpl: async () => new Response(JSON.stringify({ error: 'bad_authorization_code' }), { status: 400 }) });
     const denied = await app.request('/api/todoist/callback?error=access_denied&state=whatever');
@@ -132,8 +146,8 @@ describe('Todoist OAuth connect', () => {
 
     const res = await app.request('/api/todoist/disconnect', { method: 'POST' });
     expect(await res.json()).toEqual({ ok: true, revoked: true });
-    expect(calls.map((k) => k.url)).toEqual([TODOIST_TOKEN_URL, TODOIST_REVOKE_URL]);
-    expect(new URLSearchParams(calls[1]!.body).get('access_token')).toBe('tok-from-oauth');
+    expect(calls.map((k) => k.url.split('?')[0])).toEqual([TODOIST_TOKEN_URL, TODOIST_REVOKE_URL]);
+    expect(new URL(calls[1]!.url).searchParams.get('access_token')).toBe('tok-from-oauth');
     expect(await getSourceConfig(ctx, 'todoist')).toBeNull();
     const row = await getSourceRow(ctx, 'todoist');
     expect(row.status).toBe('disconnected');

@@ -8,7 +8,8 @@ import { markerIn } from '../../sync/todoist-push.js';
 import { wallClockToIso } from '../gradescope/parse.js';
 import { NotConfiguredError, type Ingester } from '../types.js';
 import { isClosed, type TLabel, type TProject, type TSection, type TTask, type TodoistApi } from './api.js';
-import { TodoistHttpApi } from './client.js';
+import { TODOIST_BASE, TodoistHttpApi } from './client.js';
+import { currentTodoistToken } from './token.js';
 
 /**
  * Todoist due → ISO. In API v1 `due.date` is either `YYYY-MM-DD` (all-day) or a floating `YYYY-MM-DDTHH:MM:SS`
@@ -73,11 +74,10 @@ export async function syncTodoist(ctx: AppContext, api: TodoistApi): Promise<Rec
   return { projects: projects.length, sections: sections.length, labels: labels.length, open: open.length, completed: completed.length, upserted: r.upserted, created: r.created, deleted: r.deleted };
 }
 
-export async function todoistApiForCtx(ctx: AppContext): Promise<TodoistHttpApi> {
-  const config = await getSourceConfig<{ token: string }>(ctx, 'todoist');
-  if (!config?.token) throw new NotConfiguredError('Todoist API token not set');
-  const { token } = sourceConfigSchemas.todoist.parse(config);
-  return new TodoistHttpApi(token);
+/** The client for the stored credentials: an OAuth access token is renewed before use when it is about to expire, and once more if Todoist still refuses it. */
+export async function todoistApiForCtx(ctx: AppContext, fetchImpl: typeof fetch = fetch): Promise<TodoistHttpApi> {
+  const token = await currentTodoistToken(ctx, { fetchImpl });
+  return new TodoistHttpApi(token, fetchImpl, TODOIST_BASE, (rejected) => currentTodoistToken(ctx, { rejected, fetchImpl }));
 }
 
 export const todoistIngester: Ingester = {

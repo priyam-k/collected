@@ -22,12 +22,14 @@ export class TodoistHttpApi implements TodoistApi {
   signal?: AbortSignal;
 
   constructor(
-    private readonly token: string,
+    private token: string,
     private readonly fetchImpl: typeof fetch = fetch,
     readonly base = TODOIST_BASE,
+    /** Asked once per request after a 401 with the token Todoist refused; a different token back means retry with it. */
+    private readonly renew?: (rejected: string) => Promise<string>,
   ) {}
 
-  private async req<T>(method: string, path: string, opts: { query?: Record<string, string | number | undefined>; body?: unknown }, attempt = 0): Promise<T> {
+  private async req<T>(method: string, path: string, opts: { query?: Record<string, string | number | undefined>; body?: unknown }, attempt = 0, renewed = false): Promise<T> {
     this.requestCount++;
     const url = new URL(`${this.base}${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
@@ -37,6 +39,14 @@ export class TodoistHttpApi implements TodoistApi {
       headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
+    if (res.status === 401 && this.renew && !renewed) {
+      // An expired access token (Todoist's error_code 477) looks like any other 401; the renewer decides.
+      const fresh = await this.renew(this.token);
+      if (fresh !== this.token) {
+        this.token = fresh;
+        return this.req(method, path, opts, attempt, true);
+      }
+    }
     if (res.status === 401 || res.status === 403) throw new NeedsAuthError(`Todoist rejected the token (${res.status})`);
     if (res.status === 429) {
       if (attempt >= MAX_429_RETRIES) throw new Error(`Todoist rate limited ${method} ${path} after ${attempt} retries`);

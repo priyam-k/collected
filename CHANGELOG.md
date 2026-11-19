@@ -7,6 +7,11 @@ should pull it; `optional` means nice to have.
 
 ## Unreleased
 
+## 1.7.2 — 2026-11-18 · recommended
+
+- Todoist: a connection made with "Connect Todoist" no longer drops to "needs auth" an hour or so later. Todoist apps now issue access tokens that expire after an hour plus a refresh token; collected kept only the access token. It now stores the refresh token, renews the access token before it expires and once more if Todoist refuses it, and asks for a reconnect only when the refresh token itself is dead. Connect Todoist once more after updating so a refresh token is on file.
+- Todoist: disconnect revokes the token through the current API (the v9 endpoint it used is retired).
+
 ## 1.7.1 — 2026-11-10 · optional
 
 - To-do widget: checking off or adding a Todoist or Google Tasks task while that app is disconnected, or after it rejected its token, now says so ("Todoist is not connected; connect it in Settings → Sources") instead of "internal error"; a rejected token also marks the source as needing a reconnect, and an answer from the app itself (a task already gone, a rate limit) comes through with its own text.

@@ -338,7 +338,9 @@ export const sourceConfigSchemas = {
   gcal: z.object({ refreshToken: z.string().min(1) }),
   /** The "Secret address in iCal format" of one Google calendar; read-only, no OAuth client needed. */
   gcal_ical: z.object({ url: outboundUrlSchema }),
-  todoist: z.object({ token: z.string().min(1) }),
+  /** A pasted API token is just `token`. An OAuth grant from a refresh-enabled Todoist app also carries the refresh
+   *  token and when the access token expires; core/src/ingest/todoist/token.ts renews it before use. */
+  todoist: z.object({ token: z.string().min(1), refreshToken: z.string().min(1).optional(), expiresAt: z.string().datetime().optional() }),
   /** Refresh token from the separate "Connect Google Tasks" consent (tasks scope, granted incrementally). */
   gtasks: z.object({ refreshToken: z.string().min(1) }),
   jobs: z.object({ sources: z.array(z.object({ id: z.string().regex(/^(?!manual$)[a-z0-9][a-z0-9_-]{0,39}$/, 'lowercase id; "manual" is reserved'), url: outboundUrlSchema })).max(20).default([]) }),

@@ -66,8 +66,8 @@ export function todoistRoutes(ctx: AppContext, apiFactory: (ctx: AppContext) => 
     pendingStates.delete(state ?? '');
     if (!code || !pending || pending.exp < now() || pending.user !== (c.get('user') ?? null)) return c.redirect(failed('expired'));
     try {
-      const token = await exchangeTodoistCode(ctx.env, code, fetchImpl);
-      await setSourceConfig(ctx, 'todoist', { token });
+      const grant = await exchangeTodoistCode(ctx.env, code, fetchImpl);
+      await setSourceConfig(ctx, 'todoist', grant);
       await mergeSourceMeta(ctx, 'todoist', { connectedVia: 'oauth' });
       await ctx.db.update(sources).set({ enabled: true }).where(eq(sources.id, 'todoist'));
       await setSourceStatus(ctx, 'todoist', 'connected', { lastError: null });

@@ -1,5 +1,5 @@
 import type { CoreConfig } from '../config.js';
-import { NotConfiguredError } from '../ingest/types.js';
+import { NeedsAuthError, NotConfiguredError } from '../ingest/types.js';
 import { readText, withTimeout } from '../lib/http.js';
 
 /**
@@ -8,8 +8,9 @@ import { readText, withTimeout } from '../lib/http.js';
  * Todoist takes the redirect from that registration, so neither request below carries one.
  */
 export const TODOIST_AUTHORIZE_URL = 'https://todoist.com/oauth/authorize';
-export const TODOIST_TOKEN_URL = 'https://todoist.com/oauth/access_token';
-export const TODOIST_REVOKE_URL = 'https://api.todoist.com/sync/v9/access_tokens/revoke';
+/** Code exchange and refresh share one endpoint; `grant_type` tells them apart. */
+export const TODOIST_TOKEN_URL = 'https://api.todoist.com/oauth/access_token';
+export const TODOIST_REVOKE_URL = 'https://api.todoist.com/api/v1/access_tokens';
 /** `data:delete` is required: the push sync deletes the tasks it created when an assignment disappears at the source. */
 export const TODOIST_SCOPE = 'data:read_write,data:delete';
 
@@ -37,18 +38,28 @@ export function todoistAuthUrl(env: CoreConfig, state: string): string {
 
 const FORM = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' };
 
-/** Swaps the authorization code for a token. Todoist tokens do not expire; there is no refresh token. */
-export async function exchangeTodoistCode(env: CoreConfig, code: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+/** What a token answer leaves us holding. A legacy Todoist app (refresh tokens off) sends no refresh token and a token that does not expire. */
+export interface TodoistGrant {
+  token: string;
+  refreshToken?: string;
+  /** ISO time the access token stops working; only meaningful alongside `refreshToken`. */
+  expiresAt?: string;
+}
+
+/** Thrown when Todoist says the refresh token itself is dead (`invalid_grant`): the person has to connect again. */
+export class TodoistReauthError extends NeedsAuthError {}
+
+async function tokenRequest(env: CoreConfig, params: Record<string, string>, what: string, fetchImpl: typeof fetch, now: () => number): Promise<TodoistGrant> {
   const { id, secret } = credentials(env);
   const res = await fetchImpl(TODOIST_TOKEN_URL, {
     method: 'POST',
     headers: FORM,
-    body: new URLSearchParams({ client_id: id, client_secret: secret, code, redirect_uri: todoistRedirectUri(env) }),
+    body: new URLSearchParams({ client_id: id, client_secret: secret, ...params }),
     signal: withTimeout(undefined, REQUEST_TIMEOUT_MS),
     redirect: 'manual',
   });
   const text = await readText(res, 64 * 1024);
-  let parsed: { access_token?: unknown; error?: unknown } = {};
+  let parsed: { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown; error?: unknown } = {};
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch {
@@ -56,9 +67,29 @@ export async function exchangeTodoistCode(env: CoreConfig, code: string, fetchIm
   }
   if (!res.ok || typeof parsed.access_token !== 'string' || !parsed.access_token) {
     // Status and Todoist's error code only: the body could hold a token, so it never reaches a log or a URL.
-    throw new Error(`Todoist token exchange failed (${res.status}${typeof parsed.error === 'string' ? `: ${parsed.error}` : ''})`);
+    const code = typeof parsed.error === 'string' ? parsed.error : undefined;
+    if (what === 'refresh' && code === 'invalid_grant') throw new TodoistReauthError('Todoist no longer accepts the refresh token; connect Todoist again in Settings → Sources');
+    throw new Error(`Todoist token ${what} failed (${res.status}${code ? `: ${code}` : ''})`);
   }
-  return parsed.access_token;
+  const grant: TodoistGrant = { token: parsed.access_token };
+  if (typeof parsed.refresh_token === 'string' && parsed.refresh_token) grant.refreshToken = parsed.refresh_token;
+  // Legacy apps answer with a ten-year expires_in and no refresh token: nothing to renew with, so no expiry is kept.
+  if (grant.refreshToken && typeof parsed.expires_in === 'number' && parsed.expires_in > 0) grant.expiresAt = new Date(now() + parsed.expires_in * 1000).toISOString();
+  return grant;
+}
+
+/** Swaps the authorization code for a grant. Refresh-enabled apps get an hour-long access token plus a refresh token. */
+export function exchangeTodoistCode(env: CoreConfig, code: string, fetchImpl: typeof fetch = fetch, now: () => number = Date.now): Promise<TodoistGrant> {
+  return tokenRequest(env, { code, redirect_uri: todoistRedirectUri(env) }, 'exchange', fetchImpl, now);
+}
+
+/**
+ * Trades a refresh token for a new access token. Todoist rotates the refresh token on every use; a reuse inside a
+ * minute answers the same access token without a refresh token (keep the old one), a reuse after that revokes every
+ * token the person has for the app. Hence the one-at-a-time rule in core/src/ingest/todoist/token.ts.
+ */
+export function refreshTodoistToken(env: CoreConfig, refreshToken: string, fetchImpl: typeof fetch = fetch, now: () => number = Date.now): Promise<TodoistGrant> {
+  return tokenRequest(env, { grant_type: 'refresh_token', refresh_token: refreshToken }, 'refresh', fetchImpl, now);
 }
 
 /** Best effort. A failed revoke still disconnects locally; the token is then an orphan the user can revoke from Todoist. */
@@ -66,13 +97,10 @@ export async function revokeTodoistToken(env: CoreConfig, token: string, fetchIm
   if (!todoistOAuthConfigured(env)) return false;
   const { id, secret } = credentials(env);
   try {
-    const res = await fetchImpl(TODOIST_REVOKE_URL, {
-      method: 'POST',
-      headers: FORM,
-      body: new URLSearchParams({ client_id: id, client_secret: secret, access_token: token }),
-      signal: withTimeout(undefined, REQUEST_TIMEOUT_MS),
-      redirect: 'manual',
-    });
+    // The v1 revoke is a DELETE with the credentials as query parameters; that is Todoist's shape, not a choice.
+    const u = new URL(TODOIST_REVOKE_URL);
+    u.search = new URLSearchParams({ client_id: id, client_secret: secret, access_token: token }).toString();
+    const res = await fetchImpl(u, { method: 'DELETE', headers: { Accept: 'application/json' }, signal: withTimeout(undefined, REQUEST_TIMEOUT_MS), redirect: 'manual' });
     await readText(res, 16 * 1024).catch(() => '');
     return res.ok;
   } catch {
